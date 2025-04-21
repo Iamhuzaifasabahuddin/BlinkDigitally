@@ -56,7 +56,7 @@ def view_data():
         # else:
 
         st.title("UK")
-        if len(data_uk) >0:
+        if len(data_uk) > 0:
             st.dataframe(data_uk)
         else:
             st.write("No data available")
@@ -72,7 +72,7 @@ def view_data():
 
         st.title("USA")
 
-        if len(data_usa) >0:
+        if len(data_usa) > 0:
             st.dataframe(data_usa)
         else:
             st.write("No data available")
