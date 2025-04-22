@@ -30,7 +30,7 @@ current_month = datetime.today().month
 
 st.title("📊 Data Management Portal")
 
-action = st.selectbox("What would you like to do?", ["Select Action", "View Data", "Add Data", "Print Data"])
+action = st.selectbox("What would you like to do?", ["View Data", "Add Data", "Print Data"], index=None, placeholder="Select Action")
 
 country = None
 selected_month = None

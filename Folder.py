@@ -18,8 +18,8 @@ data_usa = pd.read_csv(url_usa)
 
 names_usa = list(set(data_usa["Name"].dropna().tolist()))
 names_uk = list(set(data_uk["Name"].dropna().tolist()))
-base_path_usa = r"C:\Users\Huzaifa Sabah Uddin\Publishing\USA\April"
-base_path_uk = r"C:\Users\Huzaifa Sabah Uddin\Publishing\UK\April"
+base_path_usa = r"C:\Users\Huzaifa Sabah Uddin\Publishing\USA"
+base_path_uk = r"C:\Users\Huzaifa Sabah Uddin\Publishing\UK"
 main_folders_usa = [name for name in os.listdir(base_path_usa)
                     if os.path.isdir(os.path.join(base_path_usa, name))]
 main_folders_uk = [name for name in os.listdir(base_path_uk)
