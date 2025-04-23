@@ -1,7 +1,5 @@
 import calendar
-import json
 import os
-import tempfile
 from datetime import datetime
 
 import pandas as pd
@@ -17,8 +15,7 @@ from googleapiclient.errors import HttpError
 load_dotenv("Info.env")
 
 # Google Sheet Info
-# SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-SPREADSHEET_ID = st.secrets("SPREADSHEET_ID")
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 
 sheet_usa = "USA"
 sheet_uk = "UK"
@@ -83,34 +80,40 @@ def count_rows(url) -> int:
 
 
 def Add_data(row: int, country: str, data: list, url):
+    creds = None
+    token_path = r'C:\Users\Huzaifa Sabah Uddin\PycharmProjects\BlinkDigitally\token.json'
+    credentials_path = r"C:\Users\Huzaifa Sabah Uddin\PycharmProjects\BlinkDigitally\Hexz.json"
+
+    if os.path.exists(token_path):
+        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(token_path, 'w') as token:
+            token.write(creds.to_json())
+
     try:
-        # Load credentials from secrets
-        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-
-        # Write credentials to a temporary file
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as tmp:
-            json.dump(creds_dict, tmp)
-            tmp_path = tmp.name
-
-        creds = Credentials.from_service_account_file(tmp_path, scopes=SCOPES)
-
-        # Build service and update the sheet
         service = build('sheets', 'v4', credentials=creds)
         sheet = service.spreadsheets()
 
         update_range = f"{country}!A{row}:P{row}"
         response = sheet.values().update(
-            spreadsheetId=st.secrets["SPREADSHEET_ID"],
+            spreadsheetId=SPREADSHEET_ID,
             range=update_range,
             valueInputOption="USER_ENTERED",
             body={"values": [data]}
         ).execute()
-
-        st.success("✅ Data successfully added to the sheet.")
+        st.success("Data successfully added to the sheet.")
         st.dataframe(load_data(url))
 
+
     except HttpError as err:
-        st.error(f"❌ An error occurred: {err}")
+        st.error(f"An error occurred: {err}")
+
 
 def Review_data(url: str, month: int, status: str):
     data = clean_data(url)
@@ -126,7 +129,7 @@ def Printing(url: str, month: int):
     end_col_index = columns.index("Fulfilled")
     data = data.iloc[:, :end_col_index + 1]
 
-    for col in ["Order Date", "Shipping Date"]:
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         data[col] = pd.to_datetime(data[col], errors="coerce")
     if month:
         data = data[data["Order Date"].dt.month == month]
