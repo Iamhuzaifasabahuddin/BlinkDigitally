@@ -133,6 +133,7 @@ def Printing(url: str, month: int):
         data[col] = pd.to_datetime(data[col], errors="coerce")
     if month:
         data = data[data["Order Date"].dt.month == month]
+    data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False))
 
     return data
 
@@ -217,4 +218,5 @@ elif action == "Reviews" and country and selected_month and status:
     st.dataframe(data if not data.empty else "No matching reviews found.")
 
 elif action == "Printing" and selected_month:
+    st.subheader(f"🔍 Printing Data for {selected_month})")
     st.dataframe(Printing(url_printing, selected_month_number))
