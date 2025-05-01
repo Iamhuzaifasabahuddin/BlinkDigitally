@@ -23,6 +23,7 @@ url_uk = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=o
 url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
 
 current_month = datetime.today().month
+# current_month = 4
 current_month_name = calendar.month_name[current_month]
 
 
@@ -40,7 +41,8 @@ def clean_data(url: str) -> pd.DataFrame:
 
 def load_data(url, name):
     data = clean_data(url)
-    data_original = data[data["Publishing Date"].dt.month == current_month]
+    # data_original = data[data["Publishing Date"].dt.month == current_month]
+    data_original = data
     data = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
@@ -53,9 +55,12 @@ def load_data(url, name):
     attained = len(
         data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)])
     total_reviews = len(data) + attained
-    total_percentage = (attained / total_reviews)
+    min_date = data["Publishing Date"].min()
+    max_date = data["Publishing Date"].max()
+    if total_reviews > 0:
+        total_percentage = (attained / total_reviews)
 
-    return data, total_percentage
+        return data, total_percentage, min_date, max_date
 
 
 name_usa = {
@@ -103,17 +108,22 @@ def send_dm(user_id, message):
 
 
 def send_df_as_text(name, url, email):
-    user_id = get_user_id_by_email(email)
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, percentage = load_data(url, name)
-
+    df, percentage, min_date, max_date = load_data(url, name)
+    min_month_name = min_date.strftime("%B")
+    max_month_name = max_date.strftime("%B")
     if df.empty:
         print(f"⚠️ No data for {name}")
         return
+
+    # Truncate book names if they're too long
+    if "Book Name & Link" in df.columns:
+        df["Book Name & Link"] = df["Book Name & Link"].apply(lambda x: x[:60] + "..." if len(x) > 60 else x)
 
     display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
     if all(col in df.columns for col in display_columns):
@@ -121,14 +131,28 @@ def send_df_as_text(name, url, email):
     else:
         display_df = df
 
-    # Create a message with summary
-    message = (
-        f"{general_message}\n\n"
-        f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {current_month_name} 📄\n\n"
-        f"*Summary:* {len(df)} pending reviews\n\n"
-        f"*Review Retention:* {percentage:.1%}\n\n"
-        f"```{display_df.to_markdown()}```"
-    )
+
+    if "Publishing Date" in display_df.columns:
+        display_df["Publishing Date"] = display_df["Publishing Date"].dt.strftime("%m-%B-%Y")
+
+    markdown_table = display_df.to_markdown(index=False)
+
+    if len(set([min_month_name, max_month_name])) > 1:
+        message = (
+            f"{general_message}\n\n"
+            f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} 📄\n\n"
+            f"*Summary:* {len(df)} pending reviews\n\n"
+            f"*Review Retention:* {percentage:.1%}\n\n"
+            f"```\n{markdown_table}\n```"
+        )
+    else:
+        message = (
+            f"{general_message}\n\n"
+            f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} 📄\n\n"
+            f"*Summary:* {len(df)} pending reviews\n\n"
+            f"*Review Retention:* {percentage:.1%}\n\n"
+            f"```\n{markdown_table}\n```"
+        )
 
     try:
         # Open a DM channel
@@ -316,9 +340,9 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    # for name, email in name_usa.items():
-    #     send_df_as_text(name, url_usa, email)
-    #
-    # for name, email in names_uk.items():
-    #     send_df_as_text(name, url_uk, email)
-    summary()
+    for name, email in name_usa.items():
+        send_df_as_text(name, url_usa, email)
+
+    for name, email in names_uk.items():
+        send_df_as_text(name, url_uk, email)
+    # summary()
