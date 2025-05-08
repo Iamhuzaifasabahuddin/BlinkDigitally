@@ -60,7 +60,7 @@ def load_data(url, name):
     if total_reviews > 0:
         total_percentage = (attained / total_reviews)
 
-        return data, total_percentage, min_date, max_date
+        return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
 name_usa = {
@@ -108,13 +108,13 @@ def send_dm(user_id, message):
 
 
 def send_df_as_text(name, url, email):
-    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    user_id = get_user_id_by_email(email)
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, percentage, min_date, max_date = load_data(url, name)
+    df, percentage, min_date, max_date, attained, total_reviews= load_data(url, name)
     min_month_name = min_date.strftime("%B")
     max_month_name = max_date.strftime("%B")
     if df.empty:
@@ -150,7 +150,7 @@ def send_df_as_text(name, url, email):
             f"{general_message}\n\n"
             f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} 📄\n\n"
             f"*Summary:* {len(df)} pending reviews\n\n"
-            f"*Review Retention:* {percentage:.1%}\n\n"
+            f"*Review Retention:* {attained} out of {total_reviews} ({percentage:.1%})\n\n"
             f"```\n{markdown_table}\n```"
         )
 
