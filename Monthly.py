@@ -14,11 +14,13 @@ sheet_usa = "USA"
 sheet_uk = "UK"
 url_usa = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_usa}"
 url_uk = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_uk}"
+url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
 base_path_uk = r"C:\Users\Huzaifa Sabah Uddin\Monthly\UK"
 base_path_usa = r"C:\Users\Huzaifa Sabah Uddin\Monthly\USA"
+base_path_printing = r"C:\Users\Huzaifa Sabah Uddin\Monthly\Printing"
 
-current_month = datetime.today().month
-# current_month = 4
+# current_month = datetime.today().month
+current_month = 4
 current_month_name = calendar.month_name[current_month]
 
 
@@ -39,6 +41,24 @@ def load_data(url):
     data.index = range(1, len(data) + 1)
 
     data["Publishing Date"] = data["Publishing Date"].dt.strftime("%m-%B-%Y")
+
+    return data
+
+def printing():
+    data = pd.read_csv(url_printing)
+    columns = list(data.columns)
+    end_col_index = columns.index("Fulfilled")
+    data = data.iloc[:, :end_col_index + 1]
+
+    data["Order Date"] = pd.to_datetime(data["Order Date"], errors='coerce')
+
+    data = data[data["Order Date"].dt.month == current_month]
+    data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False))
+
+    data = data.sort_values(by=["Order Date"], ascending=True)
+    data.index = range(1, len(data) + 1)
+
+    data["Order Date"] = data["Order Date"].dt.strftime("%m-%B-%Y")
 
     return data
 
@@ -72,6 +92,13 @@ def generate_monthly():
 
     move_file_safely(uk_filename, base_path_uk)
     move_file_safely(usa_filename, base_path_usa)
+
+    data_printing = printing()
+    printing_filename = f"{current_month_name} PRINTING.xlsx"
+
+    data_printing.to_excel(printing_filename, index=False)
+    os.makedirs(base_path_printing, exist_ok=True)
+    move_file_safely(printing_filename, base_path_printing)
 
 
 if __name__ == '__main__':

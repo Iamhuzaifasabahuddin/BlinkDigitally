@@ -21,10 +21,12 @@ sheet_uk = "UK"
 url_usa = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_usa}"
 url_uk = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_uk}"
 url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
+url_copyright = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Copyright"
 
 current_month = datetime.today().month
 # current_month = 4
 current_month_name = calendar.month_name[current_month]
+current_year = datetime.today().year
 
 
 def clean_data(url: str) -> pd.DataFrame:
@@ -41,8 +43,8 @@ def clean_data(url: str) -> pd.DataFrame:
 
 def load_data(url, name):
     data = clean_data(url)
-    # data_original = data[data["Publishing Date"].dt.month == current_month]
-    data_original = data
+    data_original = data[(data["Publishing Date"].dt.month == current_month) & (data["Publishing Date"].dt.year == current_year)]
+    # data_original = data
     data = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
@@ -80,7 +82,7 @@ names_uk = {
 }
 
 general_message = """Hiya
-:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as pending & for those marked as Sent please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
+:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
 BM: https://bookmarketeers.com/
 WC: https://writersclique.com/
 AS: https://authorssolution.co.uk/"""
@@ -114,7 +116,7 @@ def send_df_as_text(name, url, email):
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, percentage, min_date, max_date, attained, total_reviews= load_data(url, name)
+    df, percentage, min_date, max_date, attained, total_reviews = load_data(url, name)
     min_month_name = min_date.strftime("%B")
     max_month_name = max_date.strftime("%B")
     if df.empty:
@@ -131,7 +133,6 @@ def send_df_as_text(name, url, email):
     else:
         display_df = df
 
-
     if "Publishing Date" in display_df.columns:
         display_df["Publishing Date"] = display_df["Publishing Date"].dt.strftime("%m-%B-%Y")
 
@@ -140,7 +141,7 @@ def send_df_as_text(name, url, email):
     if len(set([min_month_name, max_month_name])) > 1:
         message = (
             f"{general_message}\n\n"
-            f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} 📄\n\n"
+            f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year}📄\n\n"
             f"*Summary:* {len(df)} pending reviews\n\n"
             f"*Review Retention:* {percentage:.1%}\n\n"
             f"```\n{markdown_table}\n```"
@@ -148,7 +149,7 @@ def send_df_as_text(name, url, email):
     else:
         message = (
             f"{general_message}\n\n"
-            f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} 📄\n\n"
+            f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year}📄\n\n"
             f"*Summary:* {len(df)} pending reviews\n\n"
             f"*Review Retention:* {attained} out of {total_reviews} ({percentage:.1%})\n\n"
             f"```\n{markdown_table}\n```"
@@ -181,8 +182,25 @@ def printing():
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data = data[data["Order Date"].dt.month == current_month]
+    data = data[(data["Order Date"].dt.month == current_month) & (data["Order Date"].dt.year == current_year)]
     data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False))
+
+    return data
+
+
+def Copyright():
+    data = pd.read_csv(url_copyright)
+    columns = list(data.columns)
+    end_col_index = columns.index("Type")
+    data = data.iloc[:, :end_col_index + 1]
+
+    data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+    data = data[(data["Submission Date"].dt.month == current_month) & (data["Submission Date"].dt.year == current_year)]
+
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+    data.index = range(1, len(data) + 1)
+
+    data["Submission Date"] = data["Submission Date"].dt.strftime("%m-%B-%Y")
 
     return data
 
@@ -193,8 +211,17 @@ def summary():
 
     user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
 
-    usa_clean = usa_clean[usa_clean["Publishing Date"].dt.month == current_month]
-    uk_clean = uk_clean[uk_clean["Publishing Date"].dt.month == current_month]
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.month == current_month) & (usa_clean["Publishing Date"].dt.year == current_year)]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.month == current_month ) & (uk_clean["Publishing Date"].dt.year == current_year)]
+
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+    if usa_clean.empty or uk_clean.empty:
+        return
 
     usa_review = usa_clean["Trustpilot Review"].value_counts()
     uk_review = uk_clean["Trustpilot Review"].value_counts()
@@ -225,6 +252,12 @@ def summary():
     Lowest_copies = printing_data["No of Copies"].min()
     printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
     Average = Total_cost / Total_copies
+
+    copyright_ = Copyright()
+    copyright_data = copyright_
+    Total_copyrights = len(copyright_data)
+    Total_cost_copyright = Total_copyrights * 65
+
     message = f"""
 *{current_month_name} Trustpilot Reviews & Printing Summary*
 
@@ -244,12 +277,16 @@ def summary():
 
 *Printing Stats:*
 • Total Copies: {Total_copies}
-• Total Cost: ${Total_cost}
+• Total Cost: ${Total_cost:.2f}
 • Highest Copies: {Highest_copies}
-• Highest Cost: ${Highest_cost}
+• Highest Cost: ${Highest_cost:.2f}
 • Lowest Copies: {Lowest_copies}
-• Lowest Cost: ${Lowest_cost}
-• Average Cost: ${Average} per copy
+• Lowest Cost: ${Lowest_cost:.2f}
+• Average Cost: ${Average:.2f} per copy
+
+*Copyright Stats:*
+• Total Copyrights: {Total_copyrights}
+• Total Cost:${Total_cost_copyright}
     """
 
     try:
