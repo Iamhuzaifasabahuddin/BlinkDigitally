@@ -140,6 +140,7 @@ def Printing(url: str, month: int):
         data = data[data["Order Date"].dt.month == month]
     data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False))
     data.index = range(1, len(data) + 1)
+
     return data
 
 
@@ -222,20 +223,32 @@ elif action == "Print Data" and country and selected_month:
     st.subheader(f"🖰 Print Data for {country} - {selected_month}")
     url = url_uk if country == "UK" else url_usa
     data = load_data(url, selected_month_number)
-
+    for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime(
+            "%d-%B-%Y")
     if not data.empty:
-        csv = data.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Download CSV", data=csv, file_name=f"{country}_{selected_month}.csv", mime="text/csv")
+        # csv = data.to_csv(index=False).encode("utf-8")
+        # st.download_button("📥 Download CSV", data=csv, file_name=f"{country}_{selected_month}.csv", mime="text/csv")
         st.dataframe(data)
     else:
-        st.warning("No data available to print.")
+        st.warning(f"No data available for {selected_month} for {country}")
 
 elif action == "Reviews" and country and selected_month and status:
     url = url_uk if country == "UK" else url_usa
     data = Review_data(url, selected_month_number, status)
+    for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime(
+                "%d-%B-%Y")
     st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
     st.dataframe(data if not data.empty else "No matching reviews found.")
 
 elif action == "Printing" and selected_month:
     st.subheader(f"🔍 Printing Data for {selected_month})")
-    st.dataframe(Printing(url_printing, selected_month_number))
+    data = Printing(url_printing, selected_month_number)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime(
+            "%d-%B-%Y")
+    if not data.empty:
+        st.dataframe(data)
+    else:
+        st.warning(f"No Data Available for Printing for {selected_month}")
