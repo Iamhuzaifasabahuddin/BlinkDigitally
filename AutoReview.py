@@ -20,6 +20,7 @@ sheet_usa = "USA"
 sheet_uk = "UK"
 url_usa = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_usa}"
 url_uk = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_uk}"
+url_Audio = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=AudioBook"
 url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
 url_copyright = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Copyright"
 
@@ -43,8 +44,8 @@ def clean_data(url: str) -> pd.DataFrame:
 
 def load_data(url, name):
     data = clean_data(url)
-    data_original = data[(data["Publishing Date"].dt.month == current_month) & (data["Publishing Date"].dt.year == current_year)]
-    # data_original = data
+    # data_original = data[(data["Publishing Date"].dt.month == current_month) & (data["Publishing Date"].dt.year == current_year)]
+    data_original = data
     data = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
@@ -53,7 +54,7 @@ def load_data(url, name):
         ]
     data = data.sort_values(by=["Publishing Date"], ascending=True)
     data.index = range(1, len(data) + 1)
-
+    total_percentage = 0
     attained = len(
         data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)])
     total_reviews = len(data) + attained
@@ -62,7 +63,32 @@ def load_data(url, name):
     if total_reviews > 0:
         total_percentage = (attained / total_reviews)
 
-        return data, total_percentage, min_date, max_date, attained, total_reviews
+    return data, total_percentage, min_date, max_date, attained, total_reviews
+
+
+def load_data_audio(name):
+    data = clean_data(url_Audio)
+    data_original = data
+    # data_original = data[
+    #     (data["Publishing Date"].dt.month == current_month) & (data["Publishing Date"].dt.year == current_year)]
+    data = data_original[
+        (data_original["Project Manager"] == name) &
+        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
+        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
+        (data_original["Status"] == "Published")
+        ]
+    data = data.sort_values(by=["Publishing Date"], ascending=True)
+    data.index = range(1, len(data) + 1)
+    total_percentage = 0
+    attained = len(
+        data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)])
+    total_reviews = len(data) + attained
+    min_date = data["Publishing Date"].min()
+    max_date = data["Publishing Date"].max()
+    if total_reviews > 0:
+        total_percentage = (attained / total_reviews)
+
+    return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
 name_usa = {
@@ -117,50 +143,59 @@ def send_df_as_text(name, url, email):
         return
 
     df, percentage, min_date, max_date, attained, total_reviews = load_data(url, name)
-    min_month_name = min_date.strftime("%B")
-    max_month_name = max_date.strftime("%B")
-    if df.empty:
+    df_audio, percentage_audio, min_date_audio, max_date_audio, attained_audio, total_reviews_audio = load_data_audio(
+        name)
+
+    if df.empty and df_audio.empty:
         print(f"⚠️ No data for {name}")
         return
 
-    # Truncate book names if they're too long
-    if "Book Name & Link" in df.columns:
-        df["Book Name & Link"] = df["Book Name & Link"].apply(lambda x: x[:60] + "..." if len(x) > 60 else x)
+    min_month_name = min(min_date, min_date_audio).strftime("%B")
+    max_month_name = max(max_date, max_date_audio).strftime("%B")
+
+    def truncate_title(x):
+        return x[:60] + "..." if isinstance(x, str) and len(x) > 60 else x
+
+    for dframe in [df, df_audio]:
+        if "Book Name & Link" in dframe.columns:
+            dframe["Book Name & Link"] = dframe["Book Name & Link"].apply(truncate_title)
 
     display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    if all(col in df.columns for col in display_columns):
-        display_df = df[display_columns]
-    else:
-        display_df = df
+    display_df = df[display_columns] if all(col in df.columns for col in display_columns) else df
+    display_df_audio = df_audio[display_columns] if all(
+        col in df_audio.columns for col in display_columns) else df_audio
 
-    if "Publishing Date" in display_df.columns:
-        display_df["Publishing Date"] = display_df["Publishing Date"].dt.strftime("%m-%B-%Y")
+    for dframe in [display_df, display_df_audio]:
+        if "Publishing Date" in dframe.columns:
+            dframe["Publishing Date"] = pd.to_datetime(dframe["Publishing Date"], errors='coerce').dt.strftime(
+                "%d-%B-%Y")
 
-    markdown_table = display_df.to_markdown(index=False)
+    merged_df = pd.concat([display_df, display_df_audio], ignore_index=True)
+
+    markdown_table = merged_df.to_markdown(index=False)
 
     if len(set([min_month_name, max_month_name])) > 1:
         message = (
             f"{general_message}\n\n"
-            f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year}📄\n\n"
-            f"*Summary:* {len(df)} pending reviews\n\n"
-            f"*Review Retention:* {percentage:.1%}\n\n"
+            f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
+            f"*Summary:* {len(merged_df)} pending reviews\n\n"
+            f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
+            f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
             f"```\n{markdown_table}\n```"
         )
     else:
         message = (
             f"{general_message}\n\n"
-            f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year}📄\n\n"
-            f"*Summary:* {len(df)} pending reviews\n\n"
-            f"*Review Retention:* {attained} out of {total_reviews} ({percentage:.1%})\n\n"
+            f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
+            f"*Summary:* {len(merged_df)} pending reviews\n\n"
+            f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
+            f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
             f"```\n{markdown_table}\n```"
         )
-
     try:
-        # Open a DM channel
         conversation = client.conversations_open(users=user_id)
         channel_id = conversation['channel']['id']
 
-        # Send the formatted text message
         response = client.chat_postMessage(
             channel=channel_id,
             text=message,
@@ -200,9 +235,10 @@ def Copyright():
     data = data.sort_values(by=["Submission Date"], ascending=True)
     data.index = range(1, len(data) + 1)
 
-    data["Submission Date"] = data["Submission Date"].dt.strftime("%m-%B-%Y")
+    result_count = len(data[data["Result"] == "Yes"])
+    data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
-    return data
+    return data, result_count
 
 
 def summary():
@@ -212,9 +248,10 @@ def summary():
     user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
 
     usa_clean = usa_clean[
-        (usa_clean["Publishing Date"].dt.month == current_month) & (usa_clean["Publishing Date"].dt.year == current_year)]
+        (usa_clean["Publishing Date"].dt.month == current_month) & (
+                usa_clean["Publishing Date"].dt.year == current_year)]
     uk_clean = uk_clean[
-        (uk_clean["Publishing Date"].dt.month == current_month ) & (uk_clean["Publishing Date"].dt.year == current_year)]
+        (uk_clean["Publishing Date"].dt.month == current_month) & (uk_clean["Publishing Date"].dt.year == current_year)]
 
     if usa_clean.empty:
         print("No values found in USA sheet.")
@@ -253,7 +290,7 @@ def summary():
     printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
     Average = Total_cost / Total_copies
 
-    copyright_ = Copyright()
+    copyright_, result_count = Copyright()
     copyright_data = copyright_
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
@@ -287,7 +324,8 @@ def summary():
 *Copyright Stats:*
 • Total Copyrights: {Total_copyrights}
 • Total Cost:${Total_cost_copyright}
-    """
+• Total Successful:{result_count} / {Total_copyrights}
+"""
 
     try:
         conversation = client.conversations_open(users=user_id)
@@ -379,7 +417,7 @@ def logging_function() -> None:
 if __name__ == '__main__':
     for name, email in name_usa.items():
         send_df_as_text(name, url_usa, email)
-
-    for name, email in names_uk.items():
-        send_df_as_text(name, url_uk, email)
+    #
+    # for name, email in names_uk.items():
+    #     send_df_as_text(name, url_uk, email)
     # summary()
