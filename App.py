@@ -24,6 +24,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 # Sheet URLs
 url_usa = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_usa}"
 url_uk = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_uk}"
+url_Audio = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=AudioBook"
 url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
 
 month_list = list(calendar.month_name)[1:]
@@ -37,9 +38,13 @@ country = None
 selected_month = None
 selected_month_number = None
 status = None
+choice = None
 
-if action in ["View Data", "Add Data", "Print Data", "Reviews"]:
+if action in ["Add Data", "Print Data", "Reviews"]:
     country = st.selectbox("Select Country", ["UK", "USA"], index=None, placeholder="Select Country")
+
+if action == "View Data":
+    choice = st.selectbox("Select Data To View", ["UK", "USA", "AudioBook"], index=None, placeholder="Select Data to View")
 
 if action in ["View Data", "Print Data", "Reviews", "Printing"]:
     selected_month = st.selectbox(
@@ -70,7 +75,7 @@ def load_data(url, month_number=None):
     data = clean_data(url)
     if month_number:
         data = data[data["Publishing Date"].dt.month == month_number]
-
+    data.index = range(1, len(data) + 1)
     return data
 
 
@@ -120,7 +125,7 @@ def Review_data(url: str, month: int, status: str):
     if month and status:
         data = data[data["Publishing Date"].dt.month == month]
         data = data[data["Trustpilot Review"] == status]
-
+    data.index = range(1, len(data) + 1)
     return data
 
 def Printing(url: str, month: int):
@@ -134,16 +139,30 @@ def Printing(url: str, month: int):
     if month:
         data = data[data["Order Date"].dt.month == month]
     data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False))
-
+    data.index = range(1, len(data) + 1)
     return data
 
 
 
-if action == "View Data" and country and selected_month:
-    st.subheader(f"📂 Viewing Data for {country} - {selected_month}")
-    url = url_uk if country == "UK" else url_usa
+if action == "View Data" and choice and selected_month:
+    st.subheader(f"📂 Viewing Data for {choice} - {selected_month}")
+    url = None
+    if choice == "UK":
+        url = url_uk
+    elif choice == "AudioBook":
+        url = url_Audio
+    else:
+        url = url_usa
+
     data = load_data(url, selected_month_number)
-    st.dataframe(data if not data.empty else "No data available.")
+
+    for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime(
+                "%d-%B-%Y")
+    if data.empty:
+        st.info(f"No data available for {selected_month} for {choice}")
+    else:
+        st.dataframe(data)
 
 elif action == "Add Data" and country:
     st.subheader(f"➕ Add Data for {country}")
