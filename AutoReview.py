@@ -171,41 +171,41 @@ def send_df_as_text(name, url, email):
                 "%d-%B-%Y")
 
     merged_df = pd.concat([display_df, display_df_audio], ignore_index=True)
+    if not merged_df.empty:
+        markdown_table = merged_df.to_markdown(index=False)
 
-    markdown_table = merged_df.to_markdown(index=False)
+        if len(set([min_month_name, max_month_name])) > 1:
+            message = (
+                f"{general_message}\n\n"
+                f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
+                f"*Summary:* {len(merged_df)} pending reviews\n\n"
+                f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
+                f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
+                f"```\n{markdown_table}\n```"
+            )
+        else:
+            message = (
+                f"{general_message}\n\n"
+                f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
+                f"*Summary:* {len(merged_df)} pending reviews\n\n"
+                f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
+                f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
+                f"```\n{markdown_table}\n```"
+            )
+        try:
+            conversation = client.conversations_open(users=user_id)
+            channel_id = conversation['channel']['id']
 
-    if len(set([min_month_name, max_month_name])) > 1:
-        message = (
-            f"{general_message}\n\n"
-            f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
-            f"*Summary:* {len(merged_df)} pending reviews\n\n"
-            f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-            f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
-            f"```\n{markdown_table}\n```"
-        )
-    else:
-        message = (
-            f"{general_message}\n\n"
-            f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
-            f"*Summary:* {len(merged_df)} pending reviews\n\n"
-            f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-            f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
-            f"```\n{markdown_table}\n```"
-        )
-    try:
-        conversation = client.conversations_open(users=user_id)
-        channel_id = conversation['channel']['id']
-
-        response = client.chat_postMessage(
-            channel=channel_id,
-            text=message,
-            mrkdwn=True
-        )
-        send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"), f"✅ Review sent to {name}")
-    except SlackApiError as e:
-        print(f"❌ Error sending message to {name}: {e.response['error']}")
-        print(f"Detailed error: {str(e)}")
-        logging.error(e)
+            response = client.chat_postMessage(
+                channel=channel_id,
+                text=message,
+                mrkdwn=True
+            )
+            send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"), f"✅ Review sent to {name}")
+        except SlackApiError as e:
+            print(f"❌ Error sending message to {name}: {e.response['error']}")
+            print(f"Detailed error: {str(e)}")
+            logging.error(e)
 
 
 def printing():
