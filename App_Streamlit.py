@@ -4,16 +4,13 @@ import streamlit as st
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# Create connection to Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Sheets to access
 sheet_usa = "USA"
 sheet_uk = "UK"
 sheet_audio = "AudioBook"
 sheet_printing = "Printing"
 
-# Setup UI basics
 month_list = list(calendar.month_name)[1:]
 current_month = datetime.today().month
 st.title("📊 Data Management Portal")
@@ -58,13 +55,11 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     if data.empty:
         return pd.DataFrame()
 
-    # Find columns up to "Issues" if it exists
     columns = list(data.columns)
     if "Issues" in columns:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
 
-    # Convert date columns
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
@@ -127,7 +122,10 @@ def get_printing_data(month):
 
         if month and "Order Date" in data.columns:
             data = data[data["Order Date"].dt.month == month]
+
         if "Order Cost" in data.columns:
+            data["Order Cost"] = data["Order Cost"].astype(str)
+
             data["Order Cost"] = pd.to_numeric(data["Order Cost"].str.replace("$", "", regex=False), errors="coerce")
 
         data.index = range(1, len(data) + 1)
