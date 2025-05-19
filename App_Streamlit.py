@@ -51,6 +51,7 @@ def load_data(sheet_name, month_number=None):
             data = data[data["Publishing Date"].dt.month == month_number]
 
         data.index = range(1, len(data) + 1)
+
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -98,12 +99,15 @@ def get_printing_data(month):
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
             data["Order Cost"] = pd.to_numeric(data["Order Cost"].str.replace("$", "", regex=False), errors="coerce")
-
         data.index = range(1, len(data) + 1)
         return data
     except Exception as e:
         st.error(f"Error loading printing data: {e}")
         return pd.DataFrame()
+
+def format_review_counts(review_counts):
+    """Format review counts as a string"""
+    return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
 
 
 with st.container():
@@ -165,8 +169,25 @@ with st.container():
                 if data.empty:
                     st.info(f"No data available for {selected_month} for {choice}")
                 else:
+                    st.markdown("### 📄 Detailed Entry Data")
                     st.dataframe(data)
 
+                    st.markdown("### ⭐ Trustpilot Review Summary")
+                    reviews = data["Trustpilot Review"].value_counts()
+                    total_reviews = reviews.sum()
+                    attained = reviews.get("Attained", 0)
+                    percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
+
+                    st.markdown(f"""
+                                - 🧾 **Total Entries:** `{len(data)}`
+                                - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
+                                - 🟢 **'Attained' Reviews:** `{attained}`
+                                - 📊 **Attainment Rate:** `{percentage}%`
+                                """)
+
+                    st.markdown("#### 🔍 Review Type Breakdown")
+                    for review_type, count in reviews.items():
+                        st.markdown(f"- 📝 **{review_type}**: `{count}`")
         elif action == "Add Data" and country:
             st.subheader(f"➕ Add Data for {country}")
             sheet_name = sheet_uk if country == "UK" else sheet_usa
@@ -268,19 +289,68 @@ with st.container():
                 st.dataframe(data)
             else:
                 st.info("No matching reviews found.")
-
         elif action == "Printing" and selected_month:
-            st.subheader(f"🔍 Printing Data for {selected_month}")
+
+            st.subheader(f"🖨️ Printing Summary for {selected_month}")
+
             data = get_printing_data(selected_month_number)
 
-            for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-                if col in data.columns:
-                    data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-
             if not data.empty:
+
+                # Calculations
+
+                Total_copies = data["No of Copies"].sum()
+
+                Total_cost = data["Order Cost"].sum()
+
+                Highest_cost = data["Order Cost"].max()
+
+                Highest_copies = data["No of Copies"].max()
+
+                Lowest_cost = data["Order Cost"].min()
+
+                Lowest_copies = data["No of Copies"].min()
+
+                data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
+
+                Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
+
+
+                for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+
+                    if col in data.columns:
+                        data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+                st.markdown("### 📄 Detailed Printing Data")
+
                 st.dataframe(data)
+
+                st.markdown("### 📊 Summary Statistics")
+
+                st.markdown(f"""
+    
+                   - 🧾 **Total Orders:** {len(data)}
+    
+                   - 📦 **Total Copies Printed:** `{Total_copies}`
+    
+                   - 💰 **Total Cost:** `${Total_cost:,.2f}`
+    
+                   - 📈 **Highest Order Cost:** `${Highest_cost:,.2f}`
+    
+                   - 📉 **Lowest Order Cost:** `${Lowest_cost:,.2f}`
+    
+                   - 🔢 **Highest Copies in One Order:** `{Highest_copies}`
+    
+                   - 🧮 **Lowest Copies in One Order:** `{Lowest_copies}`
+    
+                   - 🧾 **Average Cost per Copy:** `${Average:,.2f}`
+    
+                   """)
+
             else:
-                st.warning(f"No Data Available for Printing for {selected_month}")
+
+                st.warning(f"⚠️ No Data Available for Printing in {selected_month}")
+
     elif admin_password.strip() == "" or admin_sid.strip() == "":
         st.warning("Id/Password cannot be empty")
     elif admin_password != pwd:
