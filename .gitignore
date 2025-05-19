@@ -1,2 +1,4 @@
 *.env
 Test.py
+.streamlit/secrets.toml
+*.json
