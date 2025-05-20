@@ -321,7 +321,7 @@ def get_printing_data_reviews():
     return data
 
 
-def get_copyright_data():
+def get_copyright_data(month):
     """Get copyright data for the current month"""
     data = conn.read(worksheet=sheet_copyright)
 
@@ -334,7 +334,7 @@ def get_copyright_data():
     if "Submission Date" in data.columns:
         data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
         data = data[
-            (data["Submission Date"].dt.month == current_month) & (data["Submission Date"].dt.year == current_year)]
+            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == current_year)]
 
     data = data.sort_values(by=["Submission Date"], ascending=True)
     data.index = range(1, len(data) + 1)
@@ -407,7 +407,7 @@ def summary(month):
     if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
         printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
 
-    copyright_data, result_count = get_copyright_data()
+    copyright_data, result_count = get_copyright_data(month)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
 
@@ -526,7 +526,7 @@ def format_review_counts_reviews(review_counts):
 with st.container():
     st.title("📊 Data Management Portal")
     action = st.selectbox("What would you like to do?",
-                          ["View Data", "Generate Review & Summary", "Print Data", "Reviews", "Printing"],
+                          ["View Data", "Generate Review & Summary", "Reviews", "Printing", "Copyright"],
                           index=None,
                           placeholder="Select Action")
 
@@ -536,14 +536,11 @@ with st.container():
     status = None
     choice = None
 
-    if action in ["Print Data", "Reviews"]:
-        country = st.selectbox("Select Country", ["UK", "USA"], index=None, placeholder="Select Country")
-
-    if action == "View Data":
+    if action in ["View Data", "Reviews"]:
         choice = st.selectbox("Select Data To View", ["UK", "USA", "AudioBook"], index=None,
                               placeholder="Select Data to View")
 
-    if action in ["View Data", "Print Data", "Reviews", "Printing"]:
+    if action in ["View Data", "Reviews", "Printing", "Copyright"]:
         selected_month = st.selectbox(
             "Select Month",
             month_list,
@@ -581,6 +578,8 @@ with st.container():
                 percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
                 col1, col2 = st.columns(2)
                 with col1:
+
+                    st.markdown("---")
                     st.markdown("### ⭐ Trustpilot Review Summary")
                     st.markdown(f"""
                                 - 🧾 **Total Entries:** `{len(data)}`
@@ -589,9 +588,13 @@ with st.container():
                                 - 📊 **Attainment Rate:** `{percentage}%`
                                 """)
                 with col2:
+                    st.markdown("---")
+
                     st.markdown("#### 🔍 Review Type Breakdown")
                     for review_type, count in reviews.items():
                         st.markdown(f"- 📝 **{review_type}**: `{count}`")
+            st.markdown("---")
+
     elif action == "Generate Review & Summary":
 
         tab1, tab2 = st.tabs(["Send Reviews", "Summary"])
@@ -685,20 +688,24 @@ with st.container():
         else:
             st.warning(f"No data available for {selected_month} for {country}")
 
-    elif action == "Reviews" and country and selected_month and status:
-        sheet_name = sheet_uk if country == "UK" else sheet_usa
-        data = review_data(sheet_name, selected_month_number, status)
+    elif action == "Reviews" and choice and selected_month and status:
+        sheet_name = {
+            "UK": sheet_uk,
+            "USA": sheet_usa,
+            "AudioBook": sheet_audio
+        }.get(choice)
+        if sheet_name:
+            data = review_data(sheet_name, selected_month_number, status)
 
-        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-            if col in data.columns:
-                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+            for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+                if col in data.columns:
+                    data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
-        st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
-
-        if not data.empty:
-            st.dataframe(data)
-        else:
-            st.info("No matching reviews found.")
+            st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
+            if not data.empty:
+                st.dataframe(data)
+            else:
+                st.info("No matching reviews found.")
     elif action == "Printing" and selected_month:
 
         st.subheader(f"🖨️ Printing Summary for {selected_month}")
@@ -731,6 +738,7 @@ with st.container():
             st.markdown("### 📄 Detailed Printing Data")
 
             st.dataframe(data)
+            st.markdown("---")
 
             st.markdown("### 📊 Summary Statistics")
 
@@ -753,7 +761,29 @@ with st.container():
                - 🧾 **Average Cost per Copy:** `${Average:,.2f}`
 
                """)
+            st.markdown("---")
 
         else:
 
             st.warning(f"⚠️ No Data Available for Printing in {selected_month}")
+    elif action == "Copyright" and selected_month:
+        st.subheader(f"🖨️ Copyright Summary for {selected_month}")
+
+        data, result = get_copyright_data(selected_month_number)
+
+        if not data.empty:
+            st.dataframe(data)
+
+            total_copyrights = len(data)
+            total_cost_copyright = total_copyrights * 65
+            st.markdown("---")
+            st.markdown(f"""
+            ### 📊 Summary Stats
+
+            - 🧾 **Total Copyrighted Titles:** `{total_copyrights}`
+            - 💵 **Copyright Total Cost:** `${total_cost_copyright}`
+            - ✅ **Total Approved:** `{result} / {total_copyrights}`
+            """)
+            st.markdown("---")
+        else:
+            st.warning(f"⚠️ No Data Available for Copyright in {selected_month}")
