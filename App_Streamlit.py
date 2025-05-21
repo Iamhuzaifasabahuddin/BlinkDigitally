@@ -299,9 +299,9 @@ def send_df_as_text(name, sheet_name, email):
             logging.error(e)
 
 
-def get_printing_data_reviews():
+def get_printing_data_reviews(month, year):
     """Get printing data for the current month"""
-    data = conn.read(worksheet=sheet_printing)
+    data = conn.read(worksheet=sheet_printing, ttl=0)
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
@@ -312,7 +312,7 @@ def get_printing_data_reviews():
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data = data[(data["Order Date"].dt.month == current_month) & (data["Order Date"].dt.year == current_year)]
+    data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
 
     if "Order Cost" in data.columns:
         data["Order Cost"] = data["Order Cost"].astype(str)
@@ -321,9 +321,9 @@ def get_printing_data_reviews():
     return data
 
 
-def get_copyright_data(month):
+def get_copyright_data(month, year):
     """Get copyright data for the current month"""
-    data = conn.read(worksheet=sheet_copyright)
+    data = conn.read(worksheet=sheet_copyright, ttl=0)
 
     # Filter and process columns
     columns = list(data.columns)
@@ -334,7 +334,7 @@ def get_copyright_data(month):
     if "Submission Date" in data.columns:
         data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
         data = data[
-            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == current_year)]
+            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == year)]
 
     data = data.sort_values(by=["Submission Date"], ascending=True)
     data.index = range(1, len(data) + 1)
@@ -347,7 +347,169 @@ def get_copyright_data(month):
     return data, result_count
 
 
-def summary(month):
+def copyright_all(year):
+    data = conn.read(worksheet=sheet_copyright, ttl=0)
+
+    # Filter and process columns
+    columns = list(data.columns)
+    if "Type" in columns:
+        end_col_index = columns.index("Type")
+        data = data.iloc[:, :end_col_index + 1]
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year == year)]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+    data.index = range(1, len(data) + 1)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    return data, result_count
+
+
+def printing_data_all(year):
+    data = conn.read(worksheet=sheet_printing, ttl=0)
+
+    columns = list(data.columns)
+    if "Fulfilled" in columns:
+        end_col_index = columns.index("Fulfilled")
+        data = data.iloc[:, :end_col_index + 1]
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data[(data["Order Date"].dt.year == year)]
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+
+    return data
+
+
+def generate_year_summary(year):
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.year == year)
+    ]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.year == year)
+    ]
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+        return False
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+        return False
+    if usa_clean.empty and uk_clean.empty:
+        return False
+
+    usa_review = usa_clean[
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+
+    usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
+    uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
+
+    usa_total = usa_review.sum() if not usa_review.empty else 0
+    uk_total = uk_review.sum() if not uk_review.empty else 0
+
+    usa_attained = usa_review.get('Attained', 0)
+    uk_attained = uk_review.get('Attained', 0)
+
+    usa_attained_pct = (usa_attained / usa_total * 100).round(1) if usa_total > 0 else 0
+    uk_attained_pct = (uk_attained / uk_total * 100).round(1) if uk_total > 0 else 0
+
+    combined_total = usa_total + uk_total
+    combined_attained = usa_attained + uk_attained
+    combined_attained_pct = (combined_attained / combined_total * 100).round(1) if combined_total > 0 else 0
+
+    printing_data = printing_data_all(year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
+
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count = copyright_all(year)
+    Total_copyrights = len(copyright_data)
+    Total_cost_copyright = Total_copyrights * 65
+
+    message = f"""
+    *{current_year} Trustpilot Reviews & Printing Summary*
+
+    *USA Reviews:*
+    • Total Reviews: {usa_total}
+    • Status Breakdown: {format_review_counts_reviews(usa_review)}
+    • Attained Percentage: {usa_attained_pct}%
+
+    *UK Reviews:*
+    • Total Reviews: {uk_total}
+    • Status Breakdown: {format_review_counts_reviews(uk_review)}
+    • Attained Percentage: {uk_attained_pct}%
+
+    *Combined Stats:*
+    • Total Reviews: {combined_total}
+    • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+
+    *Printing Stats:*
+    • Total Copies: {Total_copies}
+    • Total Cost: ${Total_cost:.2f}
+    • Highest Copies: {Highest_copies}
+    • Highest Cost: ${Highest_cost:.2f}
+    • Lowest Copies: {Lowest_copies}
+    • Lowest Cost: ${Lowest_cost:.2f}
+    • Average Cost: ${Average:.2f} per copy
+
+    *Copyright Stats:*
+    • Total Copyrights: {Total_copyrights}
+    • Total Cost: ${Total_cost_copyright}
+    • Total Successful: {result_count} / {Total_copyrights}
+    """
+
+    try:
+        conversation = client.conversations_open(users=user_id)
+        channel_id = conversation['channel']['id']
+
+        response = client.chat_postMessage(
+            channel=channel_id,
+            text=message,
+            mrkdwn=True
+        )
+
+        client.files_upload_v2(
+            channel=channel_id,
+            file=usa_chart_path,
+            title="USA Trustpilot Reviews"
+        )
+
+        client.files_upload_v2(
+            channel=channel_id,
+            file=uk_chart_path,
+            title="UK Trustpilot Reviews"
+        )
+
+        send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"), f"✅ Review summary sent with charts")
+    except SlackApiError as e:
+        print(f"❌ Error sending message: {e.response['error']}")
+        print(f"Detailed error: {str(e)}")
+        logging.error(e)
+
+
+def summary(month, year):
     """Generate and send summary report to management"""
     # Get the data
     uk_clean = clean_data_reviews(sheet_uk)
@@ -357,11 +519,11 @@ def summary(month):
 
     usa_clean = usa_clean[
         (usa_clean["Publishing Date"].dt.month == month) &
-        (usa_clean["Publishing Date"].dt.year == current_year)
+        (usa_clean["Publishing Date"].dt.year == year)
         ]
     uk_clean = uk_clean[
         (uk_clean["Publishing Date"].dt.month == month) &
-        (uk_clean["Publishing Date"].dt.year == current_year)
+        (uk_clean["Publishing Date"].dt.year == year)
         ]
 
     if usa_clean.empty:
@@ -377,11 +539,9 @@ def summary(month):
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
     uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
 
-    # Generate pie charts
     usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
     uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
 
-    # Calculate statistics
     usa_total = usa_review.sum() if not usa_review.empty else 0
     uk_total = uk_review.sum() if not uk_review.empty else 0
 
@@ -395,7 +555,7 @@ def summary(month):
     combined_attained = usa_attained + uk_attained
     combined_attained_pct = (combined_attained / combined_total * 100).round(1) if combined_total > 0 else 0
 
-    printing_data = get_printing_data_reviews()
+    printing_data = get_printing_data_reviews(month, year)
     Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
     Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
     Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
@@ -407,7 +567,7 @@ def summary(month):
     if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
         printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
 
-    copyright_data, result_count = get_copyright_data(month)
+    copyright_data, result_count = get_copyright_data(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
 
@@ -522,11 +682,23 @@ def format_review_counts_reviews(review_counts):
         return "No data"
     return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
 
+def get_min_year():
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+    combined = pd.concat([uk_clean, usa_clean])
+
+    combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
+
+    min_year = combined["Publishing Date"].dt.year.min()
+
+    return min_year
+
 
 with st.container():
     st.title("📊 Data Management Portal")
     action = st.selectbox("What would you like to do?",
-                          ["View Data", "Generate Review & Summary", "Reviews", "Printing", "Copyright"],
+                          ["View Data", "Reviews", "Printing", "Copyright", "Generate Review & Summary",
+                           "Year Summary"],
                           index=None,
                           placeholder="Select Action")
 
@@ -535,7 +707,9 @@ with st.container():
     selected_month_number = None
     status = None
     choice = None
-
+    number = None
+    if action == "Year Summary":
+        number = st.number_input("Enter Year to generate summary", min_value=int(get_min_year()), step=1)
     if action in ["View Data", "Reviews"]:
         choice = st.selectbox("Select Data To View", ["UK", "USA", "AudioBook"], index=None,
                               placeholder="Select Data to View")
@@ -635,42 +809,39 @@ with st.container():
                 index=current_month - 1,
                 placeholder="Select Month"
             )
+            number = st.number_input("Enter Year to generate summary", min_value=int(get_min_year()), step=1)
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
             uk_clean = clean_data_reviews(sheet_uk)
             usa_clean = clean_data_reviews(sheet_usa)
 
             usa_clean = usa_clean[
                 (usa_clean["Publishing Date"].dt.month == selected_month_number) &
-                (usa_clean["Publishing Date"].dt.year == current_year)
+                (usa_clean["Publishing Date"].dt.year == number)
                 ]
             uk_clean = uk_clean[
                 (uk_clean["Publishing Date"].dt.month == selected_month_number) &
-                (uk_clean["Publishing Date"].dt.year == current_year)
+                (uk_clean["Publishing Date"].dt.year == number)
                 ]
-
-            # Check and warn if data is missing
             no_data = False
 
             if usa_clean.empty:
-                print("No values found in USA sheet.")
-                st.warning("No data available for selected month for USA")
-
-            if uk_clean.empty:
-                print("No values found in UK sheet.")
-                st.warning("No data available for selected month for UK")
-
-            if usa_clean.empty and uk_clean.empty:
-                st.warning("No data available for selected month")
                 no_data = True
 
-            # Only proceed if data exists and a month is selected
-            if st.button("Generate and Send Summary") and selected_month:
-                if no_data:
-                    st.error("Cannot generate summary — no data available for the selected month.")
-                else:
-                    with st.spinner(f"Generating summary report for {selected_month}..."):
-                        summary(selected_month_number)
-                    st.success(f"Summary report for {selected_month} generated and sent!")
+            if uk_clean.empty:
+                no_data = True
+            if usa_clean.empty and uk_clean.empty:
+                no_data = True
+
+            if no_data:
+                st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
+            else:
+                if st.button("Generate and Send Summary") and selected_month and number:
+                    if no_data:
+                        st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
+                    else:
+                        with st.spinner(f"Generating summary report for {selected_month} {number}..."):
+                            summary(selected_month_number, number)
+                        st.success(f"Summary report for {selected_month} {number} generated and sent!")
 
 
     elif action == "Print Data" and country and selected_month:
@@ -769,7 +940,7 @@ with st.container():
     elif action == "Copyright" and selected_month:
         st.subheader(f"🖨️ Copyright Summary for {selected_month}")
 
-        data, result = get_copyright_data(selected_month_number)
+        data, result = get_copyright_data(selected_month_number, number)
 
         if not data.empty:
             st.dataframe(data)
@@ -787,3 +958,35 @@ with st.container():
             st.markdown("---")
         else:
             st.warning(f"⚠️ No Data Available for Copyright in {selected_month}")
+    elif action == "Year Summary" and number:
+        uk_clean = clean_data_reviews(sheet_uk)
+        usa_clean = clean_data_reviews(sheet_usa)
+
+        usa_clean = usa_clean[
+            (usa_clean["Publishing Date"].dt.year == number)
+        ]
+        uk_clean = uk_clean[
+            (uk_clean["Publishing Date"].dt.year == number)
+        ]
+        no_data = False
+
+        if usa_clean.empty:
+            no_data = True
+
+        if uk_clean.empty:
+            no_data = True
+
+        if usa_clean.empty and uk_clean.empty:
+            no_data = True
+
+        if no_data:
+            st.error(f"Cannot generate summary — no data available for the Year {number}.")
+        else:
+
+            if st.button("Year Summary"):
+                if no_data:
+                    st.error(f"Cannot generate summary — no data available for the Year {number}.")
+                else:
+                    with st.spinner(f"Generating summary report for Year {number}..."):
+                        generate_year_summary(number)
+                    st.success(f"Summary report for Year {number} generated and sent!")
