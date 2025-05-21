@@ -96,7 +96,7 @@ def review_data(sheet_name, month, status):
 def get_printing_data(month):
     """Get printing data filtered by month"""
     try:
-        data = conn.read(worksheet=sheet_printing)
+        data = conn.read(worksheet=sheet_printing, ttl=0)
 
         for col in ["Order Date", "Shipping Date", "Fulfilled"]:
             if col in data.columns:
@@ -122,7 +122,7 @@ def format_review_counts(review_counts):
 
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     """Clean the data from Google Sheets"""
-    data = conn.read(worksheet=sheet_name)
+    data = conn.read(worksheet=sheet_name, ttl=0)
 
     # Find the index of the "Issues" column if it exists
     columns = list(data.columns)
