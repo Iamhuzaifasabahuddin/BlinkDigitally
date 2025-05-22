@@ -747,7 +747,7 @@ with st.container():
                     data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
             if data.empty:
-                st.info(f"No data available for {selected_month} for {choice}")
+                st.info(f"No data available for {selected_month} {number} for {choice}")
             else:
                 st.markdown("### 📄 Detailed Entry Data")
                 st.dataframe(data)
@@ -805,7 +805,7 @@ with st.container():
             if not data.empty:
                 st.dataframe(data)
             else:
-                st.info("No matching reviews found.")
+                st.info(f"No matching reviews found for {selected_month_number} {number}")
     elif action == "Printing" and selected_month and number:
 
         st.subheader(f"🖨️ Printing Summary for {selected_month}")
@@ -867,7 +867,7 @@ with st.container():
 
         else:
 
-            st.warning(f"⚠️ No Data Available for Printing in {selected_month}")
+            st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
     elif action == "Copyright" and selected_month and number:
         st.subheader(f"🖨️ Copyright Summary for {selected_month}")
 
@@ -888,7 +888,7 @@ with st.container():
             """)
             st.markdown("---")
         else:
-            st.warning(f"⚠️ No Data Available for Copyright in {selected_month}")
+            st.warning(f"⚠️ No Data Available for Copyright in {selected_month} {number}")
     elif action == "Generate Review & Summary":
 
         tab1, tab2 = st.tabs(["Send Reviews", "Summary"])
