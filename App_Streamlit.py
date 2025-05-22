@@ -328,7 +328,7 @@ def get_copyright_data(month, year):
     # Filter and process columns
     columns = list(data.columns)
     if "Type" in columns:
-        end_col_index = columns.index("Type")
+        end_col_index = columns.index("Country")
         data = data.iloc[:, :end_col_index + 1]
 
     if "Submission Date" in data.columns:
@@ -353,7 +353,7 @@ def copyright_all(year):
     # Filter and process columns
     columns = list(data.columns)
     if "Type" in columns:
-        end_col_index = columns.index("Type")
+        end_col_index = columns.index("Country")
         data = data.iloc[:, :end_col_index + 1]
 
     if "Submission Date" in data.columns:
