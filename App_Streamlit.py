@@ -31,7 +31,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
     "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
@@ -73,7 +72,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def load_data(sheet_name, month_number, year)-> pd.DataFrame:
+def load_data(sheet_name, month_number, year) -> pd.DataFrame:
     """Load data from Google Sheets with optional month filtering"""
     try:
         data = conn.read(worksheet=sheet_name, ttl=0)
@@ -105,7 +104,7 @@ def load_data(sheet_name, month_number, year)-> pd.DataFrame:
 #         st.error(f"An error occurred: {e}")
 
 
-def review_data(sheet_name, month, year, status)-> pd.DataFrame:
+def review_data(sheet_name, month, year, status) -> pd.DataFrame:
     """Filter data by month and review status"""
     data = load_data(sheet_name)
     if not data.empty and month and status:
@@ -116,10 +115,15 @@ def review_data(sheet_name, month, year, status)-> pd.DataFrame:
     return data
 
 
-def get_printing_data(month, year)-> pd.DataFrame:
+def get_printing_data(month, year) -> pd.DataFrame:
     """Get printing data filtered by month"""
     try:
         data = conn.read(worksheet=sheet_printing, ttl=0)
+
+        columns = list(data.columns)
+        if "Fulfilled" in columns:
+            end_col_index = columns.index("Fulfilled")
+            data = data.iloc[:, :end_col_index + 1]
 
         for col in ["Order Date", "Shipping Date", "Fulfilled"]:
             if col in data.columns:
@@ -161,7 +165,7 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     return data
 
 
-def load_data_reviews(sheet_name, name)-> (pd.DataFrame, float, datetime, datetime, int):
+def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datetime, int):
     """Load and filter data for a specific project manager"""
     data = clean_data_reviews(sheet_name)
     data_original = data
@@ -193,7 +197,7 @@ def load_data_reviews(sheet_name, name)-> (pd.DataFrame, float, datetime, dateti
     return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
-def load_data_audio(name)-> pd.DataFrame:
+def load_data_audio(name) -> pd.DataFrame:
     """Load and filter audio book data for a specific project manager"""
     return load_data_reviews(sheet_audio, name)
 
@@ -209,7 +213,7 @@ def get_user_id_by_email(email):
         return None
 
 
-def send_dm(user_id, message)-> None:
+def send_dm(user_id, message) -> None:
     """Send a direct message to a user"""
     try:
         response = client.chat_postMessage(
@@ -299,7 +303,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
             logging.error(e)
 
 
-def get_printing_data_reviews(month, year)-> pd.DataFrame:
+def get_printing_data_reviews(month, year) -> pd.DataFrame:
     """Get printing data for the current month"""
     data = conn.read(worksheet=sheet_printing, ttl=0)
 
@@ -320,7 +324,8 @@ def get_printing_data_reviews(month, year)-> pd.DataFrame:
 
     return data
 
-def printing_data_all(year)-> pd.DataFrame:
+
+def printing_data_all(year) -> pd.DataFrame:
     data = conn.read(worksheet=sheet_printing, ttl=0)
 
     columns = list(data.columns)
@@ -340,7 +345,8 @@ def printing_data_all(year)-> pd.DataFrame:
 
     return data
 
-def get_copyright_data(month, year)-> (pd.DataFrame, int):
+
+def get_copyright_data(month, year) -> (pd.DataFrame, int):
     """Get copyright data for the current month"""
     data = conn.read(worksheet=sheet_copyright, ttl=0)
 
@@ -366,7 +372,7 @@ def get_copyright_data(month, year)-> (pd.DataFrame, int):
     return data, result_count
 
 
-def copyright_all(year)-> (pd.DataFrame, int):
+def copyright_all(year) -> (pd.DataFrame, int):
     data = conn.read(worksheet=sheet_copyright, ttl=0)
 
     # Filter and process columns
@@ -388,9 +394,6 @@ def copyright_all(year)-> (pd.DataFrame, int):
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
     return data, result_count
-
-
-
 
 
 def generate_year_summary(year) -> None:
@@ -510,7 +513,7 @@ def generate_year_summary(year) -> None:
         logging.error(e)
 
 
-def summary(month, year)-> None:
+def summary(month, year) -> None:
     """Generate and send summary report to management"""
     # Get the data
     uk_clean = clean_data_reviews(sheet_uk)
@@ -823,7 +826,9 @@ with st.container():
 
             Lowest_copies = data["No of Copies"].min()
 
-            data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
+            # data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
+            #
+            # da
 
             Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
 
