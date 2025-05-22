@@ -32,6 +32,29 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+name_usa = {
+    "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
+    "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
+    "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
+    "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
+    "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
+    "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
+    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk"
+}
+
+names_uk = {
+    "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
+    "Youha": "youha.khan@topsoftdigitals.pk",
+    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk"
+}
+
+general_message = """Hiya
+:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
+BM: https://bookmarketeers.com/
+WC: https://writersclique.com/
+AS: https://authorssolution.co.uk/"""
+
+
 def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     """Clean and prepare the dataframe"""
     if data.empty:
@@ -50,14 +73,14 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def load_data(sheet_name, month_number=None):
+def load_data(sheet_name, month_number, year)-> pd.DataFrame:
     """Load data from Google Sheets with optional month filtering"""
     try:
-        data = conn.read(worksheet=sheet_name)
+        data = conn.read(worksheet=sheet_name, ttl=0)
         data = clean_data(data)
 
-        if month_number and "Publishing Date" in data.columns:
-            data = data[data["Publishing Date"].dt.month == month_number]
+        if "Publishing Date" in data.columns:
+            data = data[(data["Publishing Date"].dt.month == month_number) & (data["Publishing Date"].dt.year == year)]
 
         data.index = range(1, len(data) + 1)
 
@@ -67,33 +90,33 @@ def load_data(sheet_name, month_number=None):
         return pd.DataFrame()
 
 
-def add_data(sheet_name, new_row):
-    """Add a new row to the specified sheet"""
-    try:
+# def add_data(sheet_name, new_row):
+#     """Add a new row to the specified sheet"""
+#     try:
+#
+#         current_data = conn.read(worksheet=sheet_name)
+#
+#         updated_data = pd.concat([current_data, pd.DataFrame([new_row], columns=current_data.columns)],
+#                                  ignore_index=True)
+#         conn.update(worksheet=sheet_name, data=updated_data, headers=False)
+#         st.success("Data successfully added to the sheet.")
+#         st.dataframe(load_data(sheet_name))
+#     except Exception as e:
+#         st.error(f"An error occurred: {e}")
 
-        current_data = conn.read(worksheet=sheet_name)
 
-        updated_data = pd.concat([current_data, pd.DataFrame([new_row], columns=current_data.columns)],
-                                 ignore_index=True)
-        conn.update(worksheet=sheet_name, data=updated_data, headers=False)
-        st.success("Data successfully added to the sheet.")
-        st.dataframe(load_data(sheet_name))
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-
-
-def review_data(sheet_name, month, status):
+def review_data(sheet_name, month, year, status)-> pd.DataFrame:
     """Filter data by month and review status"""
     data = load_data(sheet_name)
     if not data.empty and month and status:
         if "Publishing Date" in data.columns and "Trustpilot Review" in data.columns:
-            data = data[data["Publishing Date"].dt.month == month]
+            data = data[(data["Publishing Date"].dt.month == month) & (data["Publishing Date"].dt.year == year)]
             data = data[data["Trustpilot Review"] == status]
     data.index = range(1, len(data) + 1)
     return data
 
 
-def get_printing_data(month):
+def get_printing_data(month, year)-> pd.DataFrame:
     """Get printing data filtered by month"""
     try:
         data = conn.read(worksheet=sheet_printing, ttl=0)
@@ -103,7 +126,7 @@ def get_printing_data(month):
                 data[col] = pd.to_datetime(data[col], errors="coerce")
 
         if month and "Order Date" in data.columns:
-            data = data[data["Order Date"].dt.month == month]
+            data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
 
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
@@ -115,7 +138,7 @@ def get_printing_data(month):
         return pd.DataFrame()
 
 
-def format_review_counts(review_counts):
+def format_review_counts(review_counts) -> str:
     """Format review counts as a string"""
     return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
 
@@ -138,7 +161,7 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     return data
 
 
-def load_data_reviews(sheet_name, name):
+def load_data_reviews(sheet_name, name)-> (pd.DataFrame, float, datetime, datetime, int):
     """Load and filter data for a specific project manager"""
     data = clean_data_reviews(sheet_name)
     data_original = data
@@ -170,32 +193,9 @@ def load_data_reviews(sheet_name, name):
     return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
-def load_data_audio(name):
+def load_data_audio(name)-> pd.DataFrame:
     """Load and filter audio book data for a specific project manager"""
     return load_data_reviews(sheet_audio, name)
-
-
-name_usa = {
-    "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
-    "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
-    "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
-    "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
-    "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
-    "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
-    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk"
-}
-
-names_uk = {
-    "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
-    "Youha": "youha.khan@topsoftdigitals.pk",
-    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk"
-}
-
-general_message = """Hiya
-:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
-BM: https://bookmarketeers.com/
-WC: https://writersclique.com/
-AS: https://authorssolution.co.uk/"""
 
 
 def get_user_id_by_email(email):
@@ -209,7 +209,7 @@ def get_user_id_by_email(email):
         return None
 
 
-def send_dm(user_id, message):
+def send_dm(user_id, message)-> None:
     """Send a direct message to a user"""
     try:
         response = client.chat_postMessage(
@@ -221,7 +221,7 @@ def send_dm(user_id, message):
         logging.error(e)
 
 
-def send_df_as_text(name, sheet_name, email):
+def send_df_as_text(name, sheet_name, email) -> None:
     """Send DataFrame as text to a user"""
     user_id = get_user_id_by_email(email)
 
@@ -299,7 +299,7 @@ def send_df_as_text(name, sheet_name, email):
             logging.error(e)
 
 
-def get_printing_data_reviews(month, year):
+def get_printing_data_reviews(month, year)-> pd.DataFrame:
     """Get printing data for the current month"""
     data = conn.read(worksheet=sheet_printing, ttl=0)
 
@@ -320,8 +320,27 @@ def get_printing_data_reviews(month, year):
 
     return data
 
+def printing_data_all(year)-> pd.DataFrame:
+    data = conn.read(worksheet=sheet_printing, ttl=0)
 
-def get_copyright_data(month, year):
+    columns = list(data.columns)
+    if "Fulfilled" in columns:
+        end_col_index = columns.index("Fulfilled")
+        data = data.iloc[:, :end_col_index + 1]
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data[(data["Order Date"].dt.year == year)]
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+
+    return data
+
+def get_copyright_data(month, year)-> (pd.DataFrame, int):
     """Get copyright data for the current month"""
     data = conn.read(worksheet=sheet_copyright, ttl=0)
 
@@ -347,7 +366,7 @@ def get_copyright_data(month, year):
     return data, result_count
 
 
-def copyright_all(year):
+def copyright_all(year)-> (pd.DataFrame, int):
     data = conn.read(worksheet=sheet_copyright, ttl=0)
 
     # Filter and process columns
@@ -371,28 +390,10 @@ def copyright_all(year):
     return data, result_count
 
 
-def printing_data_all(year):
-    data = conn.read(worksheet=sheet_printing, ttl=0)
-
-    columns = list(data.columns)
-    if "Fulfilled" in columns:
-        end_col_index = columns.index("Fulfilled")
-        data = data.iloc[:, :end_col_index + 1]
-
-    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-        if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
-
-    data = data[(data["Order Date"].dt.year == year)]
-
-    if "Order Cost" in data.columns:
-        data["Order Cost"] = data["Order Cost"].astype(str)
-        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
-
-    return data
 
 
-def generate_year_summary(year):
+
+def generate_year_summary(year) -> None:
     user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     uk_clean = clean_data_reviews(sheet_uk)
@@ -509,7 +510,7 @@ def generate_year_summary(year):
         logging.error(e)
 
 
-def summary(month, year):
+def summary(month, year)-> None:
     """Generate and send summary report to management"""
     # Get the data
     uk_clean = clean_data_reviews(sheet_uk)
@@ -682,10 +683,12 @@ def format_review_counts_reviews(review_counts):
         return "No data"
     return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
 
-def get_min_year():
+
+def get_min_year() -> int:
     uk_clean = clean_data_reviews(sheet_uk)
+    audio = clean_data_reviews(sheet_audio)
     usa_clean = clean_data_reviews(sheet_usa)
-    combined = pd.concat([uk_clean, usa_clean])
+    combined = pd.concat([uk_clean, usa_clean, audio])
 
     combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
 
@@ -708,8 +711,6 @@ with st.container():
     status = None
     choice = None
     number = None
-    if action == "Year Summary":
-        number = st.number_input("Enter Year to generate summary", min_value=int(get_min_year()), step=1)
     if action in ["View Data", "Reviews"]:
         choice = st.selectbox("Select Data To View", ["UK", "USA", "AudioBook"], index=None,
                               placeholder="Select Data to View")
@@ -722,10 +723,12 @@ with st.container():
             placeholder="Select Month"
         )
         selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
-
+    if action in ["Year Summary", "Copyright", "Printing", "View Data", "Reviews"]:
+        number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
     if action == "Reviews":
         status = st.selectbox("Status", ["Pending", "Sent", "Attained"], index=None, placeholder="Select Status")
-    if action == "View Data" and choice and selected_month:
+
+    if action == "View Data" and choice and selected_month and number:
         st.subheader(f"📂 Viewing Data for {choice} - {selected_month}")
 
         sheet_name = {
@@ -734,7 +737,7 @@ with st.container():
             "AudioBook": sheet_audio
         }.get(choice)
         if sheet_name:
-            data = load_data(sheet_name, selected_month_number)
+            data = load_data(sheet_name, selected_month_number, number)
 
             for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
                 if col in data.columns:
@@ -768,105 +771,28 @@ with st.container():
                     for review_type, count in reviews.items():
                         st.markdown(f"- 📝 **{review_type}**: `{count}`")
             st.markdown("---")
-
-    elif action == "Generate Review & Summary":
-
-        tab1, tab2 = st.tabs(["Send Reviews", "Summary"])
-
-        with tab1:
-            st.header("Send Review Updates")
-
-            st.subheader("USA Team")
-            usa_selected = st.multiselect("Select USA team members:", list(name_usa.keys()))
-
-            st.subheader("UK Team")
-            uk_selected = st.multiselect("Select UK team members:", list(names_uk.keys()))
-
-            if st.button("Send Review Updates"):
-                progress_bar = st.progress(0)
-                total_members = len(usa_selected) + len(uk_selected)
-                count = 0
-
-                for name in usa_selected:
-                    if name in name_usa:
-                        send_df_as_text(name, sheet_usa, name_usa[name])
-                        count += 1
-                        progress_bar.progress(count / total_members)
-
-                for name in uk_selected:
-                    if name in names_uk:
-                        send_df_as_text(name, sheet_uk, names_uk[name])
-                        count += 1
-                        progress_bar.progress(count / total_members)
-
-                st.success(f"Sent review updates to {count} team members!")
-
-        with tab2:
-            st.header("Generate Summary Report")
-            selected_month = st.selectbox(
-                "Select Month",
-                month_list,
-                index=current_month - 1,
-                placeholder="Select Month"
-            )
-            number = st.number_input("Enter Year to generate summary", min_value=int(get_min_year()), step=1)
-            selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
-            uk_clean = clean_data_reviews(sheet_uk)
-            usa_clean = clean_data_reviews(sheet_usa)
-
-            usa_clean = usa_clean[
-                (usa_clean["Publishing Date"].dt.month == selected_month_number) &
-                (usa_clean["Publishing Date"].dt.year == number)
-                ]
-            uk_clean = uk_clean[
-                (uk_clean["Publishing Date"].dt.month == selected_month_number) &
-                (uk_clean["Publishing Date"].dt.year == number)
-                ]
-            no_data = False
-
-            if usa_clean.empty:
-                no_data = True
-
-            if uk_clean.empty:
-                no_data = True
-            if usa_clean.empty and uk_clean.empty:
-                no_data = True
-
-            if no_data:
-                st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
-            else:
-                if st.button("Generate and Send Summary") and selected_month and number:
-                    if no_data:
-                        st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
-                    else:
-                        with st.spinner(f"Generating summary report for {selected_month} {number}..."):
-                            summary(selected_month_number, number)
-                        st.success(f"Summary report for {selected_month} {number} generated and sent!")
-
-
-    elif action == "Print Data" and country and selected_month:
-        st.subheader(f"🖰 Print Data for {country} - {selected_month}")
-        sheet_name = sheet_uk if country == "UK" else sheet_usa
-
-        data = load_data(sheet_name, selected_month_number)
-
-        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-            if col in data.columns:
-                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-
-        if not data.empty:
-            st.dataframe(data)
-        else:
-            st.warning(f"No data available for {selected_month} for {country}")
-
-    elif action == "Reviews" and choice and selected_month and status:
+    # elif action == "Print Data" and country and selected_month:
+    #     st.subheader(f"🖰 Print Data for {country} - {selected_month}")
+    #     sheet_name = sheet_uk if country == "UK" else sheet_usa
+    #
+    #     data = load_data(sheet_name, selected_month_number, number)
+    #
+    #     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+    #         if col in data.columns:
+    #             data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+    #
+    #     if not data.empty:
+    #         st.dataframe(data)
+    #     else:
+    #         st.warning(f"No data available for {selected_month} for {country}")
+    elif action == "Reviews" and choice and selected_month and status and number:
         sheet_name = {
             "UK": sheet_uk,
             "USA": sheet_usa,
             "AudioBook": sheet_audio
         }.get(choice)
         if sheet_name:
-            data = review_data(sheet_name, selected_month_number, status)
+            data = review_data(sheet_name, selected_month_number, number, status)
 
             for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
                 if col in data.columns:
@@ -877,11 +803,11 @@ with st.container():
                 st.dataframe(data)
             else:
                 st.info("No matching reviews found.")
-    elif action == "Printing" and selected_month:
+    elif action == "Printing" and selected_month and number:
 
         st.subheader(f"🖨️ Printing Summary for {selected_month}")
 
-        data = get_printing_data(selected_month_number)
+        data = get_printing_data(selected_month_number, number)
 
         if not data.empty:
 
@@ -937,7 +863,7 @@ with st.container():
         else:
 
             st.warning(f"⚠️ No Data Available for Printing in {selected_month}")
-    elif action == "Copyright" and selected_month:
+    elif action == "Copyright" and selected_month and number:
         st.subheader(f"🖨️ Copyright Summary for {selected_month}")
 
         data, result = get_copyright_data(selected_month_number, number)
@@ -958,6 +884,80 @@ with st.container():
             st.markdown("---")
         else:
             st.warning(f"⚠️ No Data Available for Copyright in {selected_month}")
+    elif action == "Generate Review & Summary":
+
+        tab1, tab2 = st.tabs(["Send Reviews", "Summary"])
+
+        with tab1:
+            st.header("Send Review Updates")
+
+            st.subheader("USA Team")
+            usa_selected = st.multiselect("Select USA team members:", list(name_usa.keys()))
+
+            st.subheader("UK Team")
+            uk_selected = st.multiselect("Select UK team members:", list(names_uk.keys()))
+
+            if st.button("Send Review Updates"):
+                progress_bar = st.progress(0)
+                total_members = len(usa_selected) + len(uk_selected)
+                count = 0
+
+                for name in usa_selected:
+                    if name in name_usa:
+                        send_df_as_text(name, sheet_usa, name_usa[name])
+                        count += 1
+                        progress_bar.progress(count / total_members)
+
+                for name in uk_selected:
+                    if name in names_uk:
+                        send_df_as_text(name, sheet_uk, names_uk[name])
+                        count += 1
+                        progress_bar.progress(count / total_members)
+
+                st.success(f"Sent review updates to {count} team members!")
+
+        with tab2:
+            st.header("Generate Summary Report")
+            selected_month = st.selectbox(
+                "Select Month",
+                month_list,
+                index=current_month - 1,
+                placeholder="Select Month"
+            )
+            number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
+            selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
+            uk_clean = clean_data_reviews(sheet_uk)
+            usa_clean = clean_data_reviews(sheet_usa)
+
+            usa_clean = usa_clean[
+                (usa_clean["Publishing Date"].dt.month == selected_month_number) &
+                (usa_clean["Publishing Date"].dt.year == number)
+                ]
+            uk_clean = uk_clean[
+                (uk_clean["Publishing Date"].dt.month == selected_month_number) &
+                (uk_clean["Publishing Date"].dt.year == number)
+                ]
+            no_data = False
+
+            if usa_clean.empty:
+                no_data = True
+
+            if uk_clean.empty:
+                no_data = True
+            if usa_clean.empty and uk_clean.empty:
+                no_data = True
+
+            if no_data:
+                st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
+            else:
+                if st.button("Generate and Send Summary") and selected_month and number:
+                    if no_data:
+                        st.error(
+                            f"Cannot generate summary — no data available for the month {selected_month} {number}.")
+                    else:
+                        with st.spinner(f"Generating summary report for {selected_month} {number}..."):
+                            summary(selected_month_number, number)
+                        st.success(f"Summary report for {selected_month} {number} generated and sent!")
     elif action == "Year Summary" and number:
         uk_clean = clean_data_reviews(sheet_uk)
         usa_clean = clean_data_reviews(sheet_usa)
