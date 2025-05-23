@@ -24,6 +24,8 @@ current_month = datetime.today().month
 # current_month = 4  # For testing specific month
 current_month_name = calendar.month_name[current_month]
 current_year = datetime.today().year
+st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
+
 st.markdown("""
  <style>
     #MainMenu {visibility: hidden;}
