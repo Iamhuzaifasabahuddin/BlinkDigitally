@@ -12,6 +12,7 @@ from streamlit_gsheets import GSheetsConnection
 
 client = WebClient(token=st.secrets["Slack"]["Slack"])
 conn = st.connection("gsheets", type=GSheetsConnection)
+st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
 
 sheet_usa = "USA"
 sheet_uk = "UK"
@@ -24,7 +25,6 @@ current_month = datetime.today().month
 # current_month = 4  # For testing specific month
 current_month_name = calendar.month_name[current_month]
 current_year = datetime.today().year
-st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
 
 st.markdown("""
  <style>
@@ -229,7 +229,8 @@ def send_dm(user_id, message) -> None:
 
 def send_df_as_text(name, sheet_name, email) -> None:
     """Send DataFrame as text to a user"""
-    user_id = get_user_id_by_email(email)
+    # user_id = get_user_id_by_email(email)
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
@@ -247,7 +248,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
 
     def truncate_title(x):
         """Truncate long titles"""
-        return x[:60] + "..." if isinstance(x, str) and len(x) > 60 else x
+        return x[:40] + "..." if isinstance(x, str) and len(x) > 40 else x
 
     # Truncate long book titles
     for dframe in [df, df_audio]:
