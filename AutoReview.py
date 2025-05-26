@@ -24,6 +24,28 @@ url_Audio = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tq
 url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
 url_copyright = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Copyright"
 
+name_usa = {
+    "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
+    "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
+    "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
+    "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
+    "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
+    "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
+    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk"
+}
+
+names_uk = {
+    "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
+    "Youha": "youha.khan@topsoftdigitals.pk",
+    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk"
+}
+
+general_message = """Hiya
+:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
+BM: https://bookmarketeers.com/
+WC: https://writersclique.com/
+AS: https://authorssolution.co.uk/"""
+
 current_month = datetime.today().month
 # current_month = 4
 current_month_name = calendar.month_name[current_month]
@@ -84,29 +106,6 @@ def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datet
 def load_data_audio(name) -> pd.DataFrame:
     """Load and filter audio book data for a specific project manager"""
     return load_data_reviews(url_Audio, name)
-
-
-name_usa = {
-    "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
-    "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
-    "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
-    "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
-    "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
-    "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
-    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk"
-}
-
-names_uk = {
-    "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
-    "Youha": "youha.khan@topsoftdigitals.pk",
-    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk"
-}
-
-general_message = """Hiya
-:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
-BM: https://bookmarketeers.com/
-WC: https://writersclique.com/
-AS: https://authorssolution.co.uk/"""
 
 
 def get_user_id_by_email(email):
@@ -411,6 +410,9 @@ def summary(month, year) -> None:
     copyright_data, result_count = get_copyright_data(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", "N/A")
+    canada = country.get("Canada", "N/A")
 
     message = f"""
 *{current_month_name} {year} Trustpilot Reviews & Printing Summary*
@@ -451,18 +453,20 @@ def summary(month, year) -> None:
       - ⚡ *Ingram Spark:* `{combined_ingram}`
 
 *Printing Stats:*
-• Total Copies: {Total_copies}
-• Total Cost: ${Total_cost:.2f}
-• Highest Copies: {Highest_copies}
-• Highest Cost: ${Highest_cost:.2f}
-• Lowest Copies: {Lowest_copies}
-• Lowest Cost: ${Lowest_cost:.2f}
-• Average Cost: ${Average:.2f} per copy
+•🧾 Total Copies: {Total_copies}
+•💰 Total Cost: ${Total_cost:.2f}
+•📈 Highest Cost: ${Highest_cost:.2f}
+•📉 Lowest Cost: ${Lowest_cost:.2f}
+•🔢 Highest Copies: {Highest_copies}
+•🧮 Lowest Copies: {Lowest_copies}
+•🧾 Average Cost: ${Average:.2f} per copy
 
 *Copyright Stats:*
-• Total Copyrights: {Total_copyrights}
-• Total Cost: ${Total_cost_copyright}
-• Total Successful: {result_count} / {Total_copyrights}
+    •🧾 Total Copyrights: {Total_copyrights}
+    •💵 Total Cost: ${Total_cost_copyright}
+    •✅ Total Successful: {result_count} / {Total_copyrights}
+    • 🦅 **USA:** `{usa}`
+    • 🍁 **Canada:** `{canada}`
 """
 
     try:
@@ -495,8 +499,8 @@ def summary(month, year) -> None:
 
 
 def generate_year_summary(year) -> None:
-    user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
-    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     uk_clean = clean_data_reviews(url_uk)
     usa_clean = clean_data_reviews(url_usa)
@@ -572,6 +576,9 @@ def generate_year_summary(year) -> None:
     copyright_data, result_count = copyright_all(year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", "N/A")
+    canada = country.get("Canada", "N/A")
 
     message = f"""
     *{year} Trustpilot Reviews & Printing Summary*
@@ -613,18 +620,20 @@ def generate_year_summary(year) -> None:
       - ⚡ *Ingram Spark:* `{combined_ingram}`
       
     *Printing Stats:*
-    • Total Copies: {Total_copies}
-    • Total Cost: ${Total_cost:.2f}
-    • Highest Copies: {Highest_copies}
-    • Highest Cost: ${Highest_cost:.2f}
-    • Lowest Copies: {Lowest_copies}
-    • Lowest Cost: ${Lowest_cost:.2f}
-    • Average Cost: ${Average:.2f} per copy
+    •🧾 Total Copies: {Total_copies}
+    •💰 Total Cost: ${Total_cost:.2f}
+    •📈 Highest Cost: ${Highest_cost:.2f}
+    •📉 Lowest Cost: ${Lowest_cost:.2f}
+    •🔢 Highest Copies: {Highest_copies}
+    •🧮 Lowest Copies: {Lowest_copies}
+    •🧾 Average Cost: ${Average:.2f} per copy
 
     *Copyright Stats:*
-    • Total Copyrights: {Total_copyrights}
-    • Total Cost: ${Total_cost_copyright}
-    • Total Successful: {result_count} / {Total_copyrights}
+    •🧾 Total Copyrights: {Total_copyrights}
+    •💵 Total Cost: ${Total_cost_copyright}
+    •✅ Total Successful: {result_count} / {Total_copyrights}
+    • 🦅 **USA:** `{usa}`
+    • 🍁 **Canada:** `{canada}`
     """
 
     try:
@@ -722,5 +731,5 @@ if __name__ == '__main__':
 
     # for name, email in names_uk.items():
     #     send_df_as_text(name, url_uk, email)
-    summary(5, 2025)
-    # generate_year_summary(2025)
+    # summary(5, 2025)
+    generate_year_summary(2025)

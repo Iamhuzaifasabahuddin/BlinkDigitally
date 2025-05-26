@@ -526,9 +526,12 @@ def generate_year_summary(year) -> None:
     copyright_data, result_count = copyright_all(year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", "N/A")
+    canada = country.get("Canada", "N/A")
 
     message = f"""
-    *{current_year} Trustpilot Reviews & Printing Summary*
+    *{year} Trustpilot Reviews & Printing Summary*
 
     *USA Reviews:*
     • Total Reviews: {usa_total}
@@ -567,18 +570,20 @@ def generate_year_summary(year) -> None:
       - ⚡ *Ingram Spark:* `{combined_ingram}`
 
     *Printing Stats:*
-    • Total Copies: {Total_copies}
-    • Total Cost: ${Total_cost:.2f}
-    • Highest Copies: {Highest_copies}
-    • Highest Cost: ${Highest_cost:.2f}
-    • Lowest Copies: {Lowest_copies}
-    • Lowest Cost: ${Lowest_cost:.2f}
-    • Average Cost: ${Average:.2f} per copy
+    •🧾 Total Copies: {Total_copies}
+    •💰 Total Cost: ${Total_cost:.2f}
+    •📈 Highest Cost: ${Highest_cost:.2f}
+    •📉 Lowest Cost: ${Lowest_cost:.2f}
+    •🔢 Highest Copies: {Highest_copies}
+    •🧮 Lowest Copies: {Lowest_copies}
+    •🧾 Average Cost: ${Average:.2f} per copy
 
     *Copyright Stats:*
-    • Total Copyrights: {Total_copyrights}
-    • Total Cost: ${Total_cost_copyright}
-    • Total Successful: {result_count} / {Total_copyrights}
+    •🧾 Total Copyrights: {Total_copyrights}
+    •💵 Total Cost: ${Total_cost_copyright}
+    •✅ Total Successful: {result_count} / {Total_copyrights}
+    • 🦅 **USA:** `{usa}`
+    • 🍁 **Canada:** `{canada}`
     """
 
     try:
@@ -694,6 +699,9 @@ def summary(month, year) -> None:
     copyright_data, result_count = get_copyright_data(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", "N/A")
+    canada = country.get("Canada", "N/A")
 
     message = f"""
     *{current_month_name} {year} Trustpilot Reviews & Printing Summary*
@@ -734,18 +742,20 @@ def summary(month, year) -> None:
           - ⚡ *Ingram Spark:* `{combined_ingram}`
 
     *Printing Stats:*
-    • Total Copies: {Total_copies}
-    • Total Cost: ${Total_cost:.2f}
-    • Highest Copies: {Highest_copies}
-    • Highest Cost: ${Highest_cost:.2f}
-    • Lowest Copies: {Lowest_copies}
-    • Lowest Cost: ${Lowest_cost:.2f}
-    • Average Cost: ${Average:.2f} per copy
+    •🧾 Total Copies: {Total_copies}
+    •💰 Total Cost: ${Total_cost:.2f}
+    •📈 Highest Cost: ${Highest_cost:.2f}
+    •📉 Lowest Cost: ${Lowest_cost:.2f}
+    •🔢 Highest Copies: {Highest_copies}
+    •🧮 Lowest Copies: {Lowest_copies}
+    •🧾 Average Cost: ${Average:.2f} per copy
 
     *Copyright Stats:*
-    • Total Copyrights: {Total_copyrights}
-    • Total Cost: ${Total_cost_copyright}
-    • Total Successful: {result_count} / {Total_copyrights}
+        •🧾 Total Copyrights: {Total_copyrights}
+        •💵 Total Cost: ${Total_cost_copyright}
+        •✅ Total Successful: {result_count} / {Total_copyrights}
+        • 🦅 **USA:** `{usa}`
+        • 🍁 **Canada:** `{canada}`
     """
 
     try:
