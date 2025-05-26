@@ -65,7 +65,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     if "Issues" in columns:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
-    data = data.astype(str)
+    # data = data.astype(str)
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
