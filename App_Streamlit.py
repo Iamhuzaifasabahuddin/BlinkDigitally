@@ -65,12 +65,13 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     if "Issues" in columns:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
-
+    data = data.astype(str)
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
+    data = data.fillna("N/A")
     return data
 
 
@@ -83,8 +84,14 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
         if "Publishing Date" in data.columns:
             data = data[(data["Publishing Date"].dt.month == month_number) & (data["Publishing Date"].dt.year == year)]
 
-        data.index = range(1, len(data) + 1)
+        data = data.sort_values(by="Publishing Date", ascending=True)
 
+        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+        data.index = range(1, len(data) + 1)
+        data = data.fillna("N/A")
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -108,12 +115,14 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
 
 def review_data(sheet_name, month, year, status) -> pd.DataFrame:
     """Filter data by month and review status"""
-    data = load_data(sheet_name)
+    data = load_data(sheet_name, month, year)
     if not data.empty and month and status:
         if "Publishing Date" in data.columns and "Trustpilot Review" in data.columns:
             data = data[(data["Publishing Date"].dt.month == month) & (data["Publishing Date"].dt.year == year)]
             data = data[data["Trustpilot Review"] == status]
+        data = data.sort_values(by="Publishing Date", ascending=True)
     data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
     return data
 
 
@@ -127,6 +136,7 @@ def get_printing_data(month, year) -> pd.DataFrame:
             end_col_index = columns.index("Fulfilled")
             data = data.iloc[:, :end_col_index + 1]
 
+        data = data.astype(str)
         for col in ["Order Date", "Shipping Date", "Fulfilled"]:
             if col in data.columns:
                 data[col] = pd.to_datetime(data[col], errors="coerce")
@@ -137,16 +147,136 @@ def get_printing_data(month, year) -> pd.DataFrame:
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
             data["Order Cost"] = pd.to_numeric(data["Order Cost"].str.replace("$", "", regex=False), errors="coerce")
+
+        data = data.sort_values(by="Order Date", ascending=True)
+
+        for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
         data.index = range(1, len(data) + 1)
+        data = data.fillna("N/A")
+
         return data
     except Exception as e:
         st.error(f"Error loading printing data: {e}")
         return pd.DataFrame()
 
 
-def format_review_counts(review_counts) -> str:
-    """Format review counts as a string"""
-    return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
+def get_printing_data_reviews(month, year) -> pd.DataFrame:
+    """Get printing data for the current month"""
+    data = conn.read(worksheet=sheet_printing, ttl=0)
+
+    columns = list(data.columns)
+    if "Fulfilled" in columns:
+        end_col_index = columns.index("Fulfilled")
+        data = data.iloc[:, :end_col_index + 1]
+        data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+
+    data = data.sort_values(by="Order Date", ascending=True)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
+    return data
+
+
+def printing_data_all(year) -> pd.DataFrame:
+    data = conn.read(worksheet=sheet_printing, ttl=0)
+
+    columns = list(data.columns)
+    if "Fulfilled" in columns:
+        end_col_index = columns.index("Fulfilled")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data[(data["Order Date"].dt.year == year)]
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+
+    data = data.sort_values(by="Order Date", ascending=True)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
+    return data
+
+
+def get_copyright_data(month, year) -> (pd.DataFrame, int):
+    """Get copyright data for the current month"""
+    data = conn.read(worksheet=sheet_copyright, ttl=0)
+
+    columns = list(data.columns)
+    if "Type" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == year)]
+
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def copyright_all(year) -> (pd.DataFrame, int):
+    data = conn.read(worksheet=sheet_copyright, ttl=0)
+
+    columns = list(data.columns)
+    if "Type" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year == year)]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
 
 
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
@@ -163,6 +293,14 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data.sort_values(by="Publishing Date", ascending=True)
+
+    for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+    data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
 
     return data
 
@@ -181,7 +319,6 @@ def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datet
         ]
 
     data = data.sort_values(by=["Publishing Date"], ascending=True)
-    data.index = range(1, len(data) + 1)
 
     # Calculate statistics
     total_percentage = 0
@@ -196,6 +333,8 @@ def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datet
     if total_reviews > 0:
         total_percentage = (attained / total_reviews)
 
+    data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
     return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
@@ -250,7 +389,6 @@ def send_df_as_text(name, sheet_name, email) -> None:
         """Truncate long titles"""
         return x[:40] + "..." if isinstance(x, str) and len(x) > 40 else x
 
-    # Truncate long book titles
     for dframe in [df, df_audio]:
         if "Book Name & Link" in dframe.columns and not dframe.empty:
             dframe["Book Name & Link"] = dframe["Book Name & Link"].apply(truncate_title)
@@ -271,7 +409,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
     if not merged_df.empty:
         markdown_table = merged_df.to_markdown(index=False)
 
-        if len(set([min_month_name, max_month_name])) > 1:
+        if len({min_month_name, max_month_name}) > 1:
             message = (
                 f"{general_message}\n\n"
                 f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
@@ -306,103 +444,6 @@ def send_df_as_text(name, sheet_name, email) -> None:
             logging.error(e)
 
 
-def get_printing_data_reviews(month, year) -> pd.DataFrame:
-    """Get printing data for the current month"""
-    data = conn.read(worksheet=sheet_printing, ttl=0)
-
-    columns = list(data.columns)
-    if "Fulfilled" in columns:
-        end_col_index = columns.index("Fulfilled")
-        data = data.iloc[:, :end_col_index + 1]
-
-    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-        if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
-
-    data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
-
-    if "Order Cost" in data.columns:
-        data["Order Cost"] = data["Order Cost"].astype(str)
-        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
-
-    if "Tracking Number" in data.columns:
-        data["Tracking Number"] = data["Tracking Number"].astype(str)
-    return data
-
-
-def printing_data_all(year) -> pd.DataFrame:
-    data = conn.read(worksheet=sheet_printing, ttl=0)
-
-    columns = list(data.columns)
-    if "Fulfilled" in columns:
-        end_col_index = columns.index("Fulfilled")
-        data = data.iloc[:, :end_col_index + 1]
-
-    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-        if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
-
-    data = data[(data["Order Date"].dt.year == year)]
-
-    if "Order Cost" in data.columns:
-        data["Order Cost"] = data["Order Cost"].astype(str)
-        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
-
-    if "Tracking Number" in data.columns:
-        data["Tracking Number"] = data["Tracking Number"].astype(str)
-    return data
-
-
-def get_copyright_data(month, year) -> (pd.DataFrame, int):
-    """Get copyright data for the current month"""
-    data = conn.read(worksheet=sheet_copyright, ttl=0)
-
-    # Filter and process columns
-    columns = list(data.columns)
-    if "Type" in columns:
-        end_col_index = columns.index("Country")
-        data = data.iloc[:, :end_col_index + 1]
-
-    if "Submission Date" in data.columns:
-        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
-        data = data[
-            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == year)]
-
-    data = data.sort_values(by=["Submission Date"], ascending=True)
-    data.index = range(1, len(data) + 1)
-
-    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
-
-    if "Submission Date" in data.columns:
-        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
-
-    return data, result_count
-
-
-def copyright_all(year) -> (pd.DataFrame, int):
-    data = conn.read(worksheet=sheet_copyright, ttl=0)
-
-    # Filter and process columns
-    columns = list(data.columns)
-    if "Type" in columns:
-        end_col_index = columns.index("Country")
-        data = data.iloc[:, :end_col_index + 1]
-
-    if "Submission Date" in data.columns:
-        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
-        data = data[
-            (data["Submission Date"].dt.year == year)]
-    data = data.sort_values(by=["Submission Date"], ascending=True)
-    data.index = range(1, len(data) + 1)
-
-    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
-
-    if "Submission Date" in data.columns:
-        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
-
-    return data, result_count
-
-
 def generate_year_summary(year) -> None:
     user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
@@ -416,12 +457,12 @@ def generate_year_summary(year) -> None:
     ]
     if usa_clean.empty:
         print("No values found in USA sheet.")
-        return False
+        return
     if uk_clean.empty:
         print("No values found in UK sheet.")
-        return False
+        return
     if usa_clean.empty and uk_clean.empty:
-        return False
+        return
 
     usa_review = usa_clean[
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
@@ -539,12 +580,12 @@ def summary(month, year) -> None:
 
     if usa_clean.empty:
         print("No values found in USA sheet.")
-        return False
+        return
     if uk_clean.empty:
         print("No values found in UK sheet.")
-        return False
+        return
     if usa_clean.empty and uk_clean.empty:
-        return False
+        return
 
     usa_review = usa_clean[
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
@@ -695,6 +736,7 @@ def format_review_counts_reviews(review_counts):
 
 
 def get_min_year() -> int:
+    """Gets Minimum year from the data"""
     uk_clean = clean_data_reviews(sheet_uk)
     audio = clean_data_reviews(sheet_audio)
     usa_clean = clean_data_reviews(sheet_usa)
@@ -748,10 +790,6 @@ with st.container():
         }.get(choice)
         if sheet_name:
             data = load_data(sheet_name, selected_month_number, number)
-
-            for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-                if col in data.columns:
-                    data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
             if data.empty:
                 st.info(f"No data available for {selected_month} {number} for {choice}")
@@ -828,10 +866,6 @@ with st.container():
         if sheet_name:
             data = review_data(sheet_name, selected_month_number, number, status)
 
-            for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-                if col in data.columns:
-                    data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-
             st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
             if not data.empty:
                 st.dataframe(data)
@@ -862,11 +896,6 @@ with st.container():
             # da
 
             Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
-
-            for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-
-                if col in data.columns:
-                    data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
             st.markdown("### 📄 Detailed Printing Data")
 
