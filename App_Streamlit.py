@@ -150,6 +150,7 @@ def get_printing_data(month, year) -> pd.DataFrame:
 
         data = data.sort_values(by="Order Date", ascending=True)
 
+        data["No of Copies"] = data["No of Copies"].astype(float)
         for col in ["Order Date", "Shipping Date", "Fulfilled"]:
             if col in data.columns:
                 data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
@@ -183,8 +184,8 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
 
+    data["No of Copies"] = data["No of Copies"].astype(float)
     data = data.sort_values(by="Order Date", ascending=True)
-
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
 
         if col in data.columns:
@@ -214,6 +215,7 @@ def printing_data_all(year) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
 
+    data["No of Copies"] = data["No of Copies"].astype(float)
     data = data.sort_values(by="Order Date", ascending=True)
 
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
@@ -879,17 +881,17 @@ with st.container():
 
         if not data.empty:
 
-            Total_copies = float(data["No of Copies"].sum())
+            Total_copies = data["No of Copies"].sum()
 
-            Total_cost = float(data["Order Cost"].sum())
+            Total_cost = data["Order Cost"].sum()
 
-            Highest_cost = float(data["Order Cost"].max())
+            Highest_cost = data["Order Cost"].max()
 
-            Highest_copies = float(data["No of Copies"].max())
+            Highest_copies = data["No of Copies"].max()
 
-            Lowest_cost = float(data["Order Cost"].min())
+            Lowest_cost = data["Order Cost"].min()
 
-            Lowest_copies = float(data["No of Copies"].min())
+            Lowest_copies = data["No of Copies"].min()
 
             # data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
             #
