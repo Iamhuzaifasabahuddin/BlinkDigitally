@@ -30,65 +30,60 @@ current_month_name = calendar.month_name[current_month]
 current_year = datetime.today().year
 
 
-def clean_data(url: str) -> pd.DataFrame:
-    data = pd.read_csv(url)
+def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
+    """Clean the data from Google Sheets"""
+    data = pd.read_csv(sheet_name)
+
     columns = list(data.columns)
-    end_col_index = columns.index("Issues")
-    data = data.iloc[:, :end_col_index + 1]
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
 
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-        data[col] = pd.to_datetime(data[col], errors="coerce")
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data.sort_values(by="Publishing Date", ascending=True)
+    data.index = range(1, len(data) + 1)
 
     return data
 
 
-def load_data(url, name):
-    data = clean_data(url)
-    # data_original = data[(data["Publishing Date"].dt.month == current_month) & (data["Publishing Date"].dt.year == current_year)]
+def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datetime, int):
+    """Load and filter data for a specific project manager"""
+    data = clean_data_reviews(sheet_name)
     data_original = data
+
+    # Filter data based on criteria
     data = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
         (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
         (data_original["Status"] == "Published")
         ]
+
     data = data.sort_values(by=["Publishing Date"], ascending=True)
-    data.index = range(1, len(data) + 1)
+
+    # Calculate statistics
     total_percentage = 0
     attained = len(
-        data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)])
+        data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)]
+    )
     total_reviews = len(data) + attained
-    min_date = data["Publishing Date"].min()
-    max_date = data["Publishing Date"].max()
+
+    min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
+    max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
+
     if total_reviews > 0:
         total_percentage = (attained / total_reviews)
 
-    return data, total_percentage, min_date, max_date, attained, total_reviews
-
-
-def load_data_audio(name):
-    data = clean_data(url_Audio)
-    data_original = data
-    # data_original = data[
-    #     (data["Publishing Date"].dt.month == current_month) & (data["Publishing Date"].dt.year == current_year)]
-    data = data_original[
-        (data_original["Project Manager"] == name) &
-        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
-        (data_original["Status"] == "Published")
-        ]
-    data = data.sort_values(by=["Publishing Date"], ascending=True)
     data.index = range(1, len(data) + 1)
-    total_percentage = 0
-    attained = len(
-        data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)])
-    total_reviews = len(data) + attained
-    min_date = data["Publishing Date"].min()
-    max_date = data["Publishing Date"].max()
-    if total_reviews > 0:
-        total_percentage = (attained / total_reviews)
-
     return data, total_percentage, min_date, max_date, attained, total_reviews
+
+
+def load_data_audio(name) -> pd.DataFrame:
+    """Load and filter audio book data for a specific project manager"""
+    return load_data_reviews(url_Audio, name)
 
 
 name_usa = {
@@ -135,46 +130,50 @@ def send_dm(user_id, message):
         logging.error(e)
 
 
-def send_df_as_text(name, url, email):
+def send_df_as_text(name, sheet_name, email) -> None:
+    """Send DataFrame as text to a user"""
     user_id = get_user_id_by_email(email)
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, percentage, min_date, max_date, attained, total_reviews = load_data(url, name)
+    df, percentage, min_date, max_date, attained, total_reviews = load_data_reviews(sheet_name, name)
     df_audio, percentage_audio, min_date_audio, max_date_audio, attained_audio, total_reviews_audio = load_data_audio(
         name)
 
     if df.empty and df_audio.empty:
         print(f"⚠️ No data for {name}")
         return
-
     min_month_name = min(min_date, min_date_audio).strftime("%B")
     max_month_name = max(max_date, max_date_audio).strftime("%B")
 
     def truncate_title(x):
-        return x[:60] + "..." if isinstance(x, str) and len(x) > 60 else x
+        """Truncate long titles"""
+        return x[:40] + "..." if isinstance(x, str) and len(x) > 40 else x
 
     for dframe in [df, df_audio]:
-        if "Book Name & Link" in dframe.columns:
+        if "Book Name & Link" in dframe.columns and not dframe.empty:
             dframe["Book Name & Link"] = dframe["Book Name & Link"].apply(truncate_title)
 
     display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    display_df = df[display_columns] if all(col in df.columns for col in display_columns) else df
-    display_df_audio = df_audio[display_columns] if all(
+    display_df = df[display_columns] if not df.empty and all(col in df.columns for col in display_columns) else df
+    display_df_audio = df_audio[display_columns] if not df_audio.empty and all(
         col in df_audio.columns for col in display_columns) else df_audio
 
     for dframe in [display_df, display_df_audio]:
-        if "Publishing Date" in dframe.columns:
+        if "Publishing Date" in dframe.columns and not dframe.empty:
             dframe["Publishing Date"] = pd.to_datetime(dframe["Publishing Date"], errors='coerce').dt.strftime(
                 "%d-%B-%Y")
 
     merged_df = pd.concat([display_df, display_df_audio], ignore_index=True)
+    display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
+    merged_df = merged_df[display_columns]
     if not merged_df.empty:
         markdown_table = merged_df.to_markdown(index=False)
 
-        if len(set([min_month_name, max_month_name])) > 1:
+        if len({min_month_name, max_month_name}) > 1:
             message = (
                 f"{general_message}\n\n"
                 f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
@@ -192,6 +191,7 @@ def send_df_as_text(name, url, email):
                 f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
                 f"```\n{markdown_table}\n```"
             )
+
         try:
             conversation = client.conversations_open(users=user_id)
             channel_id = conversation['channel']['id']
@@ -208,66 +208,162 @@ def send_df_as_text(name, url, email):
             logging.error(e)
 
 
-def printing():
+def get_printing_data_reviews(month, year) -> pd.DataFrame:
+    """Get printing data for the current month"""
     data = pd.read_csv(url_printing)
+
     columns = list(data.columns)
-    end_col_index = columns.index("Fulfilled")
-    data = data.iloc[:, :end_col_index + 1]
+    if "Fulfilled" in columns:
+        end_col_index = columns.index("Fulfilled")
+        data = data.iloc[:, :end_col_index + 1]
+        data = data.astype(str)
 
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-        data[col] = pd.to_datetime(data[col], errors="coerce")
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data = data[(data["Order Date"].dt.month == current_month) & (data["Order Date"].dt.year == current_year)]
-    data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False))
+    data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+
+    data["No of Copies"] = data["No of Copies"].astype(float)
+    data = data.sort_values(by="Order Date", ascending=True)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
 
     return data
 
 
-def Copyright():
-    data = pd.read_csv(url_copyright)
-    columns = list(data.columns)
-    end_col_index = columns.index("Type")
-    data = data.iloc[:, :end_col_index + 1]
+def printing_data_all(year) -> pd.DataFrame:
+    data = pd.read_csv(url_printing)
 
-    data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
-    data = data[(data["Submission Date"].dt.month == current_month) & (data["Submission Date"].dt.year == current_year)]
+    columns = list(data.columns)
+    if "Fulfilled" in columns:
+        end_col_index = columns.index("Fulfilled")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data = data[(data["Order Date"].dt.year == year)]
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+
+    data["No of Copies"] = data["No of Copies"].astype(float)
+    data = data.sort_values(by="Order Date", ascending=True)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+    data = data.fillna("N/A")
+    return data
+
+
+def get_copyright_data(month, year) -> (pd.DataFrame, int):
+    """Get copyright data for the current month"""
+    data = pd.read_csv(url_copyright)
+
+    columns = list(data.columns)
+    if "Type" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == year)]
 
     data = data.sort_values(by=["Submission Date"], ascending=True)
-    data.index = range(1, len(data) + 1)
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
 
-    result_count = len(data[data["Result"] == "Yes"])
-    data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
 
     return data, result_count
 
 
-def summary():
-    uk_clean = clean_data(url_uk)
-    usa_clean = clean_data(url_usa)
+def copyright_all(year) -> (pd.DataFrame, int):
+    data = pd.read_csv(url_copyright)
+
+    columns = list(data.columns)
+    if "Type" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year == year)]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def summary(month, year) -> None:
+    """Generate and send summary report to management"""
+    # Get the data
+    uk_clean = clean_data_reviews(url_uk)
+    usa_clean = clean_data_reviews(url_usa)
 
     user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     usa_clean = usa_clean[
-        (usa_clean["Publishing Date"].dt.month == current_month) & (
-                usa_clean["Publishing Date"].dt.year == current_year)]
+        (usa_clean["Publishing Date"].dt.month == month) &
+        (usa_clean["Publishing Date"].dt.year == year)
+        ]
     uk_clean = uk_clean[
-        (uk_clean["Publishing Date"].dt.month == current_month) & (uk_clean["Publishing Date"].dt.year == current_year)]
+        (uk_clean["Publishing Date"].dt.month == month) &
+        (uk_clean["Publishing Date"].dt.year == year)
+        ]
 
     if usa_clean.empty:
         print("No values found in USA sheet.")
+        return
     if uk_clean.empty:
         print("No values found in UK sheet.")
-    if usa_clean.empty or uk_clean.empty:
+        return
+    if usa_clean.empty and uk_clean.empty:
         return
 
-    usa_review = usa_clean["Trustpilot Review"].value_counts()
-    uk_review = uk_clean["Trustpilot Review"].value_counts()
+    usa_review = usa_clean[
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
 
     usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
     uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
 
-    usa_total = usa_review.sum()
-    uk_total = uk_review.sum()
+    usa_total = usa_review.sum() if not usa_review.empty else 0
+    uk_total = uk_review.sum() if not uk_review.empty else 0
 
     usa_attained = usa_review.get('Attained', 0)
     uk_attained = uk_review.get('Attained', 0)
@@ -279,19 +375,19 @@ def summary():
     combined_attained = usa_attained + uk_attained
     combined_attained_pct = (combined_attained / combined_total * 100).round(1) if combined_total > 0 else 0
 
-    printing_ = printing()
-    printing_data = printing_
-    Total_copies = printing_data["No of Copies"].sum()
-    Total_cost = printing_data["Order Cost"].sum()
-    Highest_cost = printing_data["Order Cost"].max()
-    Highest_copies = printing_data["No of Copies"].max()
-    Lowest_cost = printing_data["Order Cost"].min()
-    Lowest_copies = printing_data["No of Copies"].min()
-    printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
-    Average = Total_cost / Total_copies
+    printing_data = get_printing_data_reviews(month, year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
 
-    copyright_, result_count = Copyright()
-    copyright_data = copyright_
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count = get_copyright_data(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
 
@@ -300,12 +396,12 @@ def summary():
 
 *USA Reviews:*
 • Total Reviews: {usa_total}
-• Status Breakdown: {format_review_counts(usa_review)}
+• Status Breakdown: {format_review_counts_reviews(usa_review)}
 • Attained Percentage: {usa_attained_pct}%
 
 *UK Reviews:*
 • Total Reviews: {uk_total}
-• Status Breakdown: {format_review_counts(uk_review)}
+• Status Breakdown: {format_review_counts_reviews(uk_review)}
 • Attained Percentage: {uk_attained_pct}%
 
 *Combined Stats:*
@@ -323,9 +419,127 @@ def summary():
 
 *Copyright Stats:*
 • Total Copyrights: {Total_copyrights}
-• Total Cost:${Total_cost_copyright}
-• Total Successful:{result_count} / {Total_copyrights}
+• Total Cost: ${Total_cost_copyright}
+• Total Successful: {result_count} / {Total_copyrights}
 """
+
+    try:
+        conversation = client.conversations_open(users=user_id)
+        channel_id = conversation['channel']['id']
+
+        response = client.chat_postMessage(
+            channel=channel_id,
+            text=message,
+            mrkdwn=True
+        )
+
+        client.files_upload_v2(
+            channel=channel_id,
+            file=usa_chart_path,
+            title="USA Trustpilot Reviews"
+        )
+
+        client.files_upload_v2(
+            channel=channel_id,
+            file=uk_chart_path,
+            title="UK Trustpilot Reviews"
+        )
+
+        send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"), f"✅ Review summary sent with charts")
+    except SlackApiError as e:
+        print(f"❌ Error sending message: {e.response['error']}")
+        print(f"Detailed error: {str(e)}")
+        logging.error(e)
+
+
+def generate_year_summary(year) -> None:
+    user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+
+    uk_clean = clean_data_reviews(url_uk)
+    usa_clean = clean_data_reviews(url_usa)
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.year == year)
+    ]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.year == year)
+    ]
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+        return
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+        return
+    if usa_clean.empty and uk_clean.empty:
+        return
+
+    usa_review = usa_clean[
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+
+    usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
+    uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
+
+    usa_total = usa_review.sum() if not usa_review.empty else 0
+    uk_total = uk_review.sum() if not uk_review.empty else 0
+
+    usa_attained = usa_review.get('Attained', 0)
+    uk_attained = uk_review.get('Attained', 0)
+
+    usa_attained_pct = (usa_attained / usa_total * 100).round(1) if usa_total > 0 else 0
+    uk_attained_pct = (uk_attained / uk_total * 100).round(1) if uk_total > 0 else 0
+
+    combined_total = usa_total + uk_total
+    combined_attained = usa_attained + uk_attained
+    combined_attained_pct = (combined_attained / combined_total * 100).round(1) if combined_total > 0 else 0
+
+    printing_data = printing_data_all(year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
+
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count = copyright_all(year)
+    Total_copyrights = len(copyright_data)
+    Total_cost_copyright = Total_copyrights * 65
+
+    message = f"""
+    *{current_year} Trustpilot Reviews & Printing Summary*
+
+    *USA Reviews:*
+    • Total Reviews: {usa_total}
+    • Status Breakdown: {format_review_counts_reviews(usa_review)}
+    • Attained Percentage: {usa_attained_pct}%
+
+    *UK Reviews:*
+    • Total Reviews: {uk_total}
+    • Status Breakdown: {format_review_counts_reviews(uk_review)}
+    • Attained Percentage: {uk_attained_pct}%
+
+    *Combined Stats:*
+    • Total Reviews: {combined_total}
+    • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+
+    *Printing Stats:*
+    • Total Copies: {Total_copies}
+    • Total Cost: ${Total_cost:.2f}
+    • Highest Copies: {Highest_copies}
+    • Highest Cost: ${Highest_cost:.2f}
+    • Lowest Copies: {Lowest_copies}
+    • Lowest Cost: ${Lowest_cost:.2f}
+    • Average Cost: ${Average:.2f} per copy
+
+    *Copyright Stats:*
+    • Total Copyrights: {Total_copyrights}
+    • Total Cost: ${Total_cost_copyright}
+    • Total Successful: {result_count} / {Total_copyrights}
+    """
 
     try:
         conversation = client.conversations_open(users=user_id)
@@ -391,8 +605,10 @@ def generate_review_pie_chart(review_counts, title):
     return file_path
 
 
-def format_review_counts(review_counts):
+def format_review_counts_reviews(review_counts):
     """Format review counts as a string"""
+    if review_counts.empty:
+        return "No data"
     return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
 
 
@@ -417,7 +633,8 @@ def logging_function() -> None:
 if __name__ == '__main__':
     for name, email in name_usa.items():
         send_df_as_text(name, url_usa, email)
-    #
+
     # for name, email in names_uk.items():
     #     send_df_as_text(name, url_uk, email)
-    # summary()
+    # summary(5,2025)
+    # generate_year_summary(2025)

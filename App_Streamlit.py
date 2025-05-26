@@ -65,13 +65,17 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     if "Issues" in columns:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
-    # data = data.astype(str)
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data = data.fillna("N/A")
+    data[["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+        ["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].astype(str)
+
+    data[["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+        ["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].fillna("N/A")
+
     return data
 
 
@@ -91,7 +95,6 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
                 data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
         data.index = range(1, len(data) + 1)
-        data = data.fillna("N/A")
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -122,7 +125,6 @@ def review_data(sheet_name, month, year, status) -> pd.DataFrame:
             data = data[data["Trustpilot Review"] == status]
         data = data.sort_values(by="Publishing Date", ascending=True)
     data.index = range(1, len(data) + 1)
-    data = data.fillna("N/A")
     return data
 
 
@@ -193,6 +195,7 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
 
     data.index = range(1, len(data) + 1)
     data = data.fillna("N/A")
+
     return data
 
 
@@ -250,6 +253,7 @@ def get_copyright_data(month, year) -> (pd.DataFrame, int):
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
     data = data.fillna("N/A")
+
     data.index = range(1, len(data) + 1)
 
     return data, result_count
@@ -276,6 +280,7 @@ def copyright_all(year) -> (pd.DataFrame, int):
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
     data = data.fillna("N/A")
+
     data.index = range(1, len(data) + 1)
 
     return data, result_count
@@ -285,24 +290,21 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     """Clean the data from Google Sheets"""
     data = conn.read(worksheet=sheet_name, ttl=0)
 
-    # Find the index of the "Issues" column if it exists
     columns = list(data.columns)
     if "Issues" in columns:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
 
-    # Convert date columns to datetime
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
     data = data.sort_values(by="Publishing Date", ascending=True)
-
-    for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-        if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+    #
+    # for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+    #     if col in data.columns:
+    #         data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
     data.index = range(1, len(data) + 1)
-    data = data.fillna("N/A")
 
     return data
 
@@ -336,7 +338,6 @@ def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datet
         total_percentage = (attained / total_reviews)
 
     data.index = range(1, len(data) + 1)
-    data = data.fillna("N/A")
     return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
@@ -370,8 +371,8 @@ def send_dm(user_id, message) -> None:
 
 def send_df_as_text(name, sheet_name, email) -> None:
     """Send DataFrame as text to a user"""
-    user_id = get_user_id_by_email(email)
-    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email(email)
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
@@ -447,6 +448,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
 
 
 def generate_year_summary(year) -> None:
+    # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
     user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     uk_clean = clean_data_reviews(sheet_uk)
@@ -569,7 +571,8 @@ def summary(month, year) -> None:
     uk_clean = clean_data_reviews(sheet_uk)
     usa_clean = clean_data_reviews(sheet_usa)
 
-    user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     usa_clean = usa_clean[
         (usa_clean["Publishing Date"].dt.month == month) &
