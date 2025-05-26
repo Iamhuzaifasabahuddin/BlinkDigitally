@@ -325,6 +325,8 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
 
+    if "Tracking Number" in data.columns:
+        data["Tracking Number"] = data["Tracking Number"].astype(str)
     return data
 
 
@@ -346,6 +348,8 @@ def printing_data_all(year) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
 
+    if "Tracking Number" in data.columns:
+        data["Tracking Number"] = data["Tracking Number"].astype(str)
     return data
 
 
@@ -718,7 +722,7 @@ with st.container():
     choice = None
     number = None
     if action in ["View Data", "Reviews"]:
-        choice = st.selectbox("Select Data To View", ["UK", "USA", "AudioBook"], index=None,
+        choice = st.selectbox("Select Data To View", ["USA", "UK", "AudioBook"], index=None,
                               placeholder="Select Data to View")
 
     if action in ["View Data", "Reviews", "Printing", "Copyright"]:
