@@ -330,7 +330,6 @@ def copyright_all(year) -> (pd.DataFrame, int):
 
 def summary(month, year) -> None:
     """Generate and send summary report to management"""
-    # Get the data
     uk_clean = clean_data_reviews(url_uk)
     usa_clean = clean_data_reviews(url_usa)
 
@@ -354,6 +353,28 @@ def summary(month, year) -> None:
         return
     if usa_clean.empty and uk_clean.empty:
         return
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", "N/A")
+    bookmarketeers = brands.get("BookMarketeers", "N/A")
+    kdp = brands.get("KDP", "N/A")
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", "N/A")
+
+    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+
+    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+
+    combined_amazon = int(usa_amazon) + int(uk_amazon)
+    combined_bn = int(usa_bn) + int(uk_bn)
+    combined_ingram = int(usa_ingram) + int(uk_ingram)
 
     usa_review = usa_clean[
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
@@ -392,21 +413,42 @@ def summary(month, year) -> None:
     Total_cost_copyright = Total_copyrights * 65
 
     message = f"""
-*{current_month_name} Trustpilot Reviews & Printing Summary*
+*{current_month_name} {year} Trustpilot Reviews & Printing Summary*
 
 *USA Reviews:*
 • Total Reviews: {usa_total}
 • Status Breakdown: {format_review_counts_reviews(usa_review)}
 • Attained Percentage: {usa_attained_pct}%
+    *Brands*
+    - 📘 *BookMarketeers:* `{bookmarketeers}`
+    - 📙 *Writers Clique:* `{writers_clique}`
+    - 📕 *KDP:* `{kdp}`
+    
+    *Platforms*
+    - 🅰 *Amazon:* `{usa_amazon}`
+    - 📔 *Barnes & Noble:* `{usa_bn}`
+    - ⚡ *Ingram Spark:* `{usa_ingram}`
 
 *UK Reviews:*
-• Total Reviews: {uk_total}
-• Status Breakdown: {format_review_counts_reviews(uk_review)}
-• Attained Percentage: {uk_attained_pct}%
+    • Total Reviews: {uk_total}
+    • Status Breakdown: {format_review_counts_reviews(uk_review)}
+    • Attained Percentage: {uk_attained_pct}%
+    
+    **Brand**
+    - 📘 **Authors Solution:** `{authors_solution}`
 
+    *Platforms*
+    - 🅰 *Amazon:* `{uk_amazon}`
+    - 📔 *Barnes & Noble:* `{uk_bn}`
+    - ⚡ *Ingram Spark:* `{uk_ingram}`
+    
 *Combined Stats:*
-• Total Reviews: {combined_total}
-• Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+    • Total Reviews: {combined_total}
+    • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+    • Platform Totals:
+      - 🅰 *Amazon:* `{combined_amazon}`
+      - 📔 *Barnes & Noble:* `{combined_bn}`
+      - ⚡ *Ingram Spark:* `{combined_ingram}`
 
 *Printing Stats:*
 • Total Copies: {Total_copies}
@@ -477,6 +519,28 @@ def generate_year_summary(year) -> None:
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
     uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
 
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    kdp = brands.get("KDP", 0)
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", 0)
+
+    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+
+    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+
+    combined_amazon = int(usa_amazon) + int(uk_amazon)
+    combined_bn = int(usa_bn) + int(uk_bn)
+    combined_ingram = int(usa_ingram) + int(uk_ingram)
+
     usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
     uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
 
@@ -510,22 +574,44 @@ def generate_year_summary(year) -> None:
     Total_cost_copyright = Total_copyrights * 65
 
     message = f"""
-    *{current_year} Trustpilot Reviews & Printing Summary*
+    *{year} Trustpilot Reviews & Printing Summary*
 
     *USA Reviews:*
     • Total Reviews: {usa_total}
     • Status Breakdown: {format_review_counts_reviews(usa_review)}
     • Attained Percentage: {usa_attained_pct}%
+    
+    *Brands*
+    - 📘 *BookMarketeers:* `{bookmarketeers}`
+    - 📙 *Writers Clique:* `{writers_clique}`
+    - 📕 *KDP:* `{kdp}`
+    
+    *Platforms*
+    - 🅰 *Amazon:* `{usa_amazon}`
+    - 📔 *Barnes & Noble:* `{usa_bn}`
+    - ⚡ *Ingram Spark:* `{usa_ingram}`
 
     *UK Reviews:*
     • Total Reviews: {uk_total}
     • Status Breakdown: {format_review_counts_reviews(uk_review)}
     • Attained Percentage: {uk_attained_pct}%
+    
+    *Brand*
+    - 📘 *Authors Solution:* `{authors_solution}`
 
+    *Platforms*
+    - 🅰 *Amazon:* `{uk_amazon}`
+    - 📔 **Barnes & Noble:* `{uk_bn}`
+    - ⚡ *Ingram Spark:* `{uk_ingram}`
+    
     *Combined Stats:*
     • Total Reviews: {combined_total}
     • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
-
+    • Platform Totals:
+      - 🅰 *Amazon:* `{combined_amazon}`
+      - 📔 *Barnes & Noble:* `{combined_bn}`
+      - ⚡ *Ingram Spark:* `{combined_ingram}`
+      
     *Printing Stats:*
     • Total Copies: {Total_copies}
     • Total Cost: ${Total_cost:.2f}
@@ -631,10 +717,10 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    for name, email in name_usa.items():
-        send_df_as_text(name, url_usa, email)
+    # for name, email in name_usa.items():
+    #     send_df_as_text(name, url_usa, email)
 
     # for name, email in names_uk.items():
     #     send_df_as_text(name, url_uk, email)
-    # summary(5,2025)
+    summary(5, 2025)
     # generate_year_summary(2025)

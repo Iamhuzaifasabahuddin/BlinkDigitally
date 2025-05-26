@@ -1,6 +1,7 @@
 import calendar
 import logging
 import tempfile
+import time
 from datetime import datetime
 
 import matplotlib.pyplot as plt
@@ -70,11 +71,11 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data[["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
-        ["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].astype(str)
+    data[[ "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].astype(str)
 
-    data[["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
-        ["LCCN", "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].fillna("N/A")
+    data[["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].fillna("N/A")
 
     return data
 
@@ -448,8 +449,8 @@ def send_df_as_text(name, sheet_name, email) -> None:
 
 
 def generate_year_summary(year) -> None:
-    # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
-    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     uk_clean = clean_data_reviews(sheet_uk)
     usa_clean = clean_data_reviews(sheet_usa)
@@ -471,6 +472,28 @@ def generate_year_summary(year) -> None:
     usa_review = usa_clean[
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
     uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    kdp = brands.get("KDP", 0)
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", 0)
+
+    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+
+    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+
+    combined_amazon = int(usa_amazon) + int(uk_amazon)
+    combined_bn = int(usa_bn) + int(uk_bn)
+    combined_ingram = int(usa_ingram) + int(uk_ingram)
 
     usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
     uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
@@ -512,14 +535,36 @@ def generate_year_summary(year) -> None:
     • Status Breakdown: {format_review_counts_reviews(usa_review)}
     • Attained Percentage: {usa_attained_pct}%
 
+    *Brands*
+    - 📘 *BookMarketeers:* `{bookmarketeers}`
+    - 📙 *Writers Clique:* `{writers_clique}`
+    - 📕 *KDP:* `{kdp}`
+
+    *Platforms*
+    - 🅰 *Amazon:* `{usa_amazon}`
+    - 📔 *Barnes & Noble:* `{usa_bn}`
+    - ⚡ *Ingram Spark:* `{usa_ingram}`
+
     *UK Reviews:*
     • Total Reviews: {uk_total}
     • Status Breakdown: {format_review_counts_reviews(uk_review)}
     • Attained Percentage: {uk_attained_pct}%
 
+    *Brand*
+    - 📘 *Authors Solution:* `{authors_solution}`
+
+    *Platforms*
+    - 🅰 *Amazon:* `{uk_amazon}`
+    - 📔 **Barnes & Noble:* `{uk_bn}`
+    - ⚡ *Ingram Spark:* `{uk_ingram}`
+
     *Combined Stats:*
     • Total Reviews: {combined_total}
     • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+    • Platform Totals:
+      - 🅰 *Amazon:* `{combined_amazon}`
+      - 📔 *Barnes & Noble:* `{combined_bn}`
+      - ⚡ *Ingram Spark:* `{combined_ingram}`
 
     *Printing Stats:*
     • Total Copies: {Total_copies}
@@ -571,8 +616,8 @@ def summary(month, year) -> None:
     uk_clean = clean_data_reviews(sheet_uk)
     usa_clean = clean_data_reviews(sheet_usa)
 
-    # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
-    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     usa_clean = usa_clean[
         (usa_clean["Publishing Date"].dt.month == month) &
@@ -591,6 +636,28 @@ def summary(month, year) -> None:
         return
     if usa_clean.empty and uk_clean.empty:
         return
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", "N/A")
+    bookmarketeers = brands.get("BookMarketeers", "N/A")
+    kdp = brands.get("KDP", "N/A")
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", "N/A")
+
+    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+
+    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+
+    combined_amazon = int(usa_amazon) + int(uk_amazon)
+    combined_bn = int(usa_bn) + int(uk_bn)
+    combined_ingram = int(usa_ingram) + int(uk_ingram)
 
     usa_review = usa_clean[
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
@@ -629,36 +696,57 @@ def summary(month, year) -> None:
     Total_cost_copyright = Total_copyrights * 65
 
     message = f"""
-*{current_month_name} Trustpilot Reviews & Printing Summary*
+    *{current_month_name} {year} Trustpilot Reviews & Printing Summary*
 
-*USA Reviews:*
-• Total Reviews: {usa_total}
-• Status Breakdown: {format_review_counts_reviews(usa_review)}
-• Attained Percentage: {usa_attained_pct}%
+    *USA Reviews:*
+    • Total Reviews: {usa_total}
+    • Status Breakdown: {format_review_counts_reviews(usa_review)}
+    • Attained Percentage: {usa_attained_pct}%
+        *Brands*
+        - 📘 *BookMarketeers:* `{bookmarketeers}`
+        - 📙 *Writers Clique:* `{writers_clique}`
+        - 📕 *KDP:* `{kdp}`
 
-*UK Reviews:*
-• Total Reviews: {uk_total}
-• Status Breakdown: {format_review_counts_reviews(uk_review)}
-• Attained Percentage: {uk_attained_pct}%
+        *Platforms*
+        - 🅰 *Amazon:* `{usa_amazon}`
+        - 📔 *Barnes & Noble:* `{usa_bn}`
+        - ⚡ *Ingram Spark:* `{usa_ingram}`
 
-*Combined Stats:*
-• Total Reviews: {combined_total}
-• Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+    *UK Reviews:*
+        • Total Reviews: {uk_total}
+        • Status Breakdown: {format_review_counts_reviews(uk_review)}
+        • Attained Percentage: {uk_attained_pct}%
 
-*Printing Stats:*
-• Total Copies: {Total_copies}
-• Total Cost: ${Total_cost:.2f}
-• Highest Copies: {Highest_copies}
-• Highest Cost: ${Highest_cost:.2f}
-• Lowest Copies: {Lowest_copies}
-• Lowest Cost: ${Lowest_cost:.2f}
-• Average Cost: ${Average:.2f} per copy
+        **Brand**
+        - 📘 **Authors Solution:** `{authors_solution}`
 
-*Copyright Stats:*
-• Total Copyrights: {Total_copyrights}
-• Total Cost: ${Total_cost_copyright}
-• Total Successful: {result_count} / {Total_copyrights}
-"""
+        *Platforms*
+        - 🅰 *Amazon:* `{uk_amazon}`
+        - 📔 *Barnes & Noble:* `{uk_bn}`
+        - ⚡ *Ingram Spark:* `{uk_ingram}`
+
+    *Combined Stats:*
+        • Total Reviews: {combined_total}
+        • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+        • Platform Totals:
+          - 🅰 *Amazon:* `{combined_amazon}`
+          - 📔 *Barnes & Noble:* `{combined_bn}`
+          - ⚡ *Ingram Spark:* `{combined_ingram}`
+
+    *Printing Stats:*
+    • Total Copies: {Total_copies}
+    • Total Cost: ${Total_cost:.2f}
+    • Highest Copies: {Highest_copies}
+    • Highest Cost: ${Highest_cost:.2f}
+    • Lowest Copies: {Lowest_copies}
+    • Lowest Cost: ${Lowest_cost:.2f}
+    • Average Cost: ${Average:.2f} per copy
+
+    *Copyright Stats:*
+    • Total Copyrights: {Total_copyrights}
+    • Total Cost: ${Total_cost_copyright}
+    • Total Successful: {result_count} / {Total_copyrights}
+    """
 
     try:
         conversation = client.conversations_open(users=user_id)
@@ -835,7 +923,7 @@ with st.container():
                                 - 📕 **KDP:** `{kdp}`
                                 - 📘 **Authors Solution:** `{authors_solution}`
                                 
-                                **Platofrms**
+                                **Platforms**
                                 - 🅰 **Amazon:** `{amazon}`
                                 - 📔 **Barnes & Noble:** `{bn}`
                                 - ⚡ **Ingram Spark:** `{ingram}`
@@ -980,6 +1068,7 @@ with st.container():
                 for name in usa_selected:
                     if name in name_usa:
                         send_df_as_text(name, sheet_usa, name_usa[name])
+                        time.sleep(10)
                         count += 1
                         progress_bar.progress(count / total_members)
 
