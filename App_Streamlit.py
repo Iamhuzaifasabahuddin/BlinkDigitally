@@ -10,9 +10,9 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from streamlit_gsheets import GSheetsConnection
 
+st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="wide")
 client = WebClient(token=st.secrets["Slack"]["Slack"])
 conn = st.connection("gsheets", type=GSheetsConnection)
-st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
 
 sheet_usa = "USA"
 sheet_uk = "UK"
@@ -229,8 +229,8 @@ def send_dm(user_id, message) -> None:
 
 def send_df_as_text(name, sheet_name, email) -> None:
     """Send DataFrame as text to a user"""
-    # user_id = get_user_id_by_email(email)
-    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    user_id = get_user_id_by_email(email)
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
@@ -755,6 +755,18 @@ with st.container():
                 st.markdown("### 📄 Detailed Entry Data")
                 st.dataframe(data)
 
+                brands = data["Brand"].value_counts()
+                writers_clique = brands.get("Writers Clique", "N/A")
+                bookmarketeers = brands.get("BookMarketeers", "N/A")
+                kdp = brands.get("KDP", "N/A")
+                authors_solution = brands.get("Authors Solution", "N/A")
+
+                platforms = data["Platform"].value_counts()
+                amazon = platforms.get("Amazon", "N/A")
+                bn = platforms.get("Barnes & Noble", "N/A")
+                ingram = platforms.get("Ingram Spark", "N/A")
+                fav = platforms.get("FAV", "N/A")
+
                 reviews = data["Trustpilot Review"].value_counts()
                 total_reviews = reviews.sum()
                 attained = reviews.get("Attained", 0)
@@ -769,6 +781,18 @@ with st.container():
                                 - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
                                 - 🟢 **'Attained' Reviews:** `{attained}`
                                 - 📊 **Attainment Rate:** `{percentage}%`
+                                
+                                **Brands**
+                                - 📘 **BookMarketeers:** `{bookmarketeers}`
+                                - 📙 **Writers Clique:** `{writers_clique}`
+                                - 📕 **KDP:** `{kdp}`
+                                - 📘 **Authors Solution:** `{authors_solution}`
+                                
+                                **Platofrms**
+                                - 🅰 **Amazon:** `{amazon}`
+                                - 📔 **Barnes & Noble:** `{bn}`
+                                - ⚡ **Ingram Spark:** `{ingram}`
+                                - 🔉 **Findaway Voices:** `{fav}`
                                 """)
                 with col2:
                     st.markdown("---")
@@ -872,7 +896,7 @@ with st.container():
 
             st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
     elif action == "Copyright" and selected_month and number:
-        st.subheader(f"🖨️ Copyright Summary for {selected_month}")
+        st.subheader(f"© Copyright Summary for {selected_month}")
 
         data, result = get_copyright_data(selected_month_number, number)
 
@@ -881,6 +905,9 @@ with st.container():
 
             total_copyrights = len(data)
             total_cost_copyright = total_copyrights * 65
+            country = data["Country"].value_counts()
+            usa = country.get("USA", "N/A")
+            canada = country.get("Canada", "N/A")
             st.markdown("---")
             st.markdown(f"""
             ### 📊 Summary Stats
@@ -888,6 +915,8 @@ with st.container():
             - 🧾 **Total Copyrighted Titles:** `{total_copyrights}`
             - 💵 **Copyright Total Cost:** `${total_cost_copyright}`
             - ✅ **Total Approved:** `{result} / {total_copyrights}`
+            - 🦅 **USA:** `{usa}`
+            - 🍁 **Canada:** `{canada}`
             """)
             st.markdown("---")
         else:
@@ -899,10 +928,10 @@ with st.container():
         with tab1:
             st.header("Send Review Updates")
 
-            st.subheader("USA Team")
+            st.subheader("🦅 USA Team")
             usa_selected = st.multiselect("Select USA team members:", list(name_usa.keys()))
 
-            st.subheader("UK Team")
+            st.subheader("☕ UK Team")
             uk_selected = st.multiselect("Select UK team members:", list(names_uk.keys()))
 
             if st.button("Send Review Updates"):
@@ -925,7 +954,7 @@ with st.container():
                 st.success(f"Sent review updates to {count} team members!")
 
         with tab2:
-            st.header("Generate Summary Report")
+            st.header("📄 Generate Summary Report")
             selected_month = st.selectbox(
                 "Select Month",
                 month_list,
@@ -967,6 +996,9 @@ with st.container():
                             summary(selected_month_number, number)
                         st.success(f"Summary report for {selected_month} {number} generated and sent!")
     elif action == "Year Summary" and number:
+
+        st.header("📄 Generate Year Summary Report")
+
         uk_clean = clean_data_reviews(sheet_uk)
         usa_clean = clean_data_reviews(sheet_usa)
 
