@@ -879,17 +879,17 @@ with st.container():
 
         if not data.empty:
 
-            Total_copies = data["No of Copies"].sum()
+            Total_copies = float(data["No of Copies"].sum())
 
-            Total_cost = data["Order Cost"].sum()
+            Total_cost = float(data["Order Cost"].sum())
 
-            Highest_cost = data["Order Cost"].max()
+            Highest_cost = float(data["Order Cost"].max())
 
-            Highest_copies = data["No of Copies"].max()
+            Highest_copies = float(data["No of Copies"].max())
 
-            Lowest_cost = data["Order Cost"].min()
+            Lowest_cost = float(data["Order Cost"].min())
 
-            Lowest_copies = data["No of Copies"].min()
+            Lowest_copies = float(data["No of Copies"].min())
 
             # data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
             #
