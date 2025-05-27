@@ -465,8 +465,8 @@ def summary(month, year) -> None:
     •🧾 Total Copyrights: {Total_copyrights}
     •💵 Total Cost: ${Total_cost_copyright}
     •✅ Total Successful: {result_count} / {Total_copyrights}
-    • 🦅 **USA:** `{usa}`
-    • 🍁 **Canada:** `{canada}`
+    • 🦅 *USA:* `{usa}`
+    • 🍁 *Canada:* `{canada}`
 """
 
     try:
@@ -632,8 +632,8 @@ def generate_year_summary(year) -> None:
     •🧾 Total Copyrights: {Total_copyrights}
     •💵 Total Cost: ${Total_cost_copyright}
     •✅ Total Successful: {result_count} / {Total_copyrights}
-    • 🦅 **USA:** `{usa}`
-    • 🍁 **Canada:** `{canada}`
+    • 🦅 *USA:* `{usa}`
+    • 🍁 *Canada:* `{canada}`
     """
 
     try:

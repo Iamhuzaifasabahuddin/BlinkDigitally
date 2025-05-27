@@ -71,7 +71,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data[[ "Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+    data[["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
         ["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].astype(str)
 
     data[["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
@@ -79,7 +79,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
 
     return data
 
-
+@st.cache_data(ttl=3600)
 def load_data(sheet_name, month_number, year) -> pd.DataFrame:
     """Load data from Google Sheets with optional month filtering"""
     try:
@@ -582,8 +582,8 @@ def generate_year_summary(year) -> None:
     •🧾 Total Copyrights: {Total_copyrights}
     •💵 Total Cost: ${Total_cost_copyright}
     •✅ Total Successful: {result_count} / {Total_copyrights}
-    • 🦅 **USA:** `{usa}`
-    • 🍁 **Canada:** `{canada}`
+    • 🦅 *USA:* `{usa}`
+    • 🍁 *Canada:* `{canada}`
     """
 
     try:
@@ -754,8 +754,8 @@ def summary(month, year) -> None:
         •🧾 Total Copyrights: {Total_copyrights}
         •💵 Total Cost: ${Total_cost_copyright}
         •✅ Total Successful: {result_count} / {Total_copyrights}
-        • 🦅 **USA:** `{usa}`
-        • 🍁 **Canada:** `{canada}`
+        • 🦅 *USA:* `{usa}`
+        • 🍁 *Canada:* `{canada}`
     """
 
     try:
