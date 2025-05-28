@@ -7,7 +7,7 @@ streamlit
 st-gsheets-connection
 tabulate
 plotly
-
+reportlab
 dotenv
 python-dotenv
 protobuf
