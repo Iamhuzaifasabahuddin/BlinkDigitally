@@ -2,3 +2,4 @@
 Test.py
 .streamlit/secrets.toml
 *.json
+Gspread.py
