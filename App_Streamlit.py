@@ -52,6 +52,7 @@ sheet_uk = "UK"
 sheet_audio = "AudioBook"
 sheet_printing = "Printing"
 sheet_copyright = "Copyright"
+sheet_a_plus = "A_plus"
 
 month_list = list(calendar.month_name)[1:]
 current_month = datetime.today().month
@@ -489,6 +490,64 @@ def copyright_all(year) -> (pd.DataFrame, int):
 
     if "Submission Date" in data.columns:
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def get_A_plus_data(month, year) -> (pd.DataFrame, int):
+    data = get_sheet_data(sheet_a_plus)
+    if data.empty:
+        return data
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], errors='coerce')
+        data = data[
+            (data["A+ Content Date"].dt.month == month) & (data["A+ Content Date"].dt.year == year)]
+    data = data.sort_values(by=["A+ Content Date"], ascending=True)
+
+    result_count = len(data[data["Status"] == "Published"]) if "Status" in data.columns else 0
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = data["A+ Content Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def get_A_plus_all(year) -> (pd.DataFrame, int):
+    data = get_sheet_data(sheet_a_plus)
+    if data.empty:
+        return data
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], errors='coerce')
+        data = data[
+            (data["A+ Content Date"].dt.year == year)]
+    data = data.sort_values(by=["A+ Content Date"], ascending=True)
+
+    result_count = len(data[data["Status"] == "Published"]) if "Status" in data.columns else 0
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = data["A+ Content Date"].dt.strftime("%d-%B-%Y")
 
     data = data.fillna("N/A")
 
@@ -998,6 +1057,8 @@ def summary(month, year):
     usa = country.get("USA", "N/A")
     canada = country.get("Canada", "N/A")
 
+    a_plus, a_plus_count = get_A_plus_data(month, year)
+
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp}
     uk_brands = {'Authors Solution': authors_solution}
 
@@ -1022,7 +1083,7 @@ def summary(month, year):
         'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count
 
 
 def generate_year_summary(year):
@@ -1094,6 +1155,8 @@ def generate_year_summary(year):
     usa = country.get("USA", "N/A")
     canada = country.get("Canada", "N/A")
 
+    a_plus, a_plus_count = get_A_plus_all(year)
+
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp}
     uk_brands = {'Authors Solution': authors_solution}
 
@@ -1118,7 +1181,7 @@ def generate_year_summary(year):
         'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count
 
 
 def logging_function() -> None:
@@ -1140,7 +1203,7 @@ def logging_function() -> None:
 
 
 def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_brands,
-                                usa_platforms, uk_platforms, printing_stats, copyright_stats,
+                                usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus,
                                 selected_month, number, filename="summary_report.pdf"):
     """
     Generate a PDF version of the Streamlit summary report
@@ -1364,6 +1427,27 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     story.append(copyright_table)
     story.append(Spacer(1, 20))
 
+    story.append(Paragraph("A+ Content", section_style))
+    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
+    story.append(Spacer(1, 12))
+    a_plus_data = [
+        ['Metric', 'Count'],
+        ['Total A+', str(a_plus)]
+    ]
+
+    a_plus_table = Table(a_plus_data)
+    a_plus_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.blue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
+    ]))
+
+    story.append(a_plus_table)
+    story.append(Spacer(1, 20))
+
     # Executive Summary Section
     story.append(Paragraph("📈 Executive Summary", section_style))
     story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
@@ -1385,6 +1469,10 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     • Applications: {copyright_stats['Total_copyrights']}<br/>
     • Success Rate: {success_rate:.1f}%<br/>
     • Total Cost: ${copyright_stats['Total_cost_copyright']:,}<br/>
+
+    <b>A+ Content:</b><br/>
+    • Total A+: {a_plus}<br/>
+
     """
 
     story.append(Paragraph(exec_summary, styles['Normal']))
@@ -1682,13 +1770,13 @@ def main():
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            col1, col2, col3, col4 = st.columns(4)
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
                                                                                  usa_platforms, uk_platforms,
                                                                                  printing_stats, copyright_stats,
+                                                                                 a_plus,
                                                                                  selected_month, number)
 
                             usa_total = usa_review_data.sum()
@@ -1834,6 +1922,14 @@ def main():
 
                             st.divider()
 
+                            cola = st.columns(1)
+
+                            with cola[0]:
+                                st.subheader("🅰➕ Content")
+                                st.metric("A+ Count", f"{a_plus} Published")
+
+                            st.divider()
+
                             st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
 
                             summary_col1, summary_col2, summary_col3 = st.columns(3)
@@ -1894,14 +1990,13 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus = generate_year_summary(
                             number)
-
-                        pdf_data, pdf_filename = generate_summary_report_pdf(
-                            usa_review_data, uk_review_data, usa_brands, uk_brands,
-                            usa_platforms, uk_platforms, printing_stats, copyright_stats,
-                            selected_month, number
-                        )
+                        pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
+                                                                             usa_brands, uk_brands,
+                                                                             usa_platforms, uk_platforms,
+                                                                             printing_stats, copyright_stats, a_plus,
+                                                                             selected_month, number)
 
                         # Calculate metrics for display
                         usa_total = usa_review_data.sum()
@@ -2041,6 +2136,14 @@ def main():
                                 title="Copyright Applications by Country"
                             )
                             st.plotly_chart(fig_copyright, use_container_width=True)
+
+                        st.divider()
+
+                        cola = st.columns(1)
+
+                        with cola[0]:
+                            st.subheader("🅰➕ Content")
+                            st.metric("A+ Count", f"{a_plus} Published")
 
                         st.divider()
 
