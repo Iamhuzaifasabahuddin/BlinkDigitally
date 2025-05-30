@@ -6,6 +6,8 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -14,15 +16,54 @@ load_dotenv('Info.env')
 SLACK_BOT_TOKEN = os.getenv("SLACK")
 client = WebClient(token=SLACK_BOT_TOKEN)
 
-# Sheet URLs
+# Google Sheets setup with gspread
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+
+
+
+# Initialize gspread client
+def get_gspread_client():
+    """Initialize and return gspread client with service account credentials"""
+    try:
+        credentials = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+        gc = gspread.authorize(credentials)
+        return gc
+    except Exception as e:
+        logging.error(f"Failed to initialize gspread client: {e}")
+        return None
+
+
+def get_sheet_data(sheet_name):
+    """Get data from a specific sheet using gspread"""
+    try:
+        gc = get_gspread_client()
+        if not gc:
+            return pd.DataFrame()
+
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        worksheet = spreadsheet.worksheet(sheet_name)
+
+        # Get all records as a list of dictionaries
+        records = worksheet.get_all_values()
+        headers = records[0]
+        rows = records[1:]
+        # Convert to DataFrame
+        df = pd.DataFrame(rows, columns=headers)
+
+        return df
+    except Exception as e:
+        logging.error(f"Failed to get data from sheet {sheet_name}: {e}")
+        return pd.DataFrame()
+
+
+# Sheet names
 sheet_usa = "USA"
 sheet_uk = "UK"
-url_usa = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_usa}"
-url_uk = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_uk}"
-url_Audio = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=AudioBook"
-url_printing = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Printing"
-url_copyright = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Copyright"
+sheet_audio = "AudioBook"
+sheet_printing = "Printing"
+sheet_copyright = "Copyright"
 
 name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
@@ -53,14 +94,19 @@ current_year = datetime.today().year
 
 
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
-    """Clean the data from Google Sheets"""
-    data = pd.read_csv(sheet_name)
+    """Clean the data from Google Sheets using gspread"""
+    data = get_sheet_data(sheet_name)
+
+    if data.empty:
+        logging.warning(f"No data found in sheet: {sheet_name}")
+        return data
 
     columns = list(data.columns)
     if "Issues" in columns:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
 
+    # Handle date columns
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
@@ -71,10 +117,13 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     return data
 
 
-def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datetime, int):
+def load_data_reviews(sheet_name, name) -> tuple:
     """Load and filter data for a specific project manager"""
     data = clean_data_reviews(sheet_name)
     data_original = data
+
+    if data.empty:
+        return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
 
     # Filter data based on criteria
     data = data_original[
@@ -103,9 +152,9 @@ def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datet
     return data, total_percentage, min_date, max_date, attained, total_reviews
 
 
-def load_data_audio(name) -> pd.DataFrame:
+def load_data_audio(name) -> tuple:
     """Load and filter audio book data for a specific project manager"""
-    return load_data_reviews(url_Audio, name)
+    return load_data_reviews(sheet_audio, name)
 
 
 def get_user_id_by_email(email):
@@ -131,8 +180,8 @@ def send_dm(user_id, message):
 
 def send_df_as_text(name, sheet_name, email) -> None:
     """Send DataFrame as text to a user"""
-    user_id = get_user_id_by_email(email)
-    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email(email)
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
@@ -145,8 +194,17 @@ def send_df_as_text(name, sheet_name, email) -> None:
     if df.empty and df_audio.empty:
         print(f"⚠️ No data for {name}")
         return
-    min_month_name = min(min_date, min_date_audio).strftime("%B")
-    max_month_name = max(max_date, max_date_audio).strftime("%B")
+
+    # Handle NaT values for date formatting
+    min_dates = [d for d in [min_date, min_date_audio] if pd.notna(d)]
+    max_dates = [d for d in [max_date, max_date_audio] if pd.notna(d)]
+
+    if not min_dates or not max_dates:
+        print(f"⚠️ No valid dates for {name}")
+        return
+
+    min_month_name = min(min_dates).strftime("%B")
+    max_month_name = max(max_dates).strftime("%B")
 
     def truncate_title(x):
         """Truncate long titles"""
@@ -169,6 +227,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
     merged_df = pd.concat([display_df, display_df_audio], ignore_index=True)
     display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
     merged_df = merged_df[display_columns]
+
     if not merged_df.empty:
         markdown_table = merged_df.to_markdown(index=False)
 
@@ -208,8 +267,11 @@ def send_df_as_text(name, sheet_name, email) -> None:
 
 
 def get_printing_data_reviews(month, year) -> pd.DataFrame:
-    """Get printing data for the current month"""
-    data = pd.read_csv(url_printing)
+    """Get printing data for the current month using gspread"""
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return data
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
@@ -227,10 +289,12 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
 
-    data["No of Copies"] = data["No of Copies"].astype(float)
-    data = data.sort_values(by="Order Date", ascending=True)
-    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
 
+    data = data.sort_values(by="Order Date", ascending=True)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
@@ -241,7 +305,11 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
 
 
 def printing_data_all(year) -> pd.DataFrame:
-    data = pd.read_csv(url_printing)
+    """Get all printing data for a specific year using gspread"""
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return data
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
@@ -259,11 +327,12 @@ def printing_data_all(year) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
 
-    data["No of Copies"] = data["No of Copies"].astype(float)
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
+
     data = data.sort_values(by="Order Date", ascending=True)
 
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
@@ -272,12 +341,15 @@ def printing_data_all(year) -> pd.DataFrame:
     return data
 
 
-def get_copyright_data(month, year) -> (pd.DataFrame, int):
-    """Get copyright data for the current month"""
-    data = pd.read_csv(url_copyright)
+def get_copyright_data(month, year) -> tuple:
+    """Get copyright data for the current month using gspread"""
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return data, 0
 
     columns = list(data.columns)
-    if "Type" in columns:
+    if "Country" in columns:
         end_col_index = columns.index("Country")
         data = data.iloc[:, :end_col_index + 1]
     data = data.astype(str)
@@ -294,17 +366,20 @@ def get_copyright_data(month, year) -> (pd.DataFrame, int):
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
     data = data.fillna("N/A")
-
     data.index = range(1, len(data) + 1)
 
     return data, result_count
 
 
-def copyright_all(year) -> (pd.DataFrame, int):
-    data = pd.read_csv(url_copyright)
+def copyright_all(year) -> tuple:
+    """Get all copyright data for a specific year using gspread"""
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return data, 0
 
     columns = list(data.columns)
-    if "Type" in columns:
+    if "Country" in columns:
         end_col_index = columns.index("Country")
         data = data.iloc[:, :end_col_index + 1]
     data = data.astype(str)
@@ -321,7 +396,6 @@ def copyright_all(year) -> (pd.DataFrame, int):
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
     data = data.fillna("N/A")
-
     data.index = range(1, len(data) + 1)
 
     return data, result_count
@@ -329,44 +403,52 @@ def copyright_all(year) -> (pd.DataFrame, int):
 
 def summary(month, year) -> None:
     """Generate and send summary report to management"""
-    uk_clean = clean_data_reviews(url_uk)
-    usa_clean = clean_data_reviews(url_usa)
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
 
-    user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
-    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
-    usa_clean = usa_clean[
-        (usa_clean["Publishing Date"].dt.month == month) &
-        (usa_clean["Publishing Date"].dt.year == year)
-        ]
-    uk_clean = uk_clean[
-        (uk_clean["Publishing Date"].dt.month == month) &
-        (uk_clean["Publishing Date"].dt.year == year)
-        ]
+    if usa_clean.empty and uk_clean.empty:
+        print("No data found in either USA or UK sheets.")
+        return
+
+    if not usa_clean.empty:
+        usa_clean = usa_clean[
+            (usa_clean["Publishing Date"].dt.month == month) &
+            (usa_clean["Publishing Date"].dt.year == year)
+            ]
+
+    if not uk_clean.empty:
+        uk_clean = uk_clean[
+            (uk_clean["Publishing Date"].dt.month == month) &
+            (uk_clean["Publishing Date"].dt.year == year)
+            ]
 
     if usa_clean.empty:
-        print("No values found in USA sheet.")
-        return
+        print("No values found in USA sheet for the specified period.")
     if uk_clean.empty:
-        print("No values found in UK sheet.")
-        return
+        print("No values found in UK sheet for the specified period.")
+
     if usa_clean.empty and uk_clean.empty:
         return
 
-    brands = usa_clean["Brand"].value_counts()
+    # Process USA data
+    brands = usa_clean["Brand"].value_counts() if not usa_clean.empty else pd.Series()
     writers_clique = brands.get("Writers Clique", "N/A")
     bookmarketeers = brands.get("BookMarketeers", "N/A")
     kdp = brands.get("KDP", "N/A")
 
-    uk_brand = uk_clean["Brand"].value_counts()
-    authors_solution = uk_brand.get("Authors Solution", "N/A")
-
-    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_platforms = usa_clean["Platform"].value_counts() if not usa_clean.empty else pd.Series()
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
 
-    uk_platforms = uk_clean["Platform"].value_counts()
+    # Process UK data
+    uk_brand = uk_clean["Brand"].value_counts() if not uk_clean.empty else pd.Series()
+    authors_solution = uk_brand.get("Authors Solution", "N/A")
+
+    uk_platforms = uk_clean["Platform"].value_counts() if not uk_clean.empty else pd.Series()
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
@@ -376,8 +458,9 @@ def summary(month, year) -> None:
     combined_ingram = int(usa_ingram) + int(uk_ingram)
 
     usa_review = usa_clean[
-        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns and not usa_clean.empty else pd.Series()
+    uk_review = uk_clean[
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns and not uk_clean.empty else pd.Series()
 
     usa_chart_path = generate_review_pie_chart(usa_review, "USA Trustpilot Reviews")
     uk_chart_path = generate_review_pie_chart(uk_review, "UK Trustpilot Reviews")
@@ -410,7 +493,7 @@ def summary(month, year) -> None:
     copyright_data, result_count = get_copyright_data(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
-    country = copyright_data["Country"].value_counts()
+    country = copyright_data["Country"].value_counts() if not copyright_data.empty else pd.Series()
     usa = country.get("USA", "N/A")
     canada = country.get("Canada", "N/A")
 
@@ -425,7 +508,7 @@ def summary(month, year) -> None:
     - 📘 *BookMarketeers:* `{bookmarketeers}`
     - 📙 *Writers Clique:* `{writers_clique}`
     - 📕 *KDP:* `{kdp}`
-    
+
     *Platforms*
     - 🅰 *Amazon:* `{usa_amazon}`
     - 📔 *Barnes & Noble:* `{usa_bn}`
@@ -435,15 +518,15 @@ def summary(month, year) -> None:
     • Total Reviews: {uk_total}
     • Status Breakdown: {format_review_counts_reviews(uk_review)}
     • Attained Percentage: {uk_attained_pct}%
-    
-    **Brand**
-    - 📘 **Authors Solution:** `{authors_solution}`
+
+    *Brand*
+    - 📘 *Authors Solution:* `{authors_solution}`
 
     *Platforms*
     - 🅰 *Amazon:* `{uk_amazon}`
     - 📔 *Barnes & Noble:* `{uk_bn}`
     - ⚡ *Ingram Spark:* `{uk_ingram}`
-    
+
 *Combined Stats:*
     • Total Reviews: {combined_total}
     • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
@@ -502,41 +585,44 @@ def generate_year_summary(year) -> None:
     # user_id = get_user_id_by_email("farmanali@topsoftdigitals.pk")
     user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
-    uk_clean = clean_data_reviews(url_uk)
-    usa_clean = clean_data_reviews(url_usa)
-    usa_clean = usa_clean[
-        (usa_clean["Publishing Date"].dt.year == year)
-    ]
-    uk_clean = uk_clean[
-        (uk_clean["Publishing Date"].dt.year == year)
-    ]
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+
+    if not usa_clean.empty:
+        usa_clean = usa_clean[
+            (usa_clean["Publishing Date"].dt.year == year)
+        ]
+    if not uk_clean.empty:
+        uk_clean = uk_clean[
+            (uk_clean["Publishing Date"].dt.year == year)
+        ]
+
     if usa_clean.empty:
         print("No values found in USA sheet.")
-        return
     if uk_clean.empty:
         print("No values found in UK sheet.")
-        return
     if usa_clean.empty and uk_clean.empty:
         return
 
     usa_review = usa_clean[
-        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns and not usa_clean.empty else pd.Series()
+    uk_review = uk_clean[
+        "Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns and not uk_clean.empty else pd.Series()
 
-    brands = usa_clean["Brand"].value_counts()
+    brands = usa_clean["Brand"].value_counts() if not usa_clean.empty else pd.Series()
     writers_clique = brands.get("Writers Clique", 0)
     bookmarketeers = brands.get("BookMarketeers", 0)
     kdp = brands.get("KDP", 0)
 
-    uk_brand = uk_clean["Brand"].value_counts()
+    uk_brand = uk_clean["Brand"].value_counts() if not uk_clean.empty else pd.Series()
     authors_solution = uk_brand.get("Authors Solution", 0)
 
-    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_platforms = usa_clean["Platform"].value_counts() if not usa_clean.empty else pd.Series()
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
 
-    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_platforms = uk_clean["Platform"].value_counts() if not uk_clean.empty else pd.Series()
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
@@ -581,60 +667,60 @@ def generate_year_summary(year) -> None:
     canada = country.get("Canada", "N/A")
 
     message = f"""
-    *{year} Trustpilot Reviews & Printing Summary*
+        *{year} Trustpilot Reviews & Printing Summary*
 
-    *USA Reviews:*
-    • Total Reviews: {usa_total}
-    • Status Breakdown: {format_review_counts_reviews(usa_review)}
-    • Attained Percentage: {usa_attained_pct}%
-    
-    *Brands*
-    - 📘 *BookMarketeers:* `{bookmarketeers}`
-    - 📙 *Writers Clique:* `{writers_clique}`
-    - 📕 *KDP:* `{kdp}`
-    
-    *Platforms*
-    - 🅰 *Amazon:* `{usa_amazon}`
-    - 📔 *Barnes & Noble:* `{usa_bn}`
-    - ⚡ *Ingram Spark:* `{usa_ingram}`
+        *USA Reviews:*
+        • Total Reviews: {usa_total}
+        • Status Breakdown: {format_review_counts_reviews(usa_review)}
+        • Attained Percentage: {usa_attained_pct}%
 
-    *UK Reviews:*
-    • Total Reviews: {uk_total}
-    • Status Breakdown: {format_review_counts_reviews(uk_review)}
-    • Attained Percentage: {uk_attained_pct}%
-    
-    *Brand*
-    - 📘 *Authors Solution:* `{authors_solution}`
+        *Brands*
+        - 📘 *BookMarketeers:* `{bookmarketeers}`
+        - 📙 *Writers Clique:* `{writers_clique}`
+        - 📕 *KDP:* `{kdp}`
 
-    *Platforms*
-    - 🅰 *Amazon:* `{uk_amazon}`
-    - 📔 **Barnes & Noble:* `{uk_bn}`
-    - ⚡ *Ingram Spark:* `{uk_ingram}`
-    
-    *Combined Stats:*
-    • Total Reviews: {combined_total}
-    • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
-    • Platform Totals:
-      - 🅰 *Amazon:* `{combined_amazon}`
-      - 📔 *Barnes & Noble:* `{combined_bn}`
-      - ⚡ *Ingram Spark:* `{combined_ingram}`
-      
-    *Printing Stats:*
-    •🧾 Total Copies: {Total_copies}
-    •💰 Total Cost: ${Total_cost:.2f}
-    •📈 Highest Cost: ${Highest_cost:.2f}
-    •📉 Lowest Cost: ${Lowest_cost:.2f}
-    •🔢 Highest Copies: {Highest_copies}
-    •🧮 Lowest Copies: {Lowest_copies}
-    •🧾 Average Cost: ${Average:.2f} per copy
+        *Platforms*
+        - 🅰 *Amazon:* `{usa_amazon}`
+        - 📔 *Barnes & Noble:* `{usa_bn}`
+        - ⚡ *Ingram Spark:* `{usa_ingram}`
 
-    *Copyright Stats:*
-    •🧾 Total Copyrights: {Total_copyrights}
-    •💵 Total Cost: ${Total_cost_copyright}
-    •✅ Total Successful: {result_count} / {Total_copyrights}
-    • 🦅 *USA:* `{usa}`
-    • 🍁 *Canada:* `{canada}`
-    """
+        *UK Reviews:*
+        • Total Reviews: {uk_total}
+        • Status Breakdown: {format_review_counts_reviews(uk_review)}
+        • Attained Percentage: {uk_attained_pct}%
+
+        *Brand*
+        - 📘 *Authors Solution:* `{authors_solution}`
+
+        *Platforms*
+        - 🅰 *Amazon:* `{uk_amazon}`
+        - 📔 **Barnes & Noble:* `{uk_bn}`
+        - ⚡ *Ingram Spark:* `{uk_ingram}`
+
+        *Combined Stats:*
+        • Total Reviews: {combined_total}
+        • Attained Reviews: {combined_attained} ({combined_attained_pct}%)
+        • Platform Totals:
+          - 🅰 *Amazon:* `{combined_amazon}`
+          - 📔 *Barnes & Noble:* `{combined_bn}`
+          - ⚡ *Ingram Spark:* `{combined_ingram}`
+
+        *Printing Stats:*
+        •🧾 Total Copies: {Total_copies}
+        •💰 Total Cost: ${Total_cost:.2f}
+        •📈 Highest Cost: ${Highest_cost:.2f}
+        •📉 Lowest Cost: ${Lowest_cost:.2f}
+        •🔢 Highest Copies: {Highest_copies}
+        •🧮 Lowest Copies: {Lowest_copies}
+        •🧾 Average Cost: ${Average:.2f} per copy
+
+        *Copyright Stats:*
+        •🧾 Total Copyrights: {Total_copyrights}
+        •💵 Total Cost: ${Total_cost_copyright}
+        •✅ Total Successful: {result_count} / {Total_copyrights}
+        • 🦅 *USA:* `{usa}`
+        • 🍁 *Canada:* `{canada}`
+        """
 
     try:
         conversation = client.conversations_open(users=user_id)
@@ -727,9 +813,9 @@ def logging_function() -> None:
 
 if __name__ == '__main__':
     # for name, email in name_usa.items():
-    #     send_df_as_text(name, url_usa, email)
+    #     send_df_as_text(name, sheet_usa, email)
 
     # for name, email in names_uk.items():
     #     send_df_as_text(name, url_uk, email)
-    # summary(5, 2025)
-    generate_year_summary(2025)
+    summary(5, 2025)
+    # generate_year_summary(2025)
