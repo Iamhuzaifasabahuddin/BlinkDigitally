@@ -21,7 +21,7 @@ from reportlab.platypus.flowables import HRFlowable
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
 client = WebClient(token=st.secrets["Slack"]["Slack"])
 
 creds_dict = {
@@ -1089,7 +1089,7 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
 
     <b>Printing:</b><br/>
     • Total Copies: {printing_stats['Total_copies']:,}<br/>
-    • Total Investment: ${printing_stats['Total_cost']:,.2f}<br/>
+    • Total Cost: ${printing_stats['Total_cost']:,.2f}<br/>
     • Cost Efficiency: ${printing_stats['Average']:.2f}/copy<br/><br/>
 
     <b>Copyright:</b><br/>
@@ -1320,6 +1320,7 @@ def main():
                 - 🧾 **Total Copyrighted Titles:** `{total_copyrights}`
                 - 💵 **Copyright Total Cost:** `${total_cost_copyright}`
                 - ✅ **Total Approved:** `{result} / {total_copyrights}`
+                - 📈 **Total Approved rate:** `{result / total_copyrights:.1%}`
                 - 🦅 **USA:** `{usa}`
                 - 🍁 **Canada:** `{canada}`
                 """)
@@ -1572,7 +1573,7 @@ def main():
                             with summary_col2:
                                 st.markdown("### 🖨️ Printing")
                                 st.write(f"• **Total Copies**: {printing_stats['Total_copies']:,}")
-                                st.write(f"• **Total Investment**: ${printing_stats['Total_cost']:,.2f}")
+                                st.write(f"• **Total Cost**: ${printing_stats['Total_cost']:,.2f}")
                                 st.write(f"• **Cost Efficiency**: ${printing_stats['Average']:.2f}/copy")
 
                             with summary_col3:
@@ -1790,7 +1791,7 @@ def main():
                         with summary_col2:
                             st.markdown("### 🖨️ Printing")
                             st.write(f"• **Total Copies**: {printing_stats['Total_copies']:,}")
-                            st.write(f"• **Total Investment**: ${printing_stats['Total_cost']:,.2f}")
+                            st.write(f"• **Total Cost**: ${printing_stats['Total_cost']:,.2f}")
                             st.write(f"• **Cost Efficiency**: ${printing_stats['Average']:.2f}/copy")
 
                         with summary_col3:
