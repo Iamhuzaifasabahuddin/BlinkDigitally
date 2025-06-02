@@ -1356,7 +1356,6 @@ def main():
                         if name in names_uk:
                             send_df_as_text(name, sheet_uk, names_uk[name])
                             time.sleep(5)
-
                             count += 1
                             progress_bar.progress(count / total_members)
 
