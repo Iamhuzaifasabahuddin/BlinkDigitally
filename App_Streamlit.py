@@ -187,7 +187,7 @@ def get_printing_data(month, year) -> pd.DataFrame:
 
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
-            data["Order Cost"] = pd.to_numeric(data["Order Cost"].str.replace("$", "", regex=False), errors="coerce")
+            data["Order Cost"] = pd.to_numeric(data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
 
         data = data.sort_values(by="Order Date", ascending=True)
 
@@ -384,7 +384,8 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
 
     if "Order Cost" in data.columns:
         data["Order Cost"] = data["Order Cost"].astype(str)
-        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
 
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
@@ -421,7 +422,8 @@ def printing_data_all(year) -> pd.DataFrame:
 
     if "Order Cost" in data.columns:
         data["Order Cost"] = data["Order Cost"].astype(str)
-        data['Order Cost'] = pd.to_numeric(data['Order Cost'].str.replace('$', '', regex=False), errors='coerce')
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
 
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
