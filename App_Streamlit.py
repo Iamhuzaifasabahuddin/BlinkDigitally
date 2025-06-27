@@ -1409,11 +1409,11 @@ def main():
                                                                                  selected_month, number)
 
                             usa_total = usa_review_data.sum()
-                            usa_attained = usa_review_data['Attained']
+                            usa_attained = usa_review_data.get("Attained", 0)
                             usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
                             uk_total = uk_review_data.sum()
-                            uk_attained = uk_review_data['Attained']
+                            uk_attained = uk_review_data.get("Attained", 0)
                             uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
 
                             combined_total = usa_total + uk_total
@@ -1630,11 +1630,11 @@ def main():
 
                         # Calculate metrics for display
                         usa_total = usa_review_data.sum()
-                        usa_attained = usa_review_data['Attained']
+                        usa_attained = usa_review_data.get("Attained", 0)
                         usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
                         uk_total = uk_review_data.sum()
-                        uk_attained = uk_review_data['Attained']
+                        uk_attained = uk_review_data.get("Attained", 0)
                         uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
 
                         combined_total = usa_total + uk_total
