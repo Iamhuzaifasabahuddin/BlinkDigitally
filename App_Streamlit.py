@@ -1409,15 +1409,17 @@ def main():
                                                                                  selected_month, number)
 
                             usa_total = usa_review_data.sum()
-                            usa_attained = usa_review_data.get("Attained", 0)
+                            usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
+
                             usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
                             uk_total = uk_review_data.sum()
-                            uk_attained = uk_review_data.get("Attained", 0)
+                            uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
+
                             uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
 
                             combined_total = usa_total + uk_total
-                            combined_attained = usa_review_data['Attained'] + uk_review_data['Attained']
+                            combined_attained = usa_attained + uk_attained
                             combined_attained_pct = (
                                     combined_attained / combined_total * 100) if combined_total > 0 else 0
                             st.header(f"{selected_month} {number} Summary Report")
@@ -1630,15 +1632,17 @@ def main():
 
                         # Calculate metrics for display
                         usa_total = usa_review_data.sum()
-                        usa_attained = usa_review_data.get("Attained", 0)
+                        usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
+
                         usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
                         uk_total = uk_review_data.sum()
-                        uk_attained = uk_review_data.get("Attained", 0)
+                        uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
+
                         uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
 
                         combined_total = usa_total + uk_total
-                        combined_attained = usa_review_data['Attained'] + uk_review_data['Attained']
+                        combined_attained = usa_attained + uk_attained
                         combined_attained_pct = (combined_attained / combined_total * 100) if combined_total > 0 else 0
 
                         st.header(f"{number} Summary Report")
