@@ -1570,8 +1570,8 @@ def main():
                                 st.markdown("### 📝 Reviews")
                                 st.write(f"• **Combined Reviews**: {combined_total}")
                                 st.write(f"• **Success Rate**: {combined_attained_pct:.1f}%")
-                                st.write(f"• **USA Attained**: {usa_review_data['Attained']}")
-                                st.write(f"• **UK Attained**: {uk_review_data['Attained']}")
+                                st.write(f"• **USA Attained**: {usa_attained}")
+                                st.write(f"• **UK Attained**: {uk_attained}")
 
                             with summary_col2:
                                 st.markdown("### 🖨️ Printing")
@@ -1790,8 +1790,8 @@ def main():
                             st.markdown("### 📝 Reviews")
                             st.write(f"• **Combined Reviews**: {combined_total}")
                             st.write(f"• **Success Rate**: {combined_attained_pct:.1f}%")
-                            st.write(f"• **USA Attained**: {usa_review_data['Attained']}")
-                            st.write(f"• **UK Attained**: {uk_review_data['Attained']}")
+                            st.write(f"• **USA Attained**: {usa_attained}")
+                            st.write(f"• **UK Attained**: {uk_attained}")
 
                         with summary_col2:
                             st.markdown("### 🖨️ Printing")
