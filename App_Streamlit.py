@@ -147,7 +147,8 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
         for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
             if col in data.columns:
                 data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-
+        if "Name" in data.columns:
+            data = data.drop_duplicates(subset=["Name"])
         data.index = range(1, len(data) + 1)
         return data
     except Exception as e:
@@ -1201,6 +1202,10 @@ def main():
                     total_reviews = reviews.sum()
                     attained = reviews.get("Attained", 0)
                     percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
+
+                    unique_clients_count_per_pm = data.groupby('Project Manager')['Name'].nunique().reset_index()
+                    unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
+
                     col1, col2 = st.columns(2)
                     with col1:
 
@@ -1230,6 +1235,8 @@ def main():
                         st.markdown("#### 🔍 Review Type Breakdown")
                         for review_type, count in reviews.items():
                             st.markdown(f"- 📝 **{review_type}**: `{count}`")
+                        st.write("Clients Per PM")
+                        st.dataframe(unique_clients_count_per_pm)
                 st.markdown("---")
         elif action == "Reviews" and choice and selected_month and status and number:
             sheet_name = {
