@@ -1,12 +1,10 @@
 import calendar
 import logging
-import tempfile
 import time
 from datetime import datetime
 from io import BytesIO
 
 import gspread
-import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -188,7 +186,8 @@ def get_printing_data(month, year) -> pd.DataFrame:
 
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
-            data["Order Cost"] = pd.to_numeric(data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+            data["Order Cost"] = pd.to_numeric(
+                data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
 
         data = data.sort_values(by="Order Date", ascending=True)
 
@@ -221,7 +220,8 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
-
+    # if "Name" in data.columns:
+    #     data = data.drop_duplicates(subset=["Name"])
     data = data.sort_values(by="Publishing Date", ascending=True)
     data.index = range(1, len(data) + 1)
 
@@ -1205,7 +1205,7 @@ def main():
 
                     unique_clients_count_per_pm = data.groupby('Project Manager')['Name'].nunique().reset_index()
                     unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
-                    unique_clients_count_per_pm.index = range(1, len(data) + 1)
+                    # unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
                     col1, col2 = st.columns(2)
                     with col1:
 
