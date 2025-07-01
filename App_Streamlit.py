@@ -1205,7 +1205,7 @@ def main():
 
                     unique_clients_count_per_pm = data.groupby('Project Manager')['Name'].nunique().reset_index()
                     unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
-
+                    unique_clients_count_per_pm.index = range(1, len(data) + 1)
                     col1, col2 = st.columns(2)
                     with col1:
 
@@ -1235,7 +1235,7 @@ def main():
                         st.markdown("#### 🔍 Review Type Breakdown")
                         for review_type, count in reviews.items():
                             st.markdown(f"- 📝 **{review_type}**: `{count}`")
-                        st.write("Clients Per PM")
+                        st.write("📝 **Clients Per PM**")
                         st.dataframe(unique_clients_count_per_pm)
                 st.markdown("---")
         elif action == "Reviews" and choice and selected_month and status and number:
