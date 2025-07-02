@@ -1205,7 +1205,7 @@ def main():
 
                     unique_clients_count_per_pm = data.groupby('Project Manager')['Name'].nunique().reset_index()
                     unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
-                    # unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                    unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
                     col1, col2 = st.columns(2)
                     with col1:
 
