@@ -51,6 +51,7 @@ sheet_audio = "AudioBook"
 sheet_printing = "Printing"
 sheet_copyright = "Copyright"
 sheet_a_plus = "A_plus"
+sheet_sales = "Sales"
 
 month_list = list(calendar.month_name)[1:]
 current_month = datetime.today().month
@@ -68,6 +69,7 @@ st.markdown("""
 name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
     "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
+    "Ahsan Javed": "ahsan.javed@topsoftdigitals.pk",
     "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
     "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
     "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
@@ -1123,25 +1125,52 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
 
     return pdf_data, filename
 
+def get_min_year() -> int:
+    """Gets Minimum year from the data"""
+    uk_clean = clean_data_reviews(sheet_uk)
+    audio = clean_data_reviews(sheet_audio)
+    usa_clean = clean_data_reviews(sheet_usa)
+    combined = pd.concat([uk_clean, usa_clean, audio])
+
+    combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
+
+    min_year = combined["Publishing Date"].dt.year.min()
+
+    return min_year
+
+def sales(month, year):
+    data = get_sheet_data(sheet_sales)
+
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Payment" in columns:
+        end_col_index = columns.index("Payment")
+        data = data.iloc[:, :end_col_index + 1]
+        data["Payment Date"] = pd.to_datetime(data["Payment Date"], errors="coerce")
+
+    if "Payment Date" in data.columns:
+        data = data[(data["Payment Date"].dt.month == month) & (data["Payment Date"].dt.year == year)]
+
+    if "Payment" in data.columns:
+        data["Payment"] = data["Payment"].astype(str)
+        data["Payment"] = pd.to_numeric(
+            data["Payment"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+
+    data.index = range(1, len(data) + 1)
+
+
+    return data
+
 
 def main():
-    def get_min_year() -> int:
-        """Gets Minimum year from the data"""
-        uk_clean = clean_data_reviews(sheet_uk)
-        audio = clean_data_reviews(sheet_audio)
-        usa_clean = clean_data_reviews(sheet_usa)
-        combined = pd.concat([uk_clean, usa_clean, audio])
 
-        combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
-
-        min_year = combined["Publishing Date"].dt.year.min()
-
-        return min_year
 
     with st.container():
         st.title("📊 Blink Digitally Publishing Dashboard")
         action = st.selectbox("What would you like to do?",
-                              ["View Data", "Reviews", "Printing", "Copyright", "Generate Review & Summary",
+                              ["View Data", "Sales", "Printing", "Copyright", "Generate Review & Summary",
                                "Year Summary"],
                               index=None,
                               placeholder="Select Action")
@@ -1156,7 +1185,7 @@ def main():
             choice = st.selectbox("Select Data To View", ["USA", "UK", "AudioBook"], index=None,
                                   placeholder="Select Data to View")
 
-        if action in ["View Data", "Reviews", "Printing", "Copyright"]:
+        if action in ["View Data", "Reviews", "Printing", "Copyright", "Sales"]:
             selected_month = st.selectbox(
                 "Select Month",
                 month_list,
@@ -1164,7 +1193,7 @@ def main():
                 placeholder="Select Month"
             )
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
-        if action in ["Year Summary", "Copyright", "Printing", "View Data", "Reviews"]:
+        if action in ["Year Summary", "Copyright", "Printing", "View Data", "Reviews", "Sales"]:
             number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
         if action == "Reviews":
             status = st.selectbox("Status", ["Pending", "Sent", "Attained"], index=None, placeholder="Select Status")
@@ -1357,14 +1386,14 @@ def main():
                     for name in usa_selected:
                         if name in name_usa:
                             send_df_as_text(name, sheet_usa, name_usa[name])
-                            time.sleep(5)
+                            time.sleep(2)
                             count += 1
                             progress_bar.progress(count / total_members)
 
                     for name in uk_selected:
                         if name in names_uk:
                             send_df_as_text(name, sheet_uk, names_uk[name])
-                            time.sleep(5)
+                            time.sleep(2)
                             count += 1
                             progress_bar.progress(count / total_members)
 
@@ -1822,6 +1851,30 @@ def main():
                         help="Click to download the PDF report"
                     )
 
+        elif action == "Sales" and selected_month and number:
+            data = sales(selected_month_number, number)
+            if not data.empty:
+                Total_sales = data["Payment"].sum()
+
+                st.markdown("### 📄 Detailed Sales Data")
+
+                st.dataframe(data)
+                st.markdown("---")
+
+                st.markdown("### 📊 Summary Statistics")
+
+                st.markdown(f"""
+
+                              - 🧾 **Total Clients:** {len(data)}
+
+                              - 💰 **Total Sales:** `{Total_sales}`
+
+                              """)
+                st.markdown("---")
+
+            else:
+
+                st.warning(f"⚠️ No Data Available for Sales in {selected_month} {number}")
 
 if __name__ == '__main__':
     main()
