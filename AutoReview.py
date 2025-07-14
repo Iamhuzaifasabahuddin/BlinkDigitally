@@ -2,8 +2,8 @@ import calendar
 import logging
 import os
 import tempfile
+import time
 from datetime import datetime
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import gspread
@@ -15,7 +15,8 @@ from slack_sdk.errors import SlackApiError
 load_dotenv('Info.env')
 SLACK_BOT_TOKEN = os.getenv("SLACK")
 client = WebClient(token=SLACK_BOT_TOKEN)
-
+channel_usa = os.getenv("CHANNEL_USA")
+channel_uk = os.getenv("CHANNEL_UK")
 # Google Sheets setup with gspread
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 
@@ -45,11 +46,9 @@ def get_sheet_data(sheet_name):
         spreadsheet = gc.open_by_key(SPREADSHEET_ID)
         worksheet = spreadsheet.worksheet(sheet_name)
 
-        # Get all records as a list of dictionaries
         records = worksheet.get_all_values()
         headers = records[0]
         rows = records[1:]
-        # Convert to DataFrame
         df = pd.DataFrame(rows, columns=headers)
 
         return df
@@ -120,27 +119,57 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
 def load_data_reviews(sheet_name, name) -> tuple:
     """Load and filter data for a specific project manager"""
     data = clean_data_reviews(sheet_name)
-    data_original = data
 
+    if "Name" in data.columns:
+        data = data.drop_duplicates(subset=["Name"])
+
+    data_original = data
     if data.empty:
         return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
 
     # Filter data based on criteria
-    data = data_original[
+    data_count = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
         (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
         (data_original["Status"] == "Published")
         ]
 
-    data = data.sort_values(by=["Publishing Date"], ascending=True)
+
+
+    data = data_original[
+        (data_original["Project Manager"] == name) &
+        # ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
+        ((data_original["Trustpilot Review"] == "Pending")) &
+        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
+        (data_original["Status"] == "Published")
+        ]
+
+    data = data.sort_values(by="Publishing Date", ascending=True)
+
+    # Clean strings and drop missing
+    data_original["Trustpilot Review"] = data_original["Trustpilot Review"].astype(str).str.strip().str.lower()
+    data_original["Project Manager"] = data_original["Project Manager"].astype(str).str.strip()
+    name = name.strip()
+
+    # Drop rows where essential fields are missing
+    data_original = data_original.dropna(subset=["Trustpilot Review", "Project Manager"])
+
+    # Now calculate attained count
+    attained = len(
+        data_original[
+            (data_original["Trustpilot Review"] == "attained") &
+            (data_original["Project Manager"] == name)
+            ]
+    )
 
     # Calculate statistics
     total_percentage = 0
-    attained = len(
-        data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)]
-    )
-    total_reviews = len(data) + attained
+    # attained = len(
+    #     data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)]
+    # )
+
+    total_reviews = len(data_count) + attained
 
     min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
     max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
@@ -150,6 +179,7 @@ def load_data_reviews(sheet_name, name) -> tuple:
 
     data.index = range(1, len(data) + 1)
     return data, total_percentage, min_date, max_date, attained, total_reviews
+
 
 
 def load_data_audio(name) -> tuple:
@@ -178,10 +208,10 @@ def send_dm(user_id, message):
         logging.error(e)
 
 
-def send_df_as_text(name, sheet_name, email) -> None:
+def send_df_as_text(name, sheet_name, email, channel) -> None:
     """Send DataFrame as text to a user"""
-    # user_id = get_user_id_by_email(email)
-    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    user_id = get_user_id_by_email(email)
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
@@ -195,7 +225,6 @@ def send_df_as_text(name, sheet_name, email) -> None:
         print(f"⚠️ No data for {name}")
         return
 
-    # Handle NaT values for date formatting
     min_dates = [d for d in [min_date, min_date_audio] if pd.notna(d)]
     max_dates = [d for d in [max_date, max_date_audio] if pd.notna(d)]
 
@@ -208,7 +237,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
 
     def truncate_title(x):
         """Truncate long titles"""
-        return x[:40] + "..." if isinstance(x, str) and len(x) > 40 else x
+        return x[:20] + "..." if isinstance(x, str) and len(x) > 20 else x
 
     for dframe in [df, df_audio]:
         if "Book Name & Link" in dframe.columns and not dframe.empty:
@@ -234,7 +263,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
         if len({min_month_name, max_month_name}) > 1:
             message = (
                 f"{general_message}\n\n"
-                f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
+                f"Hi <@{user_id}>!  Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
                 f"*Summary:* {len(merged_df)} pending reviews\n\n"
                 f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
                 f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
@@ -243,7 +272,7 @@ def send_df_as_text(name, sheet_name, email) -> None:
         else:
             message = (
                 f"{general_message}\n\n"
-                f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
+                f"Hi <@{user_id}>! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
                 f"*Summary:* {len(merged_df)} pending reviews\n\n"
                 f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
                 f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
@@ -251,11 +280,10 @@ def send_df_as_text(name, sheet_name, email) -> None:
             )
 
         try:
-            conversation = client.conversations_open(users=user_id)
-            channel_id = conversation['channel']['id']
+
 
             response = client.chat_postMessage(
-                channel=channel_id,
+                channel=channel,
                 text=message,
                 mrkdwn=True
             )
@@ -339,6 +367,7 @@ def printing_data_all(year) -> pd.DataFrame:
     data.index = range(1, len(data) + 1)
     data = data.fillna("N/A")
     return data
+
 
 
 def get_copyright_data(month, year) -> tuple:
@@ -812,10 +841,12 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    # for name, email in name_usa.items():
-    #     send_df_as_text(name, sheet_usa, email)
+    for name, email in name_usa.items():
+        time.sleep(2)
+        send_df_as_text(name, sheet_usa, email, channel_usa)
 
     # for name, email in names_uk.items():
-    #     send_df_as_text(name, url_uk, email)
-    summary(5, 2025)
+    #     # time.sleep(5)
+    #     send_df_as_text(name, sheet_uk, email, channel_uk)
+    # summary(5, 2025)
     # generate_year_summary(2025)
