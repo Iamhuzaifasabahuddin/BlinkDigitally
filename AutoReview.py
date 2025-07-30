@@ -71,7 +71,9 @@ name_usa = {
     "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
     "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
     "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
-    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk"
+    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
+    "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
+    "Valencia Angelo": "valencia.angelo@topsoftdigitals.pk"
 }
 
 names_uk = {

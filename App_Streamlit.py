@@ -74,7 +74,9 @@ name_usa = {
     "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
     "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
     "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
-    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk"
+    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
+    "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
+    "Valencia Angelo": "valencia.angelo@topsoftdigitals.pk"
 }
 
 names_uk = {
@@ -688,6 +690,7 @@ def summary(month, year):
     country = copyright_data["Country"].value_counts()
     usa = country.get("USA", "N/A")
     canada = country.get("Canada", "N/A")
+    uk = country.get("UK", "N/A")
 
     a_plus, a_plus_count = get_A_plus_data(month, year)
 
@@ -712,7 +715,8 @@ def summary(month, year):
         'Total_cost_copyright': Total_cost_copyright,
         'result_count': result_count,
         'usa_copyrights': usa,
-        'canada_copyrights': canada
+        'canada_copyrights': canada,
+        'uk_copyrights': uk
     }
 
     return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count
@@ -786,6 +790,7 @@ def generate_year_summary(year):
     country = copyright_data["Country"].value_counts()
     usa = country.get("USA", "N/A")
     canada = country.get("Canada", "N/A")
+    uk = country.get("UK", "N/A")
 
     a_plus, a_plus_count = get_A_plus_all(year)
 
@@ -810,7 +815,8 @@ def generate_year_summary(year):
         'Total_cost_copyright': Total_cost_copyright,
         'result_count': result_count,
         'usa_copyrights': usa,
-        'canada_copyrights': canada
+        'canada_copyrights': canada,
+        'uk_copyright': uk
     }
 
     return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count
@@ -1351,6 +1357,7 @@ def main():
                 country = data["Country"].value_counts()
                 usa = country.get("USA", "N/A")
                 canada = country.get("Canada", "N/A")
+                uk = country.get("UK", "N/A")
                 st.markdown("---")
                 st.markdown(f"""
                 ### 📊 Summary Stats
@@ -1361,6 +1368,7 @@ def main():
                 - 📈 **Total Approved rate:** `{result / total_copyrights:.1%}`
                 - 🦅 **USA:** `{usa}`
                 - 🍁 **Canada:** `{canada}`
+                - ☕ **UK:** `{uk}`
                 """)
                 st.markdown("---")
             else:
@@ -1577,14 +1585,15 @@ def main():
 
                                 copyright_countries = {
                                     'USA': copyright_stats['usa_copyrights'],
-                                    'Canada': copyright_stats['canada_copyrights']
+                                    'Canada': copyright_stats['canada_copyrights'],
+                                    'Uk': copyright_stats['uk_copyrights']
                                 }
 
                                 fig_copyright = px.pie(
                                     values=list(copyright_countries.values()),
                                     names=list(copyright_countries.keys()),
                                     title="Copyright Applications by Country",
-                                    color_discrete_sequence=["#23A0F8", "#d62728"]
+                                    color_discrete_sequence=["#23A0F8", "#d62728","#d62726"]
                                 )
                                 st.plotly_chart(fig_copyright, use_container_width=True)
 
@@ -1797,14 +1806,15 @@ def main():
 
                             copyright_countries = {
                                 'USA': copyright_stats['usa_copyrights'],
-                                'Canada': copyright_stats['canada_copyrights']
+                                'Canada': copyright_stats['canada_copyrights'],
+                                'Uk': copyright_stats['uk_copyrights']
                             }
 
                             fig_copyright = px.pie(
                                 values=list(copyright_countries.values()),
                                 names=list(copyright_countries.keys()),
                                 title="Copyright Applications by Country",
-                                color_discrete_sequence=["#23A0F8", "#d62728"]
+                                color_discrete_sequence=["#23A0F8", "#d62728", "#d62726" ]
                             )
                             st.plotly_chart(fig_copyright, use_container_width=True)
 
