@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from click import Tuple
 from google.oauth2.service_account import Credentials
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -224,15 +225,14 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
-    # if "Name" in data.columns:
-    #     data = data.drop_duplicates(subset=["Name"])
+
     data = data.sort_values(by="Publishing Date", ascending=True)
     data.index = range(1, len(data) + 1)
 
     return data
 
 
-def load_data_reviews(sheet_name, name) -> (pd.DataFrame, float, datetime, datetime, int):
+def load_data_reviews(sheet_name, name) -> tuple[pd.DataFrame, float, pd.Timestamp, pd.Timestamp, int, int]:
     """Load and filter data for a specific project manager"""
     data = clean_data_reviews(sheet_name)
     data_original = data
@@ -444,7 +444,7 @@ def printing_data_all(year) -> pd.DataFrame:
     return data
 
 
-def get_copyright_data(month, year) -> (pd.DataFrame, int):
+def get_copyright_data(month, year) -> tuple[pd.DataFrame, int]:
     """Get copyright data for the current month"""
     data = get_sheet_data(sheet_copyright)
 
@@ -475,7 +475,7 @@ def get_copyright_data(month, year) -> (pd.DataFrame, int):
     return data, result_count
 
 
-def copyright_all(year) -> (pd.DataFrame, int):
+def copyright_all(year) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_copyright)
 
     if data.empty:
@@ -505,7 +505,7 @@ def copyright_all(year) -> (pd.DataFrame, int):
     return data, result_count
 
 
-def get_A_plus_data(month, year) -> (pd.DataFrame, int):
+def get_A_plus_data(month, year) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
     if data.empty:
         return data
@@ -534,7 +534,7 @@ def get_A_plus_data(month, year) -> (pd.DataFrame, int):
     return data, result_count
 
 
-def get_A_plus_all(year) -> (pd.DataFrame, int):
+def get_A_plus_all(year) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
     if data.empty:
         return data
@@ -640,6 +640,12 @@ def summary(month, year):
         return
     if usa_clean.empty and uk_clean.empty:
         return
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"])
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"])
+    total_usa = usa_clean["Name"].nunique()
+    total_uk = uk_clean["Name"].nunique()
+    total_unique_clients = total_usa + total_uk
+
 
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
@@ -715,11 +721,10 @@ def summary(month, year):
         'Total_cost_copyright': Total_cost_copyright,
         'result_count': result_count,
         'usa_copyrights': usa,
-        'canada_copyrights': canada,
-        'uk_copyrights': uk
+        'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients
 
 
 def generate_year_summary(year):
@@ -741,6 +746,13 @@ def generate_year_summary(year):
         return
     if usa_clean.empty and uk_clean.empty:
         return
+
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"])
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"])
+    total_usa = usa_clean["Name"].nunique()
+    total_uk = uk_clean["Name"].nunique()
+    total_unique_clients = total_usa + total_uk
+
 
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
@@ -815,11 +827,10 @@ def generate_year_summary(year):
         'Total_cost_copyright': Total_cost_copyright,
         'result_count': result_count,
         'usa_copyrights': usa,
-        'canada_copyrights': canada,
-        'uk_copyright': uk
+        'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients
 
 
 def logging_function() -> None:
@@ -1452,7 +1463,7 @@ def main():
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients  = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
@@ -1492,6 +1503,7 @@ def main():
                                 st.metric("Total Reviews", usa_total)
                                 st.metric("Total Attained", usa_attained)
                                 st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
+                                st.metric("Total Unique", total_unique_clients)
 
                             with col2:
                                 uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
@@ -1594,15 +1606,14 @@ def main():
 
                                 copyright_countries = {
                                     'USA': copyright_stats['usa_copyrights'],
-                                    'Canada': copyright_stats['canada_copyrights'],
-                                    'Uk': copyright_stats['uk_copyrights']
+                                    'Canada': copyright_stats['canada_copyrights']
                                 }
 
                                 fig_copyright = px.pie(
                                     values=list(copyright_countries.values()),
                                     names=list(copyright_countries.keys()),
                                     title="Copyright Applications by Country",
-                                    color_discrete_sequence=["#23A0F8", "#d62728","#d62726"]
+                                    color_discrete_sequence=["#23A0F8", "#d62728"]
                                 )
                                 st.plotly_chart(fig_copyright, use_container_width=True)
 
@@ -1676,7 +1687,7 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -1715,6 +1726,7 @@ def main():
                             st.metric("Total Reviews", usa_total)
                             st.metric("Total Attained", usa_attained)
                             st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
+                            st.metric("Total Unique", total_unique_clients)
 
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
@@ -1724,7 +1736,6 @@ def main():
                             st.metric("Total Reviews", uk_total)
                             st.metric("Total Attained", uk_attained)
                             st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
-
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                         st.plotly_chart(platform_chart, use_container_width=True)
@@ -1815,15 +1826,14 @@ def main():
 
                             copyright_countries = {
                                 'USA': copyright_stats['usa_copyrights'],
-                                'Canada': copyright_stats['canada_copyrights'],
-                                'Uk': copyright_stats['uk_copyrights']
+                                'Canada': copyright_stats['canada_copyrights']
                             }
 
                             fig_copyright = px.pie(
                                 values=list(copyright_countries.values()),
                                 names=list(copyright_countries.keys()),
                                 title="Copyright Applications by Country",
-                                color_discrete_sequence=["#23A0F8", "#d62728", "#d62726" ]
+                                color_discrete_sequence=["#23A0F8", "#d62728"]
                             )
                             st.plotly_chart(fig_copyright, use_container_width=True)
 
