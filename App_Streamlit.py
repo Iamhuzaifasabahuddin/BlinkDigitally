@@ -1234,6 +1234,7 @@ def main():
                     fav = platforms.get("FAV", "N/A")
 
                     reviews = data["Trustpilot Review"].value_counts()
+                    publishing = data["Status"].value_counts()
                     total_reviews = reviews.sum()
                     attained = reviews.get("Attained", 0)
                     percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
@@ -1241,6 +1242,7 @@ def main():
                     unique_clients_count_per_pm = data.groupby('Project Manager')['Name'].nunique().reset_index()
                     unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                     unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                    total_unique_clients = data['Name'].nunique()
                     col1, col2 = st.columns(2)
                     with col1:
 
@@ -1267,11 +1269,18 @@ def main():
                     with col2:
                         st.markdown("---")
 
-                        st.markdown("#### 🔍 Review Type Breakdown")
+                        st.markdown("#### 🔍 Review & Publishing Status Breakdown")
                         for review_type, count in reviews.items():
                             st.markdown(f"- 📝 **{review_type}**: `{count}`")
-                        st.write("📝 **Clients Per PM**")
+
+                        for status_type, count_s in publishing.items():
+                            st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
+                        st.write("🤼 **Clients Per PM**")
                         st.dataframe(unique_clients_count_per_pm)
+                        st.markdown(f"""
+
+                            - ✅ **Total Unique:** `{total_unique_clients}` """
+                                    )
                 st.markdown("---")
         elif action == "Reviews" and choice and selected_month and status and number:
             sheet_name = {
