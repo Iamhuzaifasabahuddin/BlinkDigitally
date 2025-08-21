@@ -646,6 +646,8 @@ def summary(month, year):
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
 
+    combined = pd.concat([usa_clean[["Name", "Brand"]], uk_clean[["Name", "Brand"]]])
+    combined.index =range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
@@ -724,7 +726,7 @@ def summary(month, year):
         'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined
 
 
 def generate_year_summary(year):
@@ -753,6 +755,8 @@ def generate_year_summary(year):
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
 
+    combined = pd.concat([usa_clean[["Name", "Brand"]], uk_clean[["Name", "Brand"]]])
+    combined.index =range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
@@ -830,7 +834,7 @@ def generate_year_summary(year):
         'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined
 
 
 def logging_function() -> None:
@@ -1463,7 +1467,7 @@ def main():
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients  = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
@@ -1504,7 +1508,7 @@ def main():
                                 st.metric("Total Attained", usa_attained)
                                 st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
                                 st.metric("Total Unique", total_unique_clients)
-
+                                st.dataframe(combined)
                             with col2:
                                 uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                                 if uk_pie:
@@ -1687,7 +1691,7 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -1727,6 +1731,7 @@ def main():
                             st.metric("Total Attained", usa_attained)
                             st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
                             st.metric("Total Unique", total_unique_clients)
+                            st.dataframe(combined)
 
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
