@@ -9,7 +9,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from click import Tuple
 from google.oauth2.service_account import Credentials
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -647,7 +646,7 @@ def summary(month, year):
     total_unique_clients = total_usa + total_uk
 
     combined = pd.concat([usa_clean[["Name", "Brand"]], uk_clean[["Name", "Brand"]]])
-    combined.index =range(1, len(combined) + 1)
+    combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
@@ -756,7 +755,7 @@ def generate_year_summary(year):
     total_unique_clients = total_usa + total_uk
 
     combined = pd.concat([usa_clean[["Name", "Brand"]], uk_clean[["Name", "Brand"]]])
-    combined.index =range(1, len(combined) + 1)
+    combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
@@ -1146,6 +1145,7 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
 
     return pdf_data, filename
 
+
 def get_min_year() -> int:
     """Gets Minimum year from the data"""
     uk_clean = clean_data_reviews(sheet_uk)
@@ -1158,6 +1158,7 @@ def get_min_year() -> int:
     min_year = combined["Publishing Date"].dt.year.min()
 
     return min_year
+
 
 def sales(month, year):
     data = get_sheet_data(sheet_sales)
@@ -1181,13 +1182,10 @@ def sales(month, year):
 
     data.index = range(1, len(data) + 1)
 
-
     return data
 
 
 def main():
-
-
     with st.container():
         st.title("📊 Blink Digitally Publishing Dashboard")
         action = st.selectbox("What would you like to do?",
@@ -1909,6 +1907,7 @@ def main():
             else:
 
                 st.warning(f"⚠️ No Data Available for Sales in {selected_month} {number}")
+
 
 if __name__ == '__main__':
     main()
