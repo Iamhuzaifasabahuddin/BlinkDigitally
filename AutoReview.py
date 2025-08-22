@@ -134,7 +134,7 @@ def load_data_reviews(sheet_name, name) -> tuple:
     data_count = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
+        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication"])) &
         (data_original["Status"] == "Published")
         ]
 
@@ -144,7 +144,7 @@ def load_data_reviews(sheet_name, name) -> tuple:
         (data_original["Project Manager"] == name) &
         # ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
         ((data_original["Trustpilot Review"] == "Pending")) &
-        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
+        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication"])) &
         (data_original["Status"] == "Published")
         ]
 
@@ -844,12 +844,12 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    for name, email in name_usa.items():
-        time.sleep(2)
-        send_df_as_text(name, sheet_usa, email, channel_usa)
+    # for name, email in name_usa.items():
+    #     time.sleep(2)
+    #     send_df_as_text(name, sheet_usa, email, channel_usa)
 
-    # for name, email in names_uk.items():
-    #     # time.sleep(5)
-    #     send_df_as_text(name, sheet_uk, email, channel_uk)
+    for name, email in names_uk.items():
+        # time.sleep(5)
+        send_df_as_text(name, sheet_uk, email, channel_uk)
     # summary(5, 2025)
     # generate_year_summary(2025)

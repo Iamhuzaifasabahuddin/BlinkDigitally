@@ -664,6 +664,7 @@ def summary(month, year):
 
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", "N/A")
+    book_publication = uk_brand.get("Book Publication", "N/A")
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -711,7 +712,7 @@ def summary(month, year):
     a_plus, a_plus_count = get_A_plus_data(month, year)
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp}
-    uk_brands = {'Authors Solution': authors_solution}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
     uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram}
@@ -780,6 +781,7 @@ def generate_year_summary(year):
 
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", "N/A")
+    book_publication = uk_brand.get("Book Publication", "N/A")
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -826,7 +828,7 @@ def generate_year_summary(year):
     a_plus, a_plus_count = get_A_plus_all(year)
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp}
-    uk_brands = {'Authors Solution': authors_solution}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
     uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram}
