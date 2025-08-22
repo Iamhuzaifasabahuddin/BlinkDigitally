@@ -1,5 +1,5 @@
 *.env
-Test.py
+Email.py
 .streamlit/secrets.toml
 *.json
 Gspread.py
