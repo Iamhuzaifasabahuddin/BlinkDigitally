@@ -631,6 +631,15 @@ def summary(month, year):
         (uk_clean["Publishing Date"].dt.year == year)
         ]
 
+    usa_clean_platforms = usa_clean[
+        (usa_clean["Publishing Date"].dt.month == month) &
+        (usa_clean["Publishing Date"].dt.year == year)
+        ]
+    uk_clean_platforms = uk_clean[
+        (uk_clean["Publishing Date"].dt.month == month) &
+        (uk_clean["Publishing Date"].dt.year == year)
+        ]
+
     if usa_clean.empty:
         print("No values found in USA sheet.")
         return
@@ -656,12 +665,12 @@ def summary(month, year):
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", "N/A")
 
-    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
 
-    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_platforms = uk_clean_platforms["Platform"].value_counts()
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
@@ -739,6 +748,13 @@ def generate_year_summary(year):
         (uk_clean["Publishing Date"].dt.year == year)
     ]
 
+    usa_clean_platforms = usa_clean[
+        (usa_clean["Publishing Date"].dt.year == year)
+        ]
+    uk_clean_platforms = uk_clean[
+        (uk_clean["Publishing Date"].dt.year == year)
+        ]
+
     if usa_clean.empty:
         print("No values found in USA sheet.")
         return
@@ -765,12 +781,12 @@ def generate_year_summary(year):
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", "N/A")
 
-    usa_platforms = usa_clean["Platform"].value_counts()
+    usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
 
-    uk_platforms = uk_clean["Platform"].value_counts()
+    uk_platforms = uk_clean_platforms["Platform"].value_counts()
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
