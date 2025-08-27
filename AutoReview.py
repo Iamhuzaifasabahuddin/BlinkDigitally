@@ -80,7 +80,9 @@ name_usa = {
 names_uk = {
     "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
     "Youha": "youha.khan@topsoftdigitals.pk",
-    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk"
+    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk",
+    "Emaan Zaidi": "emaan.zaidi@topsoftdigitals.pk",
+    "Elishba": "elishba@topsoftdigitals.pk"
 }
 
 general_message = """Hiya
@@ -844,12 +846,12 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    # for name, email in name_usa.items():
-    #     time.sleep(2)
-    #     send_df_as_text(name, sheet_usa, email, channel_usa)
-
-    for name, email in names_uk.items():
-        # time.sleep(5)
-        send_df_as_text(name, sheet_uk, email, channel_uk)
+    for name, email in name_usa.items():
+        time.sleep(2)
+        send_df_as_text(name, sheet_usa, email, channel_usa)
+    #
+    # for name, email in names_uk.items():
+    #     # time.sleep(5)
+    #     send_df_as_text(name, sheet_uk, email, channel_uk)
     # summary(5, 2025)
     # generate_year_summary(2025)

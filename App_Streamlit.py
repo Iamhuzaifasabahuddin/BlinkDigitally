@@ -443,7 +443,7 @@ def printing_data_all(year) -> pd.DataFrame:
     return data
 
 
-def get_copyright_data(month, year) -> tuple[pd.DataFrame, int]:
+def get_copyright_data(month, year) -> tuple[pd.DataFrame, int, int]:
     """Get copyright data for the current month"""
     data = get_sheet_data(sheet_copyright)
 
@@ -463,7 +463,7 @@ def get_copyright_data(month, year) -> tuple[pd.DataFrame, int]:
 
     data = data.sort_values(by=["Submission Date"], ascending=True)
     result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
-
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
     if "Submission Date" in data.columns:
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
@@ -471,10 +471,10 @@ def get_copyright_data(month, year) -> tuple[pd.DataFrame, int]:
 
     data.index = range(1, len(data) + 1)
 
-    return data, result_count
+    return data, result_count, result_count_no
 
 
-def copyright_all(year) -> tuple[pd.DataFrame, int]:
+def copyright_all(year) -> tuple[pd.DataFrame, int, int]:
     data = get_sheet_data(sheet_copyright)
 
     if data.empty:
@@ -493,7 +493,7 @@ def copyright_all(year) -> tuple[pd.DataFrame, int]:
     data = data.sort_values(by=["Submission Date"], ascending=True)
 
     result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
-
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
     if "Submission Date" in data.columns:
         data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
 
@@ -501,7 +501,7 @@ def copyright_all(year) -> tuple[pd.DataFrame, int]:
 
     data.index = range(1, len(data) + 1)
 
-    return data, result_count
+    return data, result_count, result_count_no
 
 
 def get_A_plus_data(month, year) -> tuple[pd.DataFrame, int]:
@@ -701,7 +701,7 @@ def summary(month, year):
     if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
         printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
 
-    copyright_data, result_count = get_copyright_data(month, year)
+    copyright_data, result_count, result_count_no = get_copyright_data(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
     country = copyright_data["Country"].value_counts()
@@ -731,6 +731,7 @@ def summary(month, year):
         'Total_copyrights': Total_copyrights,
         'Total_cost_copyright': Total_cost_copyright,
         'result_count': result_count,
+        'result_count_no': result_count_no,
         'usa_copyrights': usa,
         'canada_copyrights': canada
     }
@@ -817,7 +818,7 @@ def generate_year_summary(year):
     if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
         printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
 
-    copyright_data, result_count = copyright_all(year)
+    copyright_data, result_count, result_count_no = copyright_all(year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
     country = copyright_data["Country"].value_counts()
@@ -847,6 +848,7 @@ def generate_year_summary(year):
         'Total_copyrights': Total_copyrights,
         'Total_cost_copyright': Total_cost_copyright,
         'result_count': result_count,
+        'result_count_no': result_count_no,
         'usa_copyrights': usa,
         'canada_copyrights': canada
     }
@@ -1073,13 +1075,16 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     success = copyright_stats['result_count']
     success_rate = (copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats[
                                                                                                         'Total_copyrights'] > 0 else 0
-
+    rejection_rate = (copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats[
+                                                                                                        'Total_copyrights'] > 0 else 0
     copyright_data = [
         ['Metric', 'Value'],
         ['Total Copyrights', str(copyright_stats['Total_copyrights'])],
         ['Total Cost', f"${copyright_stats['Total_cost_copyright']:,}"],
         ['Success Count', f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}"],
         ['Success Percentage', f"{success_rate:.1f}%"],
+        ['Rejected', f"{copyright_stats["result_count_no"]}"],
+        ['Rejection Percentage', f"{rejection_rate:.1f}%"],
         ['USA Copyrights', str(copyright_stats['usa_copyrights'])],
         ['Canada Copyrights', str(copyright_stats['canada_copyrights'])]
     ]
@@ -1138,6 +1143,7 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     <b>Copyright:</b><br/>
     • Applications: {copyright_stats['Total_copyrights']}<br/>
     • Success Rate: {success_rate:.1f}%<br/>
+    • Rejection Rate: {rejection_rate:.1f}%<br/>
     • Total Cost: ${copyright_stats['Total_cost_copyright']:,}<br/>
 
     <b>A+ Content:</b><br/>
@@ -1387,7 +1393,7 @@ def main():
         elif action == "Copyright" and selected_month and number:
             st.subheader(f"© Copyright Summary for {selected_month}")
 
-            data, result = get_copyright_data(selected_month_number, number)
+            data, result, result_no = get_copyright_data(selected_month_number, number)
 
             if not data.empty:
                 st.dataframe(data)
@@ -1406,6 +1412,8 @@ def main():
                 - 💵 **Copyright Total Cost:** `${total_cost_copyright}`
                 - ✅ **Total Approved:** `{result} / {total_copyrights}`
                 - 📈 **Total Approved rate:** `{result / total_copyrights:.1%}`
+                - ❌ **Total Rejected:** `{result_no} / {total_copyrights}`
+                - 📈 **Total Rejected rate:** `{result_no / total_copyrights:.1%}`
                 - 🦅 **USA:** `{usa}`
                 - 🍁 **Canada:** `{canada}`
                 - ☕ **UK:** `{uk}`
@@ -1620,7 +1628,12 @@ def main():
                                 success_rate = (
                                         copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100)
                                 st.metric("Success Percentage", f"{success_rate:.1f}%")
+                                st.metric("Rejection Rate",
+                                          f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
 
+                                rejection_rate = (
+                                        copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100)
+                                st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
                             with col2:
                                 st.subheader("🌍 Country Distribution")
 
@@ -1637,6 +1650,13 @@ def main():
                                 )
                                 st.plotly_chart(fig_copyright, use_container_width=True)
 
+                                cp1, cp2 = st.columns(2)
+
+                                with cp1:
+                                    st.metric('Usa', copyright_stats['usa_copyrights'])
+
+                                with cp2:
+                                    st.metric('Canada', copyright_stats['canada_copyrights'])
                             st.divider()
 
                             cola = st.columns(1)
@@ -1668,6 +1688,7 @@ def main():
                                 st.markdown("### ©️ Copyright")
                                 st.write(f"• **Applications**: {copyright_stats['Total_copyrights']}")
                                 st.write(f"• **Success Rate**: {success_rate:.1f}%")
+                                st.write(f"• **Rejection Rate**: {rejection_rate:.1f}%")
                                 st.write(f"• **Total Cost**: ${copyright_stats['Total_cost_copyright']:,}")
                         st.success(f"Summary report for {selected_month} {number} generated!")
                         st.download_button(
@@ -1839,8 +1860,15 @@ def main():
                             st.metric("Success Rate",
                                       f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
 
-                            success_rate = (copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100)
+                            success_rate = (
+                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100)
                             st.metric("Success Percentage", f"{success_rate:.1f}%")
+                            st.metric("Rejection Rate",
+                                      f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
+
+                            rejection_rate = (
+                                    copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100)
+                            st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
 
                         with col2:
                             st.subheader("🌍 Country Distribution")
@@ -1858,6 +1886,13 @@ def main():
                             )
                             st.plotly_chart(fig_copyright, use_container_width=True)
 
+                            cp1, cp2 = st.columns(2)
+
+                            with cp1:
+                                st.metric('Usa', copyright_stats['usa_copyrights'])
+
+                            with cp2:
+                                st.metric('Canada', copyright_stats['canada_copyrights'])
                         st.divider()
 
                         cola = st.columns(1)
@@ -1889,6 +1924,7 @@ def main():
                             st.markdown("### ©️ Copyright")
                             st.write(f"• **Applications**: {copyright_stats['Total_copyrights']}")
                             st.write(f"• **Success Rate**: {success_rate:.1f}%")
+                            st.write(f"• **Rejection Rate**: {rejection_rate:.1f}%")
                             st.write(f"• **Total Cost**: ${copyright_stats['Total_cost_copyright']:,}")
 
                     st.success(f"Summary report for {number} generated!")
