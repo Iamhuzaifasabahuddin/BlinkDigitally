@@ -1,6 +1,5 @@
 import calendar
 import logging
-import time
 from datetime import datetime
 from io import BytesIO
 
@@ -562,6 +561,57 @@ def get_A_plus_all(year) -> tuple[pd.DataFrame, int]:
     return data, result_count
 
 
+def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2: str, year2: int) -> tuple:
+    """
+    Identifies names that appear in both June and July from a Google Sheet.
+    Returns:
+        - A set of matching names
+        - A dictionary with individual counts for June and July
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Date' columns or data is empty.")
+        return set(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], errors='coerce')
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Year'] = df['Publishing Date'].dt.year
+
+    month_1_names = set(
+        df[(df['Month'] == month_1) & (df['Year'] == year1)]['Name'].str.strip()
+    )
+
+    month_2_names = set(
+        df[(df['Month'] == month_2) & (df['Year'] == year2)]['Name'].str.strip()
+    )
+
+    names_in_both = month_1_names.intersection(month_2_names)
+
+    counts = {}
+    for name in names_in_both:
+        month_1_count = df[
+            (df['Month'] == month_1) &
+            (df['Year'] == year1) &
+            (df['Name'].str.strip() == name)
+            ].shape[0]
+
+        month_2_count = df[
+            (df['Month'] == month_2) &
+            (df['Year'] == year2) &
+            (df['Name'].str.strip() == name)
+            ].shape[0]
+
+        counts[name] = {
+            f"{month_1}-{year1}": month_1_count,
+            f"{month_2}-{year2}": month_2_count,
+        }
+
+    return names_in_both, counts, len(names_in_both)
+
+
 def format_review_counts_reviews(review_counts):
     """Format review counts as a string"""
     if review_counts.empty:
@@ -752,10 +802,10 @@ def generate_year_summary(year):
 
     usa_clean_platforms = usa_clean[
         (usa_clean["Publishing Date"].dt.year == year)
-        ]
+    ]
     uk_clean_platforms = uk_clean[
         (uk_clean["Publishing Date"].dt.year == year)
-        ]
+    ]
 
     if usa_clean.empty:
         print("No values found in USA sheet.")
@@ -1075,8 +1125,9 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     success = copyright_stats['result_count']
     success_rate = (copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats[
                                                                                                         'Total_copyrights'] > 0 else 0
-    rejection_rate = (copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats[
-                                                                                                        'Total_copyrights'] > 0 else 0
+    rejection_rate = (copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if \
+    copyright_stats[
+        'Total_copyrights'] > 0 else 0
     copyright_data = [
         ['Metric', 'Value'],
         ['Total Copyrights', str(copyright_stats['Total_copyrights'])],
@@ -1172,16 +1223,16 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
 
 def get_min_year() -> int:
     """Gets Minimum year from the data"""
-    uk_clean = clean_data_reviews(sheet_uk)
-    audio = clean_data_reviews(sheet_audio)
-    usa_clean = clean_data_reviews(sheet_usa)
-    combined = pd.concat([uk_clean, usa_clean, audio])
+    # uk_clean = clean_data_reviews(sheet_uk)
+    # audio = clean_data_reviews(sheet_audio)
+    # usa_clean = clean_data_reviews(sheet_usa)
+    # combined = pd.concat([uk_clean, usa_clean, audio])
+    #
+    # combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
+    #
+    # min_year = combined["Publishing Date"].dt.year.min()
 
-    combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
-
-    min_year = combined["Publishing Date"].dt.year.min()
-
-    return min_year
+    return 2025
 
 
 def sales(month, year):
@@ -1213,7 +1264,7 @@ def main():
     with st.container():
         st.title("📊 Blink Digitally Publishing Dashboard")
         action = st.selectbox("What would you like to do?",
-                              ["View Data", "Sales", "Printing", "Copyright", "Generate Review & Summary",
+                              ["View Data", "Sales", "Printing", "Copyright", "Generate Similarity & Summary",
                                "Year Summary"],
                               index=None,
                               placeholder="Select Action")
@@ -1421,39 +1472,73 @@ def main():
                 st.markdown("---")
             else:
                 st.warning(f"⚠️ No Data Available for Copyright in {selected_month} {number}")
-        elif action == "Generate Review & Summary":
+        elif action == "Generate Similarity & Summary":
 
-            tab1, tab2 = st.tabs(["Send Reviews", "Summary"])
+            tab1, tab2 = st.tabs(["Queries", "Summary"])
 
             with tab1:
-                st.header("Send Review Updates")
+                st.header("Compare clients with months")
+                choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
+                                      placeholder="Select Data to View")
+                sheet_name = {
+                    "UK": sheet_uk,
+                    "USA": sheet_usa,
+                }.get(choice)
+                selected_month_1 = st.selectbox(
+                    "Select Month 1",
+                    month_list,
+                    index=current_month - 2,
+                    placeholder="Select Month 1"
+                )
+                number1 = st.number_input("Enter Year 1", min_value=int(get_min_year()), step=1)
+                selected_month_2 = st.selectbox(
+                    "Select Month 2",
+                    month_list,
+                    index=current_month - 1,
+                    placeholder="Select Month 2"
+                )
+                number2 = st.number_input("Enter Year 2", min_value=int(get_min_year()), step=1)
+                if sheet_name:
+                    if st.button("Generate Similar Clients"):
+                        with st.spinner(
+                                f"Generating Similarity Report for {selected_month_1} N {selected_month_2} for {choice}..."):
 
-                st.subheader("🦅 USA Team")
-                usa_selected = st.multiselect("Select USA team members:", list(name_usa.keys()))
+                            data1, data2, data3 = get_names_in_both_months(sheet_name, selected_month_1, number1,
+                                                                           selected_month_2, number2)
 
-                st.subheader("☕ UK Team")
-                uk_selected = st.multiselect("Select UK team members:", list(names_uk.keys()))
+                            if not data1:
+                                print(
+                                    f"No Similar Clients found for {selected_month_1} N {selected_month_2} for {choice}")
+                            st.write(data1)
+                            st.write(data2)
+                            st.write(data3)
 
-                if st.button("Send Review Updates"):
-                    progress_bar = st.progress(0)
-                    total_members = len(usa_selected) + len(uk_selected)
-                    count = 0
-
-                    for name in usa_selected:
-                        if name in name_usa:
-                            send_df_as_text(name, sheet_usa, name_usa[name])
-                            time.sleep(2)
-                            count += 1
-                            progress_bar.progress(count / total_members)
-
-                    for name in uk_selected:
-                        if name in names_uk:
-                            send_df_as_text(name, sheet_uk, names_uk[name])
-                            time.sleep(2)
-                            count += 1
-                            progress_bar.progress(count / total_members)
-
-                    st.success(f"Sent review updates to {count} team members!")
+                # st.subheader("🦅 USA Team")
+                # usa_selected = st.multiselect("Select USA team members:", list(name_usa.keys()))
+                #
+                # st.subheader("☕ UK Team")
+                # uk_selected = st.multiselect("Select UK team members:", list(names_uk.keys()))
+                #
+                # if st.button("Send Review Updates"):
+                #     progress_bar = st.progress(0)
+                #     total_members = len(usa_selected) + len(uk_selected)
+                #     count = 0
+                #
+                #     for name in usa_selected:
+                #         if name in name_usa:
+                #             send_df_as_text(name, sheet_usa, name_usa[name])
+                #             time.sleep(2)
+                #             count += 1
+                #             progress_bar.progress(count / total_members)
+                #
+                #     for name in uk_selected:
+                #         if name in names_uk:
+                #             send_df_as_text(name, sheet_uk, names_uk[name])
+                #             time.sleep(2)
+                #             count += 1
+                #             progress_bar.progress(count / total_members)
+                #
+                #     st.success(f"Sent review updates to {count} team members!")
 
             with tab2:
                 st.header("📄 Generate Summary Report")
@@ -1626,13 +1711,13 @@ def main():
                                           f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
 
                                 success_rate = (
-                                        copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100)
+                                        copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
                                 st.metric("Success Percentage", f"{success_rate:.1f}%")
                                 st.metric("Rejection Rate",
                                           f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
 
                                 rejection_rate = (
-                                        copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100)
+                                        copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
                                 st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
                             with col2:
                                 st.subheader("🌍 Country Distribution")
@@ -1861,13 +1946,13 @@ def main():
                                       f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
 
                             success_rate = (
-                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100)
+                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
                             st.metric("Success Percentage", f"{success_rate:.1f}%")
                             st.metric("Rejection Rate",
                                       f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
 
                             rejection_rate = (
-                                    copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100)
+                                    copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
                             st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
 
                         with col2:

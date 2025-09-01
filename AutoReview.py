@@ -67,9 +67,7 @@ sheet_copyright = "Copyright"
 name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
     "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
-    "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
     "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
-    "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
     "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
     "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
     "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
@@ -80,9 +78,9 @@ name_usa = {
 names_uk = {
     "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
     "Youha": "youha.khan@topsoftdigitals.pk",
-    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk",
     "Emaan Zaidi": "emaan.zaidi@topsoftdigitals.pk",
-    "Elishba": "elishba@topsoftdigitals.pk"
+    "Elishba": "elishba@topsoftdigitals.pk",
+    "Shahrukh Yousuf": "shahrukh.yousuf@topsoftdigitals.pk"
 }
 
 general_message = """Hiya
