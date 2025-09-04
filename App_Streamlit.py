@@ -710,6 +710,7 @@ def summary(month, year):
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
     bookmarketeers = brands.get("BookMarketeers", "N/A")
+    aurora_writers = brands.get("Aurora Writers", "N/A")
     kdp = brands.get("KDP", "N/A")
 
     uk_brand = uk_clean["Brand"].value_counts()
@@ -761,7 +762,9 @@ def summary(month, year):
 
     a_plus, a_plus_count = get_A_plus_data(month, year)
 
-    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp}
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
+                  'Aurora Writers': aurora_writers}
+
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
@@ -783,7 +786,8 @@ def summary(month, year):
         'result_count': result_count,
         'result_count_no': result_count_no,
         'usa_copyrights': usa,
-        'canada_copyrights': canada
+        'canada_copyrights': canada,
+        'uk': uk
     }
 
     return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined
@@ -828,6 +832,7 @@ def generate_year_summary(year):
     brands = usa_clean["Brand"].value_counts()
     writers_clique = brands.get("Writers Clique", "N/A")
     bookmarketeers = brands.get("BookMarketeers", "N/A")
+    aurora_writers = brands.get("Aurora Writers", "N/A")
     kdp = brands.get("KDP", "N/A")
 
     uk_brand = uk_clean["Brand"].value_counts()
@@ -878,7 +883,7 @@ def generate_year_summary(year):
 
     a_plus, a_plus_count = get_A_plus_all(year)
 
-    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp}
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp, 'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
@@ -1312,6 +1317,7 @@ def main():
                     brands = data["Brand"].value_counts()
                     writers_clique = brands.get("Writers Clique", "N/A")
                     bookmarketeers = brands.get("BookMarketeers", "N/A")
+                    aurora_writers = brands.get("Aurora Writers", "N/A")
                     kdp = brands.get("KDP", "N/A")
                     authors_solution = brands.get("Authors Solution", "N/A")
 
@@ -1344,6 +1350,7 @@ def main():
 
                                     **Brands**
                                     - 📘 **BookMarketeers:** `{bookmarketeers}`
+                                    - 📘 **Aurora Writers:** `{aurora_writers}`
                                     - 📙 **Writers Clique:** `{writers_clique}`
                                     - 📕 **KDP:** `{kdp}`
                                     - 📘 **Authors Solution:** `{authors_solution}`
@@ -1724,24 +1731,29 @@ def main():
 
                                 copyright_countries = {
                                     'USA': copyright_stats['usa_copyrights'],
-                                    'Canada': copyright_stats['canada_copyrights']
+                                    'Canada': copyright_stats['canada_copyrights'],
+                                    'UK': copyright_stats['uk']
                                 }
 
                                 fig_copyright = px.pie(
                                     values=list(copyright_countries.values()),
                                     names=list(copyright_countries.keys()),
                                     title="Copyright Applications by Country",
-                                    color_discrete_sequence=["#23A0F8", "#d62728"]
+                                    color_discrete_sequence=["#23A0F8", "#d62728", "#d62724"]
                                 )
                                 st.plotly_chart(fig_copyright, use_container_width=True)
 
-                                cp1, cp2 = st.columns(2)
+                                cp1, cp2, cp3 = st.columns(3)
 
                                 with cp1:
                                     st.metric('Usa', copyright_stats['usa_copyrights'])
 
                                 with cp2:
                                     st.metric('Canada', copyright_stats['canada_copyrights'])
+
+                                with cp2:
+                                    st.metric('UK', copyright_stats['uk'])
+
                             st.divider()
 
                             cola = st.columns(1)
@@ -1960,24 +1972,29 @@ def main():
 
                             copyright_countries = {
                                 'USA': copyright_stats['usa_copyrights'],
-                                'Canada': copyright_stats['canada_copyrights']
+                                'Canada': copyright_stats['canada_copyrights'],
+                                'UK': copyright_stats['uk']
                             }
 
                             fig_copyright = px.pie(
                                 values=list(copyright_countries.values()),
                                 names=list(copyright_countries.keys()),
                                 title="Copyright Applications by Country",
-                                color_discrete_sequence=["#23A0F8", "#d62728"]
+                                color_discrete_sequence=["#23A0F8", "#d62728", "#d62724"]
                             )
                             st.plotly_chart(fig_copyright, use_container_width=True)
 
-                            cp1, cp2 = st.columns(2)
+                            cp1, cp2, cp3 = st.columns(3)
 
                             with cp1:
                                 st.metric('Usa', copyright_stats['usa_copyrights'])
 
                             with cp2:
                                 st.metric('Canada', copyright_stats['canada_copyrights'])
+
+                            with cp2:
+                                st.metric('UK', copyright_stats['uk'])
+
                         st.divider()
 
                         cola = st.columns(1)
