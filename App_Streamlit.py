@@ -931,7 +931,8 @@ def generate_year_summary(year):
         'result_count': result_count,
         'result_count_no': result_count_no,
         'usa_copyrights': usa,
-        'canada_copyrights': canada
+        'canada_copyrights': canada,
+        'uk': uk
     }
 
     return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm
@@ -1782,7 +1783,7 @@ def main():
                                     values=list(copyright_countries.values()),
                                     names=list(copyright_countries.keys()),
                                     title="Copyright Applications by Country",
-                                    color_discrete_sequence=["#23A0F8", "#d62728", "#d62724"]
+                                    color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
                                 )
                                 st.plotly_chart(fig_copyright, use_container_width=True)
 
@@ -2024,7 +2025,7 @@ def main():
                                 values=list(copyright_countries.values()),
                                 names=list(copyright_countries.keys()),
                                 title="Copyright Applications by Country",
-                                color_discrete_sequence=["#23A0F8", "#d62728", "#d62724"]
+                                color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
                             )
                             st.plotly_chart(fig_copyright, use_container_width=True)
 
