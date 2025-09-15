@@ -731,6 +731,19 @@ def summary(month, year):
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
     uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
 
+    combined_data = pd.concat([usa_clean, uk_clean], ignore_index=True)
+
+    attained_reviews_per_pm = (
+        combined_data[combined_data["Trustpilot Review"] == "Attained"]
+        .groupby("Project Manager")["Trustpilot Review"]
+        .count()
+        .reset_index()
+    )
+
+    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+
     usa_total = usa_review.sum() if not usa_review.empty else 0
     uk_total = uk_review.sum() if not uk_review.empty else 0
 
@@ -790,7 +803,7 @@ def summary(month, year):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm
 
 
 def generate_year_summary(year):
@@ -853,6 +866,19 @@ def generate_year_summary(year):
         "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
     uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
 
+    combined_data = pd.concat([usa_clean, uk_clean], ignore_index=True)
+
+    attained_reviews_per_pm = (
+        combined_data[combined_data["Trustpilot Review"] == "Attained"]
+        .groupby("Project Manager")["Trustpilot Review"]
+        .count()
+        .reset_index()
+    )
+
+    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+
     usa_total = usa_review.sum() if not usa_review.empty else 0
     uk_total = uk_review.sum() if not uk_review.empty else 0
 
@@ -908,7 +934,7 @@ def generate_year_summary(year):
         'canada_copyrights': canada
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm
 
 
 def logging_function() -> None:
@@ -1337,6 +1363,17 @@ def main():
                     unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                     unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
                     total_unique_clients = data['Name'].nunique()
+
+                    attained_reviews_per_pm = (
+                        data[data["Trustpilot Review"] == "Attained"]
+                        .groupby("Project Manager")["Trustpilot Review"]
+                        .count()
+                        .reset_index()
+                    )
+
+                    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+                    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
                     col1, col2 = st.columns(2)
                     with col1:
 
@@ -1376,6 +1413,8 @@ def main():
 
                             - ✅ **Total Unique:** `{total_unique_clients}` """
                                     )
+                        st.write("👏 **Reviews Per PM**")
+                        st.dataframe(attained_reviews_per_pm)
                 st.markdown("---")
         elif action == "Reviews" and choice and selected_month and status and number:
             sheet_name = {
@@ -1583,7 +1622,7 @@ def main():
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
@@ -1606,6 +1645,9 @@ def main():
                             combined_attained = usa_attained + uk_attained
                             combined_attained_pct = (
                                     combined_attained / combined_total * 100) if combined_total > 0 else 0
+
+
+
                             st.header(f"{selected_month} {number} Summary Report")
 
                             st.divider()
@@ -1633,6 +1675,7 @@ def main():
                                 st.metric("Total Reviews", uk_total)
                                 st.metric("Total Attained", uk_attained)
                                 st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
+                                st.dataframe(attained_reviews_per_pm)
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                             st.plotly_chart(platform_chart, use_container_width=True)
@@ -1825,7 +1868,7 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -1875,6 +1918,7 @@ def main():
                             st.metric("Total Reviews", uk_total)
                             st.metric("Total Attained", uk_attained)
                             st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
+                            st.dataframe(attained_reviews_per_pm)
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                         st.plotly_chart(platform_chart, use_container_width=True)
