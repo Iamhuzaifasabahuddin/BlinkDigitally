@@ -152,6 +152,47 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
             data = data.drop_duplicates(subset=["Name"])
         data.index = range(1, len(data) + 1)
         return data
+
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns and month_number:
+            data = data[(data["Trustpilot Review Date"].dt.month == month_number) & (
+                    data["Trustpilot Review Date"].dt.year == year)]
+        else:
+            data = data[(data["Trustpilot Review Date"].dt.year == year)]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        # for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        #     if col in data.columns:
+        #         data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        if "Name" in data.columns:
+            data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
@@ -621,16 +662,27 @@ def format_review_counts_reviews(review_counts):
 
 def create_review_pie_chart(review_data, title):
     """Create pie chart for review distribution"""
-    if review_data.empty or review_data.sum() == 0:
-        return None
+    if isinstance(review_data, dict):
+        if not review_data or sum(review_data.values()) == 0:
+            return None
+        values = list(review_data.values())
+        labels = list(review_data.keys())
 
+        # Case 2: If review_data is a Pandas Series
+    else:
+        if review_data.empty or review_data.sum() == 0:
+            return None
+        values = review_data.values
+        labels = review_data.index
+
+        # Create pie chart
     fig = px.pie(
-        values=list(review_data.values),
-        names=list(review_data.index),
+        values=values,
+        names=labels,
         title=title,
         color_discrete_sequence=px.colors.qualitative.Set3
     )
-    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update_traces(textposition="inside", textinfo="percent+label")
     return fig
 
 
@@ -727,11 +779,34 @@ def summary(month, year):
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
 
-    usa_review = usa_clean[
-        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    usa_review_sent = usa_clean[
+        "Trustpilot Review"].value_counts().get("Sent", 0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    usa_review_pending = usa_clean[
+        "Trustpilot Review"].value_counts().get("Pending",
+                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
 
-    combined_data = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    uk_review_sent = uk_clean["Trustpilot Review"].value_counts().get("Sent",
+                                                                      0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    uk_review_pending = uk_clean["Trustpilot Review"].value_counts().get("Pending",
+                                                                         0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+
+    usa_reviews_df = load_reviews(sheet_usa, year, month)
+
+    uk_reviews_df = load_reviews(sheet_uk, year, month)
+    combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
+
+    usa_attained_pm = (
+        usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+        .groupby("Project Manager")["Trustpilot Review"]
+        .count()
+        .reset_index()
+    )
+    uk_attained_pm = (
+        uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+        .groupby("Project Manager")["Trustpilot Review"]
+        .count()
+        .reset_index()
+    )
 
     attained_reviews_per_pm = (
         combined_data[combined_data["Trustpilot Review"] == "Attained"]
@@ -740,18 +815,31 @@ def summary(month, year):
         .reset_index()
     )
 
+    usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+    usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+
+    uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+    uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
+    # usa_total = usa_review.sum() if not usa_review.empty else 0
+    # uk_total = uk_review.sum() if not uk_review.empty else 0
 
-    usa_total = usa_review.sum() if not usa_review.empty else 0
-    uk_total = uk_review.sum() if not uk_review.empty else 0
+    usa_review = {
+        "Sent": usa_review_sent,
+        "Pending": usa_review_pending,
+        "Attained": usa_total_attained,
+    }
 
-    usa_attained = usa_review.get('Attained', 0)
-    uk_attained = uk_review.get('Attained', 0)
-
-    combined_total = usa_total + uk_total
-    combined_attained = usa_attained + uk_attained
+    uk_review = {
+        "Sent": uk_review_sent,
+        "Pending": uk_review_pending,
+        "Attained": uk_total_attained,
+    }
 
     printing_data = get_printing_data_reviews(month, year)
     Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
@@ -862,11 +950,34 @@ def generate_year_summary(year):
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
 
-    usa_review = usa_clean[
-        "Trustpilot Review"].value_counts() if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    uk_review = uk_clean["Trustpilot Review"].value_counts() if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    usa_review_sent = usa_clean[
+        "Trustpilot Review"].value_counts().get("Sent", 0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    usa_review_pending = usa_clean[
+        "Trustpilot Review"].value_counts().get("Pending",
+                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
 
-    combined_data = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    uk_review_sent = uk_clean["Trustpilot Review"].value_counts().get("Sent",
+                                                                      0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    uk_review_pending = uk_clean["Trustpilot Review"].value_counts().get("Pending",
+                                                                         0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+
+    usa_reviews_df = load_reviews(sheet_usa, year)
+
+    uk_reviews_df = load_reviews(sheet_uk, year)
+    combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
+
+    usa_attained_pm = (
+        usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+        .groupby("Project Manager")["Trustpilot Review"]
+        .count()
+        .reset_index()
+    )
+    uk_attained_pm = (
+        uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+        .groupby("Project Manager")["Trustpilot Review"]
+        .count()
+        .reset_index()
+    )
 
     attained_reviews_per_pm = (
         combined_data[combined_data["Trustpilot Review"] == "Attained"]
@@ -875,17 +986,31 @@ def generate_year_summary(year):
         .reset_index()
     )
 
+    usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+    usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+
+    uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+    uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
+    # usa_total = usa_review.sum() if not usa_review.empty else 0
+    # uk_total = uk_review.sum() if not uk_review.empty else 0
 
-    usa_total = usa_review.sum() if not usa_review.empty else 0
-    uk_total = uk_review.sum() if not uk_review.empty else 0
+    usa_review = {
+        "Sent": usa_review_sent,
+        "Pending": usa_review_pending,
+        "Attained": usa_total_attained,
+    }
 
-    usa_attained = usa_review.get('Attained', 0)
-    uk_attained = uk_review.get('Attained', 0)
-    combined_total = usa_total + uk_total
-    combined_attained = usa_attained + uk_attained
+    uk_review = {
+        "Sent": uk_review_sent,
+        "Pending": uk_review_pending,
+        "Attained": uk_total_attained,
+    }
 
     printing_data = printing_data_all(year)
     Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
@@ -909,7 +1034,8 @@ def generate_year_summary(year):
 
     a_plus, a_plus_count = get_A_plus_all(year)
 
-    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp, 'Aurora Writers': aurora_writers}
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
+                  'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
@@ -1017,14 +1143,20 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     story.append(Spacer(1, 20))
 
     # Calculate metrics
-    usa_total = usa_review_data.sum() if hasattr(usa_review_data, 'sum') else sum(usa_review_data.values())
-    usa_attained = usa_review_data.get('Attained', 0) if isinstance(usa_review_data, dict) else getattr(usa_review_data,
-                                                                                                        'Attained', 0)
+    # USA reviews
+    usa_total = usa_review_data.sum() if hasattr(usa_review_data, "sum") else sum(usa_review_data.values())
+    if isinstance(usa_review_data, dict):
+        usa_attained = usa_review_data.get("Attained", 0)
+    else:  # assume it's a Pandas object
+        usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
     usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
-    uk_total = uk_review_data.sum() if hasattr(uk_review_data, 'sum') else sum(uk_review_data.values())
-    uk_attained = uk_review_data.get('Attained', 0) if isinstance(uk_review_data, dict) else getattr(uk_review_data,
-                                                                                                     'Attained', 0)
+    # UK reviews
+    uk_total = uk_review_data.sum() if hasattr(uk_review_data, "sum") else sum(uk_review_data.values())
+    if isinstance(uk_review_data, dict):
+        uk_attained = uk_review_data.get("Attained", 0)
+    else:
+        uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
     uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
 
     combined_total = usa_total + uk_total
@@ -1062,6 +1194,8 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     # Platform Distribution
     story.append(Paragraph("📱 Platform Distribution", subsection_style))
 
+    total_client_usa = 0
+    total_client_uk = 0
     # USA Platforms
     if usa_platforms:
         story.append(Paragraph("USA Platform Breakdown:", styles['Normal']))
@@ -1111,12 +1245,19 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
             uk_brand = uk_items[i] if i < len(uk_items) else ('', '')
             brand_data.append([usa_brand[0], str(usa_brand[1]), uk_brand[0], str(uk_brand[1])])
 
+        # Add totals row
+        total_usa = sum(usa_brands.values())
+        total_uk = sum(uk_brands.values())
+        brand_data.append(['Total', str(total_usa), 'Total', str(total_uk)])
+
         brand_table = Table(brand_data)
         brand_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey)
         ]))
         story.append(brand_table)
         story.append(Spacer(1, 20))
@@ -1158,8 +1299,8 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     success_rate = (copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats[
                                                                                                         'Total_copyrights'] > 0 else 0
     rejection_rate = (copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if \
-    copyright_stats[
-        'Total_copyrights'] > 0 else 0
+        copyright_stats[
+            'Total_copyrights'] > 0 else 0
     copyright_data = [
         ['Metric', 'Value'],
         ['Total Copyrights', str(copyright_stats['Total_copyrights'])],
@@ -1335,6 +1476,18 @@ def main():
             if sheet_name:
                 data = load_data(sheet_name, selected_month_number, number)
 
+                review_data = load_reviews(sheet_name, number, selected_month_number)
+
+                attained_reviews_per_pm = (
+                    review_data[review_data["Trustpilot Review"] == "Attained"]
+                    .groupby("Project Manager")["Trustpilot Review"]
+                    .count()
+                    .reset_index()
+                )
+
+                attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+                attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
                 if data.empty:
                     st.info(f"No data available for {selected_month} {number} for {choice}")
                 else:
@@ -1354,26 +1507,24 @@ def main():
                     ingram = platforms.get("Ingram Spark", "N/A")
                     fav = platforms.get("FAV", "N/A")
 
-                    reviews = data["Trustpilot Review"].value_counts()
+                    sent = data["Trustpilot Review"].value_counts().get("Sent", 0)
+                    pending = data["Trustpilot Review"].value_counts().get("Pending", 0)
+
+                    review = {
+                        "Sent": sent,
+                        "Pending": pending,
+                        "Attained": attained_reviews_per_pm["Attained Reviews"].sum()
+                    }
                     publishing = data["Status"].value_counts()
-                    total_reviews = reviews.sum()
-                    attained = reviews.get("Attained", 0)
+                    total_reviews = sum(review.values())
+                    # attained = reviews.get("Attained", 0)
+                    attained = attained_reviews_per_pm["Attained Reviews"].sum()
                     percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
 
                     unique_clients_count_per_pm = data.groupby('Project Manager')['Name'].nunique().reset_index()
                     unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                     unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
                     total_unique_clients = data['Name'].nunique()
-
-                    attained_reviews_per_pm = (
-                        data[data["Trustpilot Review"] == "Attained"]
-                        .groupby("Project Manager")["Trustpilot Review"]
-                        .count()
-                        .reset_index()
-                    )
-
-                    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
-                    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -1403,7 +1554,7 @@ def main():
                         st.markdown("---")
 
                         st.markdown("#### 🔍 Review & Publishing Status Breakdown")
-                        for review_type, count in reviews.items():
+                        for review_type, count in review.items():
                             st.markdown(f"- 📝 **{review_type}**: `{count}`")
 
                         for status_type, count_s in publishing.items():
@@ -1417,20 +1568,20 @@ def main():
                         st.write("👏 **Reviews Per PM**")
                         st.dataframe(attained_reviews_per_pm)
                 st.markdown("---")
-        elif action == "Reviews" and choice and selected_month and status and number:
-            sheet_name = {
-                "UK": sheet_uk,
-                "USA": sheet_usa,
-                "AudioBook": sheet_audio
-            }.get(choice)
-            if sheet_name:
-                data = review_data(sheet_name, selected_month_number, number, status)
-
-                st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
-                if not data.empty:
-                    st.dataframe(data)
-                else:
-                    st.info(f"No matching reviews found for {selected_month_number} {number}")
+        # elif action == "Reviews" and choice and selected_month and status and number:
+        #     sheet_name = {
+        #         "UK": sheet_uk,
+        #         "USA": sheet_usa,
+        #         "AudioBook": sheet_audio
+        #     }.get(choice)
+        #     if sheet_name:
+        #         data = review_data(sheet_name, selected_month_number, number, status)
+        #
+        #         st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
+        #         if not data.empty:
+        #             st.dataframe(data)
+        #         else:
+        #             st.info(f"No matching reviews found for {selected_month_number} {number}")
         elif action == "Printing" and selected_month and number:
 
             st.subheader(f"🖨️ Printing Summary for {selected_month}")
@@ -1632,12 +1783,12 @@ def main():
                                                                                  a_plus,
                                                                                  selected_month, number)
 
-                            usa_total = usa_review_data.sum()
+                            usa_total = sum(usa_review_data.values())
                             usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
 
                             usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
-                            uk_total = uk_review_data.sum()
+                            uk_total = sum(uk_review_data.values())
                             uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
 
                             uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
@@ -1646,8 +1797,6 @@ def main():
                             combined_attained = usa_attained + uk_attained
                             combined_attained_pct = (
                                     combined_attained / combined_total * 100) if combined_total > 0 else 0
-
-
 
                             st.header(f"{selected_month} {number} Summary Report")
 
@@ -1762,13 +1911,15 @@ def main():
                                           f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
 
                                 success_rate = (
-                                        copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
+                                        copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if \
+                                    copyright_stats['Total_copyrights'] > 0 else 0
                                 st.metric("Success Percentage", f"{success_rate:.1f}%")
                                 st.metric("Rejection Rate",
                                           f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
 
                                 rejection_rate = (
-                                        copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
+                                        copyright_stats['result_count_no'] / copyright_stats[
+                                    'Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
                                 st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
                             with col2:
                                 st.subheader("🌍 Country Distribution")
@@ -1878,12 +2029,12 @@ def main():
                                                                              selected_month, number)
 
                         # Calculate metrics for display
-                        usa_total = usa_review_data.sum()
+                        usa_total = sum(usa_review_data.values())
                         usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
 
                         usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
-                        uk_total = uk_review_data.sum()
+                        uk_total = sum(uk_review_data.values())
                         uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
 
                         uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
@@ -2003,13 +2154,15 @@ def main():
                                       f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
 
                             success_rate = (
-                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
+                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if \
+                                copyright_stats['Total_copyrights'] > 0 else 0
                             st.metric("Success Percentage", f"{success_rate:.1f}%")
                             st.metric("Rejection Rate",
                                       f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
 
                             rejection_rate = (
-                                    copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
+                                    copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if \
+                                copyright_stats['Total_copyrights'] > 0 else 0
                             st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
 
                         with col2:
