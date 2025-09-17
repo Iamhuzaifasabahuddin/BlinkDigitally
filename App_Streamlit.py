@@ -667,20 +667,26 @@ def create_review_pie_chart(review_data, title):
             return None
         values = list(review_data.values())
         labels = list(review_data.keys())
-
-        # Case 2: If review_data is a Pandas Series
-    else:
+    else:  # Case 2: If review_data is a Pandas Series
         if review_data.empty or review_data.sum() == 0:
             return None
         values = review_data.values
         labels = review_data.index
 
-        # Create pie chart
+
+    custom_colors = {
+        "Attained": "#7dff8d",
+        "Pending": "#ffc444",
+        "-ve Attained": "#ff4b4b",
+        "Sent": "#77e5f7"
+    }
+
     fig = px.pie(
         values=values,
         names=labels,
         title=title,
-        color_discrete_sequence=px.colors.qualitative.Set3
+        color=labels,
+        color_discrete_map=custom_colors
     )
     fig.update_traces(textposition="inside", textinfo="percent+label")
     return fig
@@ -760,14 +766,14 @@ def summary(month, year):
     combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
-    writers_clique = brands.get("Writers Clique", "N/A")
-    bookmarketeers = brands.get("BookMarketeers", "N/A")
-    aurora_writers = brands.get("Aurora Writers", "N/A")
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    aurora_writers = brands.get("Aurora Writers", 0)
     kdp = brands.get("KDP", "N/A")
 
     uk_brand = uk_clean["Brand"].value_counts()
-    authors_solution = uk_brand.get("Authors Solution", "N/A")
-    book_publication = uk_brand.get("Book Publication", "N/A")
+    authors_solution = uk_brand.get("Authors Solution", 0)
+    book_publication = uk_brand.get("Book Publication", 0)
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -784,14 +790,19 @@ def summary(month, year):
     usa_review_pending = usa_clean[
         "Trustpilot Review"].value_counts().get("Pending",
                                                 0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    usa_review_na = usa_clean[
+        "Trustpilot Review"].value_counts().get("-ve Attained",
+                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
 
     uk_review_sent = uk_clean["Trustpilot Review"].value_counts().get("Sent",
                                                                       0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
     uk_review_pending = uk_clean["Trustpilot Review"].value_counts().get("Pending",
                                                                          0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    uk_review_na = uk_clean["Trustpilot Review"].value_counts().get("-ve Attained",
+                                                                    0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+
 
     usa_reviews_df = load_reviews(sheet_usa, year, month)
-
     uk_reviews_df = load_reviews(sheet_uk, year, month)
     combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
 
@@ -826,19 +837,18 @@ def summary(month, year):
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
-    # usa_total = usa_review.sum() if not usa_review.empty else 0
-    # uk_total = uk_review.sum() if not uk_review.empty else 0
-
     usa_review = {
+        "Attained": usa_total_attained,
         "Sent": usa_review_sent,
         "Pending": usa_review_pending,
-        "Attained": usa_total_attained,
+        "-ve Attained": usa_review_na
     }
 
     uk_review = {
+        "Attained": uk_total_attained,
         "Sent": uk_review_sent,
         "Pending": uk_review_pending,
-        "Attained": uk_total_attained,
+        "-ve Attained": uk_review_na
     }
 
     printing_data = get_printing_data_reviews(month, year)
@@ -931,14 +941,14 @@ def generate_year_summary(year):
     combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
-    writers_clique = brands.get("Writers Clique", "N/A")
-    bookmarketeers = brands.get("BookMarketeers", "N/A")
-    aurora_writers = brands.get("Aurora Writers", "N/A")
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    aurora_writers = brands.get("Aurora Writers", 0)
     kdp = brands.get("KDP", "N/A")
 
     uk_brand = uk_clean["Brand"].value_counts()
-    authors_solution = uk_brand.get("Authors Solution", "N/A")
-    book_publication = uk_brand.get("Book Publication", "N/A")
+    authors_solution = uk_brand.get("Authors Solution", 0)
+    book_publication = uk_brand.get("Book Publication", 0)
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -955,10 +965,15 @@ def generate_year_summary(year):
     usa_review_pending = usa_clean[
         "Trustpilot Review"].value_counts().get("Pending",
                                                 0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    usa_review_na = usa_clean[
+        "Trustpilot Review"].value_counts().get("-ve Attained",
+                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
 
     uk_review_sent = uk_clean["Trustpilot Review"].value_counts().get("Sent",
                                                                       0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
     uk_review_pending = uk_clean["Trustpilot Review"].value_counts().get("Pending",
+                                                                         0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    uk_review_na = uk_clean["Trustpilot Review"].value_counts().get("-ve Attained",
                                                                          0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
 
     usa_reviews_df = load_reviews(sheet_usa, year)
@@ -997,19 +1012,18 @@ def generate_year_summary(year):
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
-    # usa_total = usa_review.sum() if not usa_review.empty else 0
-    # uk_total = uk_review.sum() if not uk_review.empty else 0
-
     usa_review = {
+        "Attained": usa_total_attained,
         "Sent": usa_review_sent,
         "Pending": usa_review_pending,
-        "Attained": usa_total_attained,
+        "-ve Attained": usa_review_na
     }
 
     uk_review = {
+        "Attained": uk_total_attained,
         "Sent": uk_review_sent,
         "Pending": uk_review_pending,
-        "Attained": uk_total_attained,
+        "-ve Attained": uk_review_na
     }
 
     printing_data = printing_data_all(year)
