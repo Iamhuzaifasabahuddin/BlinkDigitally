@@ -1671,7 +1671,7 @@ def main():
                     st.markdown(f"### 📄 Total Printing Data for {number2}")
                     st.dataframe(data)
                 else:
-                    st.warning(f"⚠️ No Data Available for Printing in {number}")
+                    st.warning(f"⚠️ No Data Available for Printing in {number2}")
 
 
         elif action == "Copyright" and selected_month and number:
