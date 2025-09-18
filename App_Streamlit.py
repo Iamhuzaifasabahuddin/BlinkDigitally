@@ -1514,6 +1514,7 @@ def main():
                     aurora_writers = brands.get("Aurora Writers", "N/A")
                     kdp = brands.get("KDP", "N/A")
                     authors_solution = brands.get("Authors Solution", "N/A")
+                    book_publication = brands.get("Book Publication", "N/A")
 
                     platforms = data["Platform"].value_counts()
                     amazon = platforms.get("Amazon", "N/A")
@@ -1556,7 +1557,8 @@ def main():
                                     - 📘 **Aurora Writers:** `{aurora_writers}`
                                     - 📙 **Writers Clique:** `{writers_clique}`
                                     - 📕 **KDP:** `{kdp}`
-                                    - 📘 **Authors Solution:** `{authors_solution}`
+                                    - 📔 **Authors Solution:** `{authors_solution}`
+                                    - 📘 **Book Publication:** `{book_publication}`
 
                                     **Platforms**
                                     - 🅰 **Amazon:** `{amazon}`
