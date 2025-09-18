@@ -1466,7 +1466,7 @@ def main():
             choice = st.selectbox("Select Data To View", ["USA", "UK", "AudioBook"], index=None,
                                   placeholder="Select Data to View")
 
-        if action in ["View Data", "Reviews", "Printing", "Copyright", "Sales"]:
+        if action in ["View Data", "Reviews", "Copyright", "Sales"]:
             selected_month = st.selectbox(
                 "Select Month",
                 month_list,
@@ -1474,7 +1474,7 @@ def main():
                 placeholder="Select Month"
             )
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
-        if action in ["Year Summary", "Copyright", "Printing", "View Data", "Reviews", "Sales"]:
+        if action in ["Year Summary", "Copyright", "View Data", "Reviews", "Sales"]:
             number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
         if action == "Reviews":
             status = st.selectbox("Status", ["Pending", "Sent", "Attained"], index=None, placeholder="Select Status")
@@ -1596,63 +1596,84 @@ def main():
         #             st.dataframe(data)
         #         else:
         #             st.info(f"No matching reviews found for {selected_month_number} {number}")
-        elif action == "Printing" and selected_month and number:
+        elif action == "Printing":
+            tab1, tab2 = st.tabs(["Monthly", "Total"])
 
-            st.subheader(f"🖨️ Printing Summary for {selected_month}")
+            with tab1:
+                selected_month = st.selectbox(
+                    "Select Month",
+                    month_list,
+                    index=current_month - 1,
+                    placeholder="Select Month"
+                )
+                number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
+                selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
 
-            data = get_printing_data(selected_month_number, number)
+                if selected_month and number:
+                    st.subheader(f"🖨️ Printing Summary for {selected_month}")
 
-            if not data.empty:
+                    data = get_printing_data(selected_month_number, number)
 
-                Total_copies = data["No of Copies"].sum()
+                    if not data.empty:
 
-                Total_cost = data["Order Cost"].sum()
+                        Total_copies = data["No of Copies"].sum()
 
-                Highest_cost = data["Order Cost"].max()
+                        Total_cost = data["Order Cost"].sum()
 
-                Highest_copies = data["No of Copies"].max()
+                        Highest_cost = data["Order Cost"].max()
 
-                Lowest_cost = data["Order Cost"].min()
+                        Highest_copies = data["No of Copies"].max()
 
-                Lowest_copies = data["No of Copies"].min()
+                        Lowest_cost = data["Order Cost"].min()
 
-                # data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
-                #
-                # da
+                        Lowest_copies = data["No of Copies"].min()
 
-                Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
+                        # data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
+                        #
+                        # da
 
-                st.markdown("### 📄 Detailed Printing Data")
+                        Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
 
-                st.dataframe(data)
-                st.markdown("---")
+                        st.markdown("### 📄 Detailed Printing Data")
 
-                st.markdown("### 📊 Summary Statistics")
+                        st.dataframe(data)
+                        st.markdown("---")
 
-                st.markdown(f"""
+                        st.markdown("### 📊 Summary Statistics")
 
-                   - 🧾 **Total Orders:** {len(data)}
+                        st.markdown(f"""
+        
+                           - 🧾 **Total Orders:** {len(data)}
+        
+                           - 📦 **Total Copies Printed:** `{Total_copies}`
+        
+                           - 💰 **Total Cost:** `${Total_cost:,.2f}`
+        
+                           - 📈 **Highest Order Cost:** `${Highest_cost:,.2f}`
+        
+                           - 📉 **Lowest Order Cost:** `${Lowest_cost:,.2f}`
+        
+                           - 🔢 **Highest Copies in One Order:** `{Highest_copies}`
+        
+                           - 🧮 **Lowest Copies in One Order:** `{Lowest_copies}`
+        
+                           - 🧾 **Average Cost per Copy:** `${Average:,.2f}`
+        
+                           """)
+                        st.markdown("---")
 
-                   - 📦 **Total Copies Printed:** `{Total_copies}`
+                    else:
+                        st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
+            with tab2:
+                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), step=1)
+                data = printing_data_all(number2)
+                if not data.empty:
+                    st.markdown(f"### 📄 Total Printing Data for {number2}")
+                    st.dataframe(data)
+                else:
+                    st.warning(f"⚠️ No Data Available for Printing in {number}")
 
-                   - 💰 **Total Cost:** `${Total_cost:,.2f}`
 
-                   - 📈 **Highest Order Cost:** `${Highest_cost:,.2f}`
-
-                   - 📉 **Lowest Order Cost:** `${Lowest_cost:,.2f}`
-
-                   - 🔢 **Highest Copies in One Order:** `{Highest_copies}`
-
-                   - 🧮 **Lowest Copies in One Order:** `{Lowest_copies}`
-
-                   - 🧾 **Average Cost per Copy:** `${Average:,.2f}`
-
-                   """)
-                st.markdown("---")
-
-            else:
-
-                st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
         elif action == "Copyright" and selected_month and number:
             st.subheader(f"© Copyright Summary for {selected_month}")
 
