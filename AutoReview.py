@@ -4,11 +4,12 @@ import os
 import tempfile
 import time
 from datetime import datetime
+
+import gspread
 import matplotlib.pyplot as plt
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
+from google.oauth2.service_account import Credentials
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -21,7 +22,6 @@ channel_uk = os.getenv("CHANNEL_UK")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-
 
 
 # Initialize gspread client
@@ -134,17 +134,17 @@ def load_data_reviews(sheet_name, name) -> tuple:
     data_count = data_original[
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication"])) &
+        (data_original["Brand"].isin(
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
         (data_original["Status"] == "Published")
         ]
-
-
 
     data = data_original[
         (data_original["Project Manager"] == name) &
         # ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
         ((data_original["Trustpilot Review"] == "Pending")) &
-        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication"])) &
+        (data_original["Brand"].isin(
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
         (data_original["Status"] == "Published")
         ]
 
@@ -182,7 +182,6 @@ def load_data_reviews(sheet_name, name) -> tuple:
 
     data.index = range(1, len(data) + 1)
     return data, total_percentage, min_date, max_date, attained, total_reviews
-
 
 
 def load_data_audio(name) -> tuple:
@@ -284,7 +283,6 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
 
         try:
 
-
             response = client.chat_postMessage(
                 channel=channel,
                 text=message,
@@ -295,6 +293,145 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
             print(f"❌ Error sending message to {name}: {e.response['error']}")
             print(f"Detailed error: {str(e)}")
             logging.error(e)
+
+def load_total_reviews(sheet_name: str, name):
+    data = clean_data_reviews(sheet_name)
+
+    if "Name" in data.columns:
+        data = data.drop_duplicates(subset=["Name"])
+
+    data_original = data
+    if data.empty:
+        return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
+
+    # Filter data based on criteria
+    data_count = data_original[
+        (data_original["Project Manager"] == name) &
+        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
+        (data_original["Brand"].isin(
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+        (data_original["Status"] == "Published")
+        ]
+
+    data = data_original[
+        (data_original["Project Manager"] == name) &
+        # ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
+        ((data_original["Trustpilot Review"] == "Pending")) &
+        (data_original["Brand"].isin(
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+        (data_original["Status"] == "Published")
+        ]
+
+    data = data.sort_values(by="Publishing Date", ascending=True)
+
+    # Clean strings and drop missing
+    data_original["Trustpilot Review"] = data_original["Trustpilot Review"].astype(str).str.strip().str.lower()
+    data_original["Project Manager"] = data_original["Project Manager"].astype(str).str.strip()
+    name = name.strip()
+
+    data_original = data_original.dropna(subset=["Trustpilot Review", "Project Manager"])
+    total_reviews = len(data_count)
+
+    min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
+    max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
+
+
+    data.index = range(1, len(data) + 1)
+    return data, total_reviews
+
+
+def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns and month_number:
+            data = data[(data["Trustpilot Review Date"].dt.month == month_number) & (
+                    data["Trustpilot Review Date"].dt.year == year)]
+        else:
+            data = data[(data["Trustpilot Review Date"].dt.year == year)]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        # for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        #     if col in data.columns:
+        #         data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        if "Name" in data.columns:
+            data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        return pd.DataFrame()
+
+
+def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month = None) -> None:
+    """Send attained Trustpilot reviews for a specific Project Manager"""
+    user_id = get_user_id_by_email(email)
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    if not user_id:
+        print(f"❌ Could not find user ID for {pm_name}")
+        return
+    df, total_reviews= load_total_reviews(sheet_name, name)
+    review_data = load_reviews(sheet_name, year, month)
+
+
+
+    review_details_df = review_data.sort_values(by="Trustpilot Review Date", ascending=True)
+    review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+        review_details_df["Trustpilot Review Date"], errors="coerce"
+    ).dt.strftime("%d-%B-%Y")
+
+    attained_details = review_details_df[
+        (review_details_df["Trustpilot Review"] == "Attained") &
+        (review_details_df["Project Manager"] == pm_name)
+        ][["Name", "Trustpilot Review Date"]]
+
+    attained_details.index = range(1, len(attained_details) + 1)
+
+    if attained_details.empty:
+        print(f"⚠️ No attained reviews found for {pm_name}")
+        return
+
+    markdown_table = attained_details.to_markdown(index=True)
+
+    Total = total_reviews + len(attained_details)
+    percentage = len(attained_details) / Total
+    message = (
+                f"Hi <@{user_id}>!  Here's your Trustpilot update from {current_year} 📄\n\n"
+                f"*Summary:* {total_reviews} pending reviews\n\n"
+                f"*Review Retention:* {len(attained_details)} out of {Total} "
+                f"({percentage:.1%})\n\n"
+                f"```\n{markdown_table}\n```"
+    )
+
+    try:
+
+        client.chat_postMessage(
+            channel=channel,
+            text=message,
+            mrkdwn=True
+        )
+        send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"),
+                f"✅ Attained review details sent for {pm_name}")
+
+    except SlackApiError as e:
+        print(f"❌ Error sending message for {pm_name}: {e.response['error']}")
+        logging.error(e)
 
 
 def get_printing_data_reviews(month, year) -> pd.DataFrame:
@@ -370,7 +507,6 @@ def printing_data_all(year) -> pd.DataFrame:
     data.index = range(1, len(data) + 1)
     data = data.fillna("N/A")
     return data
-
 
 
 def get_copyright_data(month, year) -> tuple:
@@ -844,12 +980,20 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    for name, email in name_usa.items():
-        time.sleep(2)
-        send_df_as_text(name, sheet_usa, email, channel_usa)
-    #
+    # for name, email in name_usa.items():
+    #     time.sleep(2)
+    #     send_df_as_text(name, sheet_usa, email, channel_usa)
+
+    # for name, email in name_usa.items():
+    #     time.sleep(2)
+    #     send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
+
     # for name, email in names_uk.items():
     #     # time.sleep(5)
     #     send_df_as_text(name, sheet_uk, email, channel_uk)
+
+    # for name, email in names_uk.items():
+    #     time.sleep(2)
+    #     send_pm_attained_reviews(name, email, sheet_uk, 2025, channel_uk)
     # summary(5, 2025)
     # generate_year_summary(2025)
