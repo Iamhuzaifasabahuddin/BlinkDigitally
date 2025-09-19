@@ -785,22 +785,24 @@ def summary(month, year):
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
 
-    usa_review_sent = usa_clean[
-        "Trustpilot Review"].value_counts().get("Sent", 0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    usa_review_pending = usa_clean[
-        "Trustpilot Review"].value_counts().get("Pending",
-                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    usa_review_na = usa_clean[
-        "Trustpilot Review"].value_counts().get("-ve Attained",
-                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
 
-    uk_review_sent = uk_clean["Trustpilot Review"].value_counts().get("Sent",
-                                                                      0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
-    uk_review_pending = uk_clean["Trustpilot Review"].value_counts().get("Pending",
-                                                                         0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
-    uk_review_na = uk_clean["Trustpilot Review"].value_counts().get("-ve Attained",
-                                                                    0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
+    if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
+        usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
+        usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+    else:
+        usa_review_sent = usa_review_pending = usa_review_na = 0
+
+    if "Trustpilot Review" in uk_clean.columns and "Brand" in uk_clean.columns:
+        uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
+        uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+    else:
+        uk_review_sent = uk_review_pending = uk_review_na = 0
 
     usa_reviews_df = load_reviews(sheet_usa, year, month)
     uk_reviews_df = load_reviews(sheet_uk, year, month)
@@ -836,6 +838,18 @@ def summary(month, year):
 
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+    review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+
+    review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+        review_details_df["Trustpilot Review Date"], errors="coerce"
+    ).dt.strftime("%d-%B-%Y")
+
+    attained_details = review_details_df[
+        review_details_df["Trustpilot Review"] == "Attained"
+        ][["Project Manager", "Name", "Trustpilot Review Date"]]
+
+    attained_details.index = range(1, len(attained_details) + 1)
 
     usa_review = {
         "Attained": usa_total_attained,
@@ -901,7 +915,7 @@ def summary(month, year):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details
 
 
 def generate_year_summary(year):
@@ -960,21 +974,23 @@ def generate_year_summary(year):
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
 
-    usa_review_sent = usa_clean[
-        "Trustpilot Review"].value_counts().get("Sent", 0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    usa_review_pending = usa_clean[
-        "Trustpilot Review"].value_counts().get("Pending",
-                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
-    usa_review_na = usa_clean[
-        "Trustpilot Review"].value_counts().get("-ve Attained",
-                                                0) if "Trustpilot Review" in usa_clean.columns else pd.Series()
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
-    uk_review_sent = uk_clean["Trustpilot Review"].value_counts().get("Sent",
-                                                                      0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
-    uk_review_pending = uk_clean["Trustpilot Review"].value_counts().get("Pending",
-                                                                         0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
-    uk_review_na = uk_clean["Trustpilot Review"].value_counts().get("-ve Attained",
-                                                                         0) if "Trustpilot Review" in uk_clean.columns else pd.Series()
+    if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
+        usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
+        usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+    else:
+        usa_review_sent = usa_review_pending = usa_review_na = 0
+
+    if "Trustpilot Review" in uk_clean.columns and "Brand" in uk_clean.columns:
+        uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
+        uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+    else:
+        uk_review_sent = uk_review_pending = uk_review_na = 0
 
     usa_reviews_df = load_reviews(sheet_usa, year)
 
@@ -1011,6 +1027,18 @@ def generate_year_summary(year):
 
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+    review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+
+    review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+        review_details_df["Trustpilot Review Date"], errors="coerce"
+    ).dt.strftime("%d-%B-%Y")
+
+    attained_details = review_details_df[
+        review_details_df["Trustpilot Review"] == "Attained"
+        ][["Project Manager", "Name", "Trustpilot Review Date"]]
+
+    attained_details.index = range(1, len(attained_details) + 1)
 
     usa_review = {
         "Attained": usa_total_attained,
@@ -1075,7 +1103,7 @@ def generate_year_summary(year):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details
 
 
 def logging_function() -> None:
@@ -1499,6 +1527,18 @@ def main():
                     .reset_index()
                 )
 
+                review_details_df = review_data.sort_values(by="Project Manager", ascending=True)
+
+                review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+                    review_details_df["Trustpilot Review Date"], errors="coerce"
+                ).dt.strftime("%d-%B-%Y")
+
+                attained_details = review_details_df[
+                    review_details_df["Trustpilot Review"] == "Attained"
+                    ][["Project Manager", "Name", "Trustpilot Review Date"]]
+
+                attained_details.index = range(1, len(attained_details) + 1)
+
                 attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
                 attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
@@ -1522,8 +1562,9 @@ def main():
                     ingram = platforms.get("Ingram Spark", "N/A")
                     fav = platforms.get("FAV", "N/A")
 
-                    sent = data["Trustpilot Review"].value_counts().get("Sent", 0)
-                    pending = data["Trustpilot Review"].value_counts().get("Pending", 0)
+                    filtered_data = data[data["Brand"].isin(["BookMarketeers", "Writers Clique", "Aurora Writers", " Authors Solution", " Book Publication"])]
+                    sent = filtered_data["Trustpilot Review"].value_counts().get("Sent", 0)
+                    pending = filtered_data["Trustpilot Review"].value_counts().get("Pending", 0)
 
                     review = {
                         "Sent": sent,
@@ -1583,6 +1624,7 @@ def main():
                                     )
                         st.write("👏 **Reviews Per PM**")
                         st.dataframe(attained_reviews_per_pm)
+                        st.dataframe(attained_details)
                 st.markdown("---")
         # elif action == "Reviews" and choice and selected_month and status and number:
         #     sheet_name = {
@@ -1599,7 +1641,7 @@ def main():
         #         else:
         #             st.info(f"No matching reviews found for {selected_month_number} {number}")
         elif action == "Printing":
-            tab1, tab2 = st.tabs(["Monthly", "Total"])
+            tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
 
             with tab1:
                 selected_month = st.selectbox(
@@ -1673,7 +1715,19 @@ def main():
                     st.markdown(f"### 📄 Total Printing Data for {number2}")
                     st.dataframe(data)
                 else:
-                    st.warning(f"⚠️ No Data Available for Printing in {number2}")
+                   st.warning(f"⚠️ No Data Available for Printing in {number2}")
+            with tab3:
+                data = printing_data_all(2025)
+                search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")
+
+                if search_term:
+                    search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
+
+                    if search_df.empty:
+                        st.warning("No such orders found!")
+                    else:
+                        st.dataframe(search_df)
+
 
 
         elif action == "Copyright" and selected_month and number:
@@ -1811,7 +1865,7 @@ def main():
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
@@ -1863,6 +1917,7 @@ def main():
                                 st.metric("Total Attained", uk_attained)
                                 st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
                                 st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_df)
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                             st.plotly_chart(platform_chart, use_container_width=True)
@@ -2057,7 +2112,7 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -2108,6 +2163,8 @@ def main():
                             st.metric("Total Attained", uk_attained)
                             st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
                             st.dataframe(attained_reviews_per_pm)
+                            st.dataframe(attained_df)
+
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                         st.plotly_chart(platform_chart, use_container_width=True)
