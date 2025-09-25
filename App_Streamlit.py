@@ -673,7 +673,6 @@ def create_review_pie_chart(review_data, title):
         values = review_data.values
         labels = review_data.index
 
-
     custom_colors = {
         "Attained": "#7dff8d",
         "Pending": "#ffc444",
@@ -784,7 +783,6 @@ def summary(month, year):
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
-
 
     allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
@@ -1562,7 +1560,8 @@ def main():
                     ingram = platforms.get("Ingram Spark", "N/A")
                     fav = platforms.get("FAV", "N/A")
 
-                    filtered_data = data[data["Brand"].isin(["BookMarketeers", "Writers Clique", "Aurora Writers", " Authors Solution", " Book Publication"])]
+                    filtered_data = data[data["Brand"].isin(
+                        ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"])]
                     sent = filtered_data["Trustpilot Review"].value_counts().get("Sent", 0)
                     pending = filtered_data["Trustpilot Review"].value_counts().get("Pending", 0)
 
@@ -1715,7 +1714,7 @@ def main():
                     st.markdown(f"### 📄 Total Printing Data for {number2}")
                     st.dataframe(data)
                 else:
-                   st.warning(f"⚠️ No Data Available for Printing in {number2}")
+                    st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
                 data = printing_data_all(2025)
                 search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")

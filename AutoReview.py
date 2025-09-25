@@ -2,7 +2,6 @@ import calendar
 import logging
 import os
 import tempfile
-import time
 from datetime import datetime
 
 import gspread
@@ -87,7 +86,10 @@ general_message = """Hiya
 :bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
 BM: https://bookmarketeers.com/
 WC: https://writersclique.com/
-AS: https://authorssolution.co.uk/"""
+AW: https://aurorawriters.com/
+AS: https://authorssolution.co.uk/
+BP: https://bookpublication.co.uk/
+"""
 
 current_month = datetime.today().month
 # current_month = 4
@@ -265,19 +267,19 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
         if len({min_month_name, max_month_name}) > 1:
             message = (
                 f"{general_message}\n\n"
-                f"Hi <@{user_id}>!  Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
-                f"*Summary:* {len(merged_df)} pending reviews\n\n"
-                f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-                f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
+                f"Hi 👋🏻 <@{user_id}>!  Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
+                f"*Summary:* ❓ {len(merged_df)} pending reviews\n\n"
+                f"*Review Retention:* 🎯 {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
+                f"(📊 {((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
                 f"```\n{markdown_table}\n```"
             )
         else:
             message = (
                 f"{general_message}\n\n"
-                f"Hi <@{user_id}>! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
-                f"*Summary:* {len(merged_df)} pending reviews\n\n"
-                f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-                f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
+                f"Hi 👋🏻<@{user_id}>! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
+                f"*Summary:* ❓ {len(merged_df)} pending reviews\n\n"
+                f"*Review Retention:* 🎯 {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
+                f"(📊 {((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
                 f"```\n{markdown_table}\n```"
             )
 
@@ -293,6 +295,7 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
             print(f"❌ Error sending message to {name}: {e.response['error']}")
             print(f"Detailed error: {str(e)}")
             logging.error(e)
+
 
 def load_total_reviews(sheet_name: str, name):
     data = clean_data_reviews(sheet_name)
@@ -334,7 +337,6 @@ def load_total_reviews(sheet_name: str, name):
 
     min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
     max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
-
 
     data.index = range(1, len(data) + 1)
     return data, total_reviews
@@ -379,17 +381,15 @@ def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month = None) -> None:
+def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month=None) -> None:
     """Send attained Trustpilot reviews for a specific Project Manager"""
     user_id = get_user_id_by_email(email)
     # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
     if not user_id:
         print(f"❌ Could not find user ID for {pm_name}")
         return
-    df, total_reviews= load_total_reviews(sheet_name, name)
+    df, total_reviews = load_total_reviews(sheet_name, pm_name)
     review_data = load_reviews(sheet_name, year, month)
-
-
 
     review_details_df = review_data.sort_values(by="Trustpilot Review Date", ascending=True)
     review_details_df["Trustpilot Review Date"] = pd.to_datetime(
@@ -399,7 +399,7 @@ def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month = 
     attained_details = review_details_df[
         (review_details_df["Trustpilot Review"] == "Attained") &
         (review_details_df["Project Manager"] == pm_name)
-        ][["Name", "Trustpilot Review Date"]]
+        ][["Name", "Brand", "Trustpilot Review Date"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -412,15 +412,16 @@ def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month = 
     Total = total_reviews + len(attained_details)
     percentage = len(attained_details) / Total
     message = (
-                f"Hi <@{user_id}>!  Here's your Trustpilot update from {current_year} 📄\n\n"
-                f"*Summary:* {total_reviews} pending reviews\n\n"
-                f"*Review Retention:* {len(attained_details)} out of {Total} "
-                f"({percentage:.1%})\n\n"
-                f"```\n{markdown_table}\n```"
+        f"Hi 👋🏻 <@{user_id}>! Here's your Trustpilot update from {current_year} 📄\n\n"
+        f"*Summary:* ❓ {total_reviews} pending reviews\n\n"
+        f"*Review Retention:* 🎯 {len(attained_details)} out of {Total} "
+        f"(📊 {percentage:.1%})\n\n"
+        f"```\n{markdown_table}\n```"
     )
 
     try:
-
+        # conversation = client.conversations_open(users=user_id)
+        # channel_id = conversation['channel']['id']
         client.chat_postMessage(
             channel=channel,
             text=message,
@@ -983,17 +984,12 @@ if __name__ == '__main__':
     # for name, email in name_usa.items():
     #     time.sleep(2)
     #     send_df_as_text(name, sheet_usa, email, channel_usa)
-
-    # for name, email in name_usa.items():
-    #     time.sleep(2)
     #     send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
-
+    #
     # for name, email in names_uk.items():
     #     # time.sleep(5)
     #     send_df_as_text(name, sheet_uk, email, channel_uk)
-
-    # for name, email in names_uk.items():
-    #     time.sleep(2)
     #     send_pm_attained_reviews(name, email, sheet_uk, 2025, channel_uk)
+
     # summary(5, 2025)
     # generate_year_summary(2025)
