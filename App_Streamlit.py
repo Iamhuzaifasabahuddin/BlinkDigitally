@@ -190,7 +190,18 @@ def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
         #     if col in data.columns:
         #         data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
         if "Name" in data.columns:
-            data = data.drop_duplicates(subset=["Name"])
+            if "Trustpilot Review" in data.columns and "Trustpilot Review Date" in data.columns:
+                # Sort so Attained comes first, then most recent date
+                data = (
+                    data.sort_values(
+                        by=["Trustpilot Review", "Trustpilot Review Date"],
+                        key=lambda col: col.eq("Attained") if col.name == "Trustpilot Review" else col,
+                        ascending=[False, False]
+                    )
+                    .drop_duplicates(subset=["Name"], keep="first")
+                )
+            else:
+                data = data.drop_duplicates(subset=["Name"])
         data.index = range(1, len(data) + 1)
         return data
     except Exception as e:
@@ -761,7 +772,7 @@ def summary(month, year):
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
 
-    combined = pd.concat([usa_clean[["Name", "Brand"]], uk_clean[["Name", "Brand"]]])
+    combined = pd.concat([usa_clean[["Name", "Brand", "Email"]], uk_clean[["Name", "Brand", "Email"]]])
     combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
@@ -949,7 +960,7 @@ def generate_year_summary(year):
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
 
-    combined = pd.concat([usa_clean[["Name", "Brand"]], uk_clean[["Name", "Brand"]]])
+    combined = pd.concat([usa_clean[["Name", "Brand", "Email"]], uk_clean[["Name", "Brand", "Email"]]])
     combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
