@@ -90,7 +90,7 @@ BM: https://bookmarketeers.com/
 WC: https://writersclique.com/
 AS: https://authorssolution.co.uk/"""
 
-
+@st.cache_data(ttl=120)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """Get data from Google Sheets using gspread"""
     try:
@@ -845,7 +845,7 @@ def summary(month, year):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Trustpilot Review Date"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -1034,7 +1034,7 @@ def generate_year_summary(year):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Trustpilot Review Date"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -1533,7 +1533,7 @@ def main():
 
                 attained_details = review_details_df[
                     review_details_df["Trustpilot Review"] == "Attained"
-                    ][["Project Manager", "Name", "Trustpilot Review Date"]]
+                    ][["Project Manager", "Name", "Brand","Trustpilot Review Date"]]
 
                 attained_details.index = range(1, len(attained_details) + 1)
 
