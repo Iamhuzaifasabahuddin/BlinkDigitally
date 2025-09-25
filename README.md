@@ -6,7 +6,12 @@ Blink Digitally publishing dashboard is a Streamlit-based dashboard that fetches
 ---
 
 ## Key Features
-- Fetch Google Sheets data via Google Sheets API, using `gspread` + service account.  
+- Fetch Google Sheets data via Google Sheets API, using `gspread` + service account.
+  - View Monthly USA / UK Data
+  - View Printing Data & Search in Printing Data
+  - View Copyright Data
+  - Compare Client list in two different months
+  - Get Monthly & Yearly Summary Data
 - Local/function caching to limit API usage (default cache TTL: **2 minutes**).  
 - Data cleaning and typing with `pandas`.  
 - Dynamic monthly statistics: bar charts, pie charts, summary KPIs.  
