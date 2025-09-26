@@ -2040,21 +2040,34 @@ def main():
                                 st.subheader("USA Brand Breakdown")
                                 usa_df = pd.DataFrame(list(usa_brands.items()), columns=['Brand', 'Count'])
                                 st.dataframe(usa_df, hide_index=True)
+                                total_count_usa = usa_df["Count"].sum()
+                                st.markdown(f"""
+                                - 📊 **Total Count Across Brands:** `{total_count_usa}`
+                                """)
 
                                 st.subheader("USA Platform Breakdown")
                                 usa_platform_df = pd.DataFrame(list(usa_platforms.items()),
                                                                columns=['Platform', 'Count'])
                                 st.dataframe(usa_platform_df, hide_index=True)
-
+                                total_count_usa_platforms = usa_platform_df["Count"].sum()
+                                st.markdown(f"""
+                                - 📊 **Total Count Across Platforms:** `{total_count_usa_platforms}`
+                                """)
                             with col2:
                                 st.subheader("UK Brand Breakdown")
                                 uk_df = pd.DataFrame(list(uk_brands.items()), columns=['Brand', 'Count'])
                                 st.dataframe(uk_df, hide_index=True)
-
+                                total_count_uk = uk_df["Count"].sum()
+                                st.markdown(f"""
+                                - 📊 **Total Count Across Brands:** `{total_count_uk}`
+                                """)
                                 st.subheader("UK Platform Breakdown")
                                 uk_platform_df = pd.DataFrame(list(uk_platforms.items()), columns=['Platform', 'Count'])
                                 st.dataframe(uk_platform_df, hide_index=True)
-
+                                total_count_uk_platforms = uk_platform_df["Count"].sum()
+                                st.markdown(f"""
+                                - 📊 **Total Count Across Platforms:** `{total_count_uk_platforms}`
+                                """)
                             st.divider()
 
                             st.markdown('<h2 class="section-header">🖨️ Printing Analytics</h2>', unsafe_allow_html=True)
@@ -2277,6 +2290,10 @@ def main():
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                         st.plotly_chart(platform_chart, use_container_width=True)
 
+                        st.subheader("📱 Platform Distribution")
+                        platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
+                        st.plotly_chart(platform_chart, use_container_width=True)
+
                         st.subheader("🏷️ Brand Performance")
                         brand_chart = create_brand_chart(usa_brands, uk_brands)
                         st.plotly_chart(brand_chart, use_container_width=True)
@@ -2287,20 +2304,34 @@ def main():
                             st.subheader("USA Brand Breakdown")
                             usa_df = pd.DataFrame(list(usa_brands.items()), columns=['Brand', 'Count'])
                             st.dataframe(usa_df, hide_index=True)
+                            total_count_usa = usa_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Brands:** `{total_count_usa}`
+                                                        """)
 
                             st.subheader("USA Platform Breakdown")
-                            usa_platform_df = pd.DataFrame(list(usa_platforms.items()), columns=['Platform', 'Count'])
+                            usa_platform_df = pd.DataFrame(list(usa_platforms.items()),
+                                                           columns=['Platform', 'Count'])
                             st.dataframe(usa_platform_df, hide_index=True)
-
+                            total_count_usa_platforms = usa_platform_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Platforms:** `{total_count_usa_platforms}`
+                                                        """)
                         with col2:
                             st.subheader("UK Brand Breakdown")
                             uk_df = pd.DataFrame(list(uk_brands.items()), columns=['Brand', 'Count'])
                             st.dataframe(uk_df, hide_index=True)
-
+                            total_count_uk = uk_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Brands:** `{total_count_uk}`
+                                                        """)
                             st.subheader("UK Platform Breakdown")
                             uk_platform_df = pd.DataFrame(list(uk_platforms.items()), columns=['Platform', 'Count'])
                             st.dataframe(uk_platform_df, hide_index=True)
-
+                            total_count_uk_platforms = uk_platform_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Platforms:** `{total_count_uk_platforms}`
+                                                        """)
                         st.divider()
 
                         st.markdown('<h2 class="section-header">🖨️ Printing Analytics</h2>', unsafe_allow_html=True)
