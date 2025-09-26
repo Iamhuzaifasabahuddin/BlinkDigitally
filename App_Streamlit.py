@@ -2,6 +2,7 @@ import calendar
 import logging
 from datetime import datetime
 from io import BytesIO
+from typing import Any
 
 import gspread
 import pandas as pd
@@ -9,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from google.oauth2.service_account import Credentials
+from pandas import DataFrame, Series
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -89,6 +91,7 @@ general_message = """Hiya
 BM: https://bookmarketeers.com/
 WC: https://writersclique.com/
 AS: https://authorssolution.co.uk/"""
+
 
 @st.cache_data(ttl=120)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
@@ -202,6 +205,48 @@ def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
                 )
             else:
                 data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews_year(sheet_name, year, name) -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns:
+            data = data[(data["Trustpilot Review Date"].dt.year == year)]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        data_original = data
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            ((data_original["Trustpilot Review"] == "Attained")) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
         data.index = range(1, len(data) + 1)
         return data
     except Exception as e:
@@ -1001,23 +1046,87 @@ def generate_year_summary(year):
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
 
-    usa_reviews_df = load_reviews(sheet_usa, year)
+    # usa_reviews_df = load_reviews(sheet_usa, year)
+    #
+    # uk_reviews_df = load_reviews(sheet_uk, year)
+    # combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
+    #
+    # usa_attained_pm = (
+    #     usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+    #     .groupby("Project Manager")["Trustpilot Review"]
+    #     .count()
+    #     .reset_index()
+    # )
+    # uk_attained_pm = (
+    #     uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+    #     .groupby("Project Manager")["Trustpilot Review"]
+    #     .count()
+    #     .reset_index()
+    # )
+    #
+    # attained_reviews_per_pm = (
+    #     combined_data[combined_data["Trustpilot Review"] == "Attained"]
+    #     .groupby("Project Manager")["Trustpilot Review"]
+    #     .count()
+    #     .reset_index()
+    # )
+    #
+    # usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    # usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+    # usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    #
+    # uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    # uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+    # uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+    #
+    # attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+    # attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+    #
+    # review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+    #
+    # review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+    #     review_details_df["Trustpilot Review Date"], errors="coerce"
+    # ).dt.strftime("%d-%B-%Y")
+    #
+    # attained_details = review_details_df[
+    #     review_details_df["Trustpilot Review"] == "Attained"
+    #     ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
+    #
+    # attained_details.index = range(1, len(attained_details) + 1)
 
-    uk_reviews_df = load_reviews(sheet_uk, year)
-    combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
+    pm_list_usa = usa_clean["Project Manager"].dropna().unique()
+    pm_list_uk = uk_clean["Project Manager"].dropna().unique()
+
+    usa_reviews_per_pm = [load_reviews_year(sheet_usa, year, pm) for pm in pm_list_usa]
+    usa_reviews_per_pm = pd.concat([df for df in usa_reviews_per_pm if not df.empty], ignore_index=True)
+
+    uk_reviews_per_pm = [load_reviews_year(sheet_uk, year, pm) for pm in pm_list_uk]
+    uk_reviews_per_pm = pd.concat([df for df in uk_reviews_per_pm if not df.empty], ignore_index=True)
+
+    combined_data = pd.concat([usa_reviews_per_pm, uk_reviews_per_pm], ignore_index=True)
+
+
+
 
     usa_attained_pm = (
-        usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+        usa_reviews_per_pm[usa_reviews_per_pm["Trustpilot Review"] == "Attained"]
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
     )
+    usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+    usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+
     uk_attained_pm = (
-        uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+        uk_reviews_per_pm[uk_reviews_per_pm["Trustpilot Review"] == "Attained"]
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
     )
+    uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+    uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+    uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
 
     attained_reviews_per_pm = (
         combined_data[combined_data["Trustpilot Review"] == "Attained"]
@@ -1026,19 +1135,7 @@ def generate_year_summary(year):
         .reset_index()
     )
 
-    usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
-    usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
-
-    uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
-    uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
-
-    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
-    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
-
     review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
-
     review_details_df["Trustpilot Review Date"] = pd.to_datetime(
         review_details_df["Trustpilot Review Date"], errors="coerce"
     ).dt.strftime("%d-%B-%Y")
@@ -1046,8 +1143,9 @@ def generate_year_summary(year):
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
         ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
-
+    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_details.index = range(1, len(attained_details) + 1)
+    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
     usa_review = {
         "Attained": usa_total_attained,
@@ -1544,7 +1642,7 @@ def main():
 
                 attained_details = review_details_df[
                     review_details_df["Trustpilot Review"] == "Attained"
-                    ][["Project Manager", "Name", "Brand","Trustpilot Review Date"]]
+                    ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
 
                 attained_details.index = range(1, len(attained_details) + 1)
 

@@ -75,7 +75,6 @@ name_usa = {
 }
 
 names_uk = {
-    "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
     "Youha": "youha.khan@topsoftdigitals.pk",
     "Emaan Zaidi": "emaan.zaidi@topsoftdigitals.pk",
     "Elishba": "elishba@topsoftdigitals.pk",
@@ -269,8 +268,6 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
                 f"{general_message}\n\n"
                 f"Hi 👋🏻 <@{user_id}>!  Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
                 f"*Summary:* ❓ {len(merged_df)} pending reviews\n\n"
-                f"*Review Retention:* 🎯 {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-                f"(📊 {((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
                 f"```\n{markdown_table}\n```"
             )
         else:
@@ -278,8 +275,6 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
                 f"{general_message}\n\n"
                 f"Hi 👋🏻<@{user_id}>! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
                 f"*Summary:* ❓ {len(merged_df)} pending reviews\n\n"
-                f"*Review Retention:* 🎯 {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-                f"(📊 {((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
                 f"```\n{markdown_table}\n```"
             )
 
@@ -342,7 +337,7 @@ def load_total_reviews(sheet_name: str, name):
     return data, total_reviews
 
 
-def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
+def load_reviews(sheet_name, name, year, month_number=None) -> pd.DataFrame:
     data = get_sheet_data(sheet_name)
     if data.empty:
         return pd.DataFrame()
@@ -368,18 +363,20 @@ def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
         else:
             data = data[(data["Trustpilot Review Date"].dt.year == year)]
 
-        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data_original = data
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            ((data_original["Trustpilot Review"] == "Attained")) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
 
-        # for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-        #     if col in data.columns:
-        #         data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-        if "Name" in data.columns:
-            data = data.drop_duplicates(subset=["Name"])
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
         data.index = range(1, len(data) + 1)
         return data
     except Exception as e:
         return pd.DataFrame()
-
 
 def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month=None) -> None:
     """Send attained Trustpilot reviews for a specific Project Manager"""
@@ -389,17 +386,14 @@ def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month=No
         print(f"❌ Could not find user ID for {pm_name}")
         return
     df, total_reviews = load_total_reviews(sheet_name, pm_name)
-    review_data = load_reviews(sheet_name, year, month)
+    review_data = load_reviews(sheet_name, name,  year, month)
 
-    review_details_df = review_data.sort_values(by="Trustpilot Review Date", ascending=True)
+    review_details_df = review_data
     review_details_df["Trustpilot Review Date"] = pd.to_datetime(
         review_details_df["Trustpilot Review Date"], errors="coerce"
     ).dt.strftime("%d-%B-%Y")
 
-    attained_details = review_details_df[
-        (review_details_df["Trustpilot Review"] == "Attained") &
-        (review_details_df["Project Manager"] == pm_name)
-        ][["Name", "Brand", "Trustpilot Review Date"]]
+    attained_details = review_details_df[["Name", "Brand", "Trustpilot Review Date"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -981,10 +975,10 @@ def logging_function() -> None:
 
 
 if __name__ == '__main__':
-    # for name, email in name_usa.items():
-    #     time.sleep(2)
-    #     send_df_as_text(name, sheet_usa, email, channel_usa)
-    #     send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
+    for name, email in name_usa.items():
+        # time.sleep(2)
+        # send_df_as_text(name, sheet_usa, email, channel_usa)
+        send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
     #
     # for name, email in names_uk.items():
     #     # time.sleep(5)
