@@ -2,7 +2,6 @@ import calendar
 import logging
 from datetime import datetime
 from io import BytesIO
-from typing import Any
 
 import gspread
 import pandas as pd
@@ -10,7 +9,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from google.oauth2.service_account import Credentials
-from pandas import DataFrame, Series
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -151,8 +149,8 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
         for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
             if col in data.columns:
                 data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-        if "Name" in data.columns:
-            data = data.drop_duplicates(subset=["Name"])
+        # if "Name" in data.columns:
+        #     data = data.drop_duplicates(subset=["Name"])
         data.index = range(1, len(data) + 1)
         return data
 
@@ -749,7 +747,7 @@ def create_review_pie_chart(review_data, title):
 
 def create_platform_comparison_chart(usa_data, uk_data):
     """Create comparison chart for platforms"""
-    platforms = ['Amazon', 'Barnes & Noble', 'Ingram Spark']
+    platforms = ['Amazon', 'Barnes & Noble', 'Ingram Spark', 'FAV']
 
     fig = go.Figure(data=[
         go.Bar(name='USA', x=platforms, y=list(usa_data.values()), marker_color="#23A0F8"),
@@ -834,11 +832,13 @@ def summary(month, year):
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_fav = usa_platforms.get("FAV", 0)
 
     uk_platforms = uk_clean_platforms["Platform"].value_counts()
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_fav = uk_platforms.get("FAV", 0)
 
     allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
@@ -946,8 +946,8 @@ def summary(month, year):
 
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1022,11 +1022,13 @@ def generate_year_summary(year):
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_fav = usa_platforms.get("FAV", 0)
 
     uk_platforms = uk_clean_platforms["Platform"].value_counts()
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_fav = uk_platforms.get("FAV", 0)
 
     allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
@@ -1105,9 +1107,6 @@ def generate_year_summary(year):
 
     combined_data = pd.concat([usa_reviews_per_pm, uk_reviews_per_pm], ignore_index=True)
 
-
-
-
     usa_attained_pm = (
         usa_reviews_per_pm[usa_reviews_per_pm["Trustpilot Review"] == "Attained"]
         .groupby("Project Manager")["Trustpilot Review"]
@@ -1142,7 +1141,7 @@ def generate_year_summary(year):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date","Trustpilot Review Links"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_details.index = range(1, len(attained_details) + 1)
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
@@ -1187,8 +1186,8 @@ def generate_year_summary(year):
                   'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1598,7 +1597,7 @@ def main():
         choice = None
         number = None
         if action in ["View Data", "Reviews"]:
-            choice = st.selectbox("Select Data To View", ["USA", "UK", "AudioBook"], index=None,
+            choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
                                   placeholder="Select Data to View")
 
         if action in ["View Data", "Reviews", "Copyright", "Sales"]:
@@ -1624,7 +1623,9 @@ def main():
             }.get(choice)
             if sheet_name:
                 data = load_data(sheet_name, selected_month_number, number)
-
+                data_rm_dupes = data
+                if "Name" in data_rm_dupes.columns:
+                    data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"])
                 review_data = load_reviews(sheet_name, number, selected_month_number)
 
                 attained_reviews_per_pm = (
@@ -1655,7 +1656,7 @@ def main():
                     st.markdown("### 📄 Detailed Entry Data")
                     st.dataframe(data)
 
-                    brands = data["Brand"].value_counts()
+                    brands = data_rm_dupes["Brand"].value_counts()
                     writers_clique = brands.get("Writers Clique", "N/A")
                     bookmarketeers = brands.get("BookMarketeers", "N/A")
                     aurora_writers = brands.get("Aurora Writers", "N/A")
@@ -1669,7 +1670,7 @@ def main():
                     ingram = platforms.get("Ingram Spark", "N/A")
                     fav = platforms.get("FAV", "N/A")
 
-                    filtered_data = data[data["Brand"].isin(
+                    filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                         ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"])]
                     sent = filtered_data["Trustpilot Review"].value_counts().get("Sent", 0)
                     pending = filtered_data["Trustpilot Review"].value_counts().get("Pending", 0)
@@ -1679,7 +1680,7 @@ def main():
                         "Pending": pending,
                         "Attained": attained_reviews_per_pm["Attained Reviews"].sum()
                     }
-                    publishing = data["Status"].value_counts()
+                    publishing = data_rm_dupes["Status"].value_counts()
                     total_reviews = sum(review.values())
                     # attained = reviews.get("Attained", 0)
                     attained = attained_reviews_per_pm["Attained Reviews"].sum()

@@ -221,15 +221,13 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
         return
 
     df, percentage, min_date, max_date, attained, total_reviews = load_data_reviews(sheet_name, name)
-    df_audio, percentage_audio, min_date_audio, max_date_audio, attained_audio, total_reviews_audio = load_data_audio(
-        name)
 
-    if df.empty and df_audio.empty:
+    if df.empty:
         print(f"⚠️ No data for {name}")
         return
 
-    min_dates = [d for d in [min_date, min_date_audio] if pd.notna(d)]
-    max_dates = [d for d in [max_date, max_date_audio] if pd.notna(d)]
+    min_dates = [d for d in [min_date] if pd.notna(d)]
+    max_dates = [d for d in [max_date] if pd.notna(d)]
 
     if not min_dates or not max_dates:
         print(f"⚠️ No valid dates for {name}")
@@ -242,23 +240,16 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
         """Truncate long titles"""
         return x[:20] + "..." if isinstance(x, str) and len(x) > 20 else x
 
-    for dframe in [df, df_audio]:
-        if "Book Name & Link" in dframe.columns and not dframe.empty:
-            dframe["Book Name & Link"] = dframe["Book Name & Link"].apply(truncate_title)
+
+    if "Book Name & Link" in df.columns and not df.empty:
+        df["Book Name & Link"] = df["Book Name & Link"].apply(truncate_title)
+
+
+    if "Publishing Date" in df.columns and not df.empty:
+        df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
 
     display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    display_df = df[display_columns] if not df.empty and all(col in df.columns for col in display_columns) else df
-    display_df_audio = df_audio[display_columns] if not df_audio.empty and all(
-        col in df_audio.columns for col in display_columns) else df_audio
-
-    for dframe in [display_df, display_df_audio]:
-        if "Publishing Date" in dframe.columns and not dframe.empty:
-            dframe["Publishing Date"] = pd.to_datetime(dframe["Publishing Date"], errors='coerce').dt.strftime(
-                "%d-%B-%Y")
-
-    merged_df = pd.concat([display_df, display_df_audio], ignore_index=True)
-    display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    merged_df = merged_df[display_columns]
+    merged_df = df[[col for col in display_columns if col in df.columns]]
 
     if not merged_df.empty:
         markdown_table = merged_df.to_markdown(index=False)
@@ -266,20 +257,21 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
         if len({min_month_name, max_month_name}) > 1:
             message = (
                 f"{general_message}\n\n"
-                f"Hi 👋🏻 <@{user_id}>!  Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
+                f"Hi 👋🏻 <@{user_id}>! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
                 f"*Summary:* ❓ {len(merged_df)} pending reviews\n\n"
                 f"```\n{markdown_table}\n```"
             )
         else:
             message = (
                 f"{general_message}\n\n"
-                f"Hi 👋🏻<@{user_id}>! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
+                f"Hi 👋🏻 <@{user_id}>! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
                 f"*Summary:* ❓ {len(merged_df)} pending reviews\n\n"
                 f"```\n{markdown_table}\n```"
             )
 
         try:
-
+            # conversation = client.conversations_open(users=user_id)
+            # channel_id = conversation['channel']['id']
             response = client.chat_postMessage(
                 channel=channel,
                 text=message,
@@ -406,7 +398,7 @@ def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month=No
     Total = total_reviews + len(attained_details)
     percentage = len(attained_details) / Total
     message = (
-        f"Hi 👋🏻 <@{user_id}>! Here's your Trustpilot update from {current_year} 📄\n\n"
+        f"Hi 👋🏻 <@{user_id}>! Here's your Trustpilot Summary from {current_year} 🧮\n\n"
         f"*Summary:* ❓ {total_reviews} pending reviews\n\n"
         f"*Review Retention:* 🎯 {len(attained_details)} out of {Total} "
         f"(📊 {percentage:.1%})\n\n"
@@ -978,7 +970,7 @@ if __name__ == '__main__':
     for name, email in name_usa.items():
         # time.sleep(2)
         send_df_as_text(name, sheet_usa, email, channel_usa)
-        send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
+        # send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
 
     # for name, email in names_uk.items():
     #     # time.sleep(5)
