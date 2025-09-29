@@ -977,9 +977,9 @@ def logging_function() -> None:
 if __name__ == '__main__':
     for name, email in name_usa.items():
         # time.sleep(2)
-        # send_df_as_text(name, sheet_usa, email, channel_usa)
+        send_df_as_text(name, sheet_usa, email, channel_usa)
         send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
-    #
+
     # for name, email in names_uk.items():
     #     # time.sleep(5)
     #     send_df_as_text(name, sheet_uk, email, channel_uk)

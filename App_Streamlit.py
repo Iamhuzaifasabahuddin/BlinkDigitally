@@ -901,7 +901,7 @@ def summary(month, year):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -1142,7 +1142,7 @@ def generate_year_summary(year):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date","Trustpilot Review Links"]]
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_details.index = range(1, len(attained_details) + 1)
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
@@ -1642,7 +1642,7 @@ def main():
 
                 attained_details = review_details_df[
                     review_details_df["Trustpilot Review"] == "Attained"
-                    ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
+                    ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
 
                 attained_details.index = range(1, len(attained_details) + 1)
 
