@@ -2009,7 +2009,7 @@ def main():
                             with col1:
                                 usa_pie = create_review_pie_chart(usa_review_data, "USA Trustpilot Reviews")
                                 if usa_pie:
-                                    st.plotly_chart(usa_pie, use_container_width=True)
+                                    st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
 
                                 st.subheader("🇺🇸 USA Reviews")
                                 st.metric("Total Reviews", usa_total)
@@ -2020,7 +2020,7 @@ def main():
                             with col2:
                                 uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                                 if uk_pie:
-                                    st.plotly_chart(uk_pie, use_container_width=True)
+                                    st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                                 st.subheader("🇬🇧 UK Reviews")
                                 st.metric("Total Reviews", uk_total)
                                 st.metric("Total Attained", uk_attained)
@@ -2029,11 +2029,11 @@ def main():
                                 st.dataframe(attained_df)
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
-                            st.plotly_chart(platform_chart, use_container_width=True)
+                            st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
 
                             st.subheader("🏷️ Brand Performance")
                             brand_chart = create_brand_chart(usa_brands, uk_brands)
-                            st.plotly_chart(brand_chart, use_container_width=True)
+                            st.plotly_chart(brand_chart, use_container_width=True, key="brand_chart")
 
                             col1, col2 = st.columns(2)
 
@@ -2150,7 +2150,7 @@ def main():
                                     title="Copyright Applications by Country",
                                     color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
                                 )
-                                st.plotly_chart(fig_copyright, use_container_width=True)
+                                st.plotly_chart(fig_copyright, use_container_width=True, key="copyright_chart")
 
                                 cp1, cp2, cp3 = st.columns(3)
 
@@ -2267,7 +2267,7 @@ def main():
                         with col1:
                             usa_pie = create_review_pie_chart(usa_review_data, "USA Trustpilot Reviews")
                             if usa_pie:
-                                st.plotly_chart(usa_pie, use_container_width=True)
+                                st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
 
                             st.subheader("🇺🇸 USA Reviews")
                             st.metric("Total Reviews", usa_total)
@@ -2279,7 +2279,7 @@ def main():
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                             if uk_pie:
-                                st.plotly_chart(uk_pie, use_container_width=True)
+                                st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                             st.subheader("🇬🇧 UK Reviews")
                             st.metric("Total Reviews", uk_total)
                             st.metric("Total Attained", uk_attained)
@@ -2293,11 +2293,11 @@ def main():
 
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
-                        st.plotly_chart(platform_chart, use_container_width=True)
+                        st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
 
                         st.subheader("🏷️ Brand Performance")
                         brand_chart = create_brand_chart(usa_brands, uk_brands)
-                        st.plotly_chart(brand_chart, use_container_width=True)
+                        st.plotly_chart(brand_chart, use_container_width=True, key="brand_chart")
 
                         col1, col2 = st.columns(2)
 
@@ -2414,7 +2414,7 @@ def main():
                                 title="Copyright Applications by Country",
                                 color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
                             )
-                            st.plotly_chart(fig_copyright, use_container_width=True)
+                            st.plotly_chart(fig_copyright, use_container_width=True, key="copyright_chart")
 
                             cp1, cp2, cp3 = st.columns(3)
 
