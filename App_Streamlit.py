@@ -253,17 +253,6 @@ def load_reviews_year(sheet_name, year, name) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def review_data(sheet_name, month, year, status) -> pd.DataFrame:
-    """Filter data by month and review status"""
-    data = load_data(sheet_name, month, year)
-    if not data.empty and month and status:
-        if "Publishing Date" in data.columns and "Trustpilot Review" in data.columns:
-            data = data[(data["Publishing Date"].dt.month == month) & (data["Publishing Date"].dt.year == year)]
-            data = data[data["Trustpilot Review"] == status]
-        data = data.sort_values(by="Publishing Date", ascending=True)
-    data.index = range(1, len(data) + 1)
-    return data
-
 
 def get_printing_data(month, year) -> pd.DataFrame:
     """Get printing data filtered by month"""
@@ -324,142 +313,6 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     data.index = range(1, len(data) + 1)
 
     return data
-
-
-def load_data_reviews(sheet_name, name) -> tuple[pd.DataFrame, float, pd.Timestamp, pd.Timestamp, int, int]:
-    """Load and filter data for a specific project manager"""
-    data = clean_data_reviews(sheet_name)
-    data_original = data
-
-    # Filter data based on criteria
-    data = data_original[
-        (data_original["Project Manager"] == name) &
-        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        (data_original["Brand"].isin(["BookMarketeers", "Writers Clique", "Authors Solution"])) &
-        (data_original["Status"] == "Published")
-        ]
-
-    data = data.sort_values(by=["Publishing Date"], ascending=True)
-
-    # Calculate statistics
-    total_percentage = 0
-    attained = len(
-        data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)]
-    )
-    total_reviews = len(data) + attained
-
-    min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
-    max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
-
-    if total_reviews > 0:
-        total_percentage = (attained / total_reviews)
-
-    data.index = range(1, len(data) + 1)
-    return data, total_percentage, min_date, max_date, attained, total_reviews
-
-
-def load_data_audio(name) -> pd.DataFrame:
-    """Load and filter audio book data for a specific project manager"""
-    return load_data_reviews(sheet_audio, name)
-
-
-def get_user_id_by_email(email):
-    try:
-        response = client.users_lookupByEmail(email=email)
-        return response['user']['id']
-    except SlackApiError as e:
-        print(f"Error finding user: {e.response['error']}")
-        logging.error(e)
-        return None
-
-
-def send_dm(user_id, message):
-    try:
-        response = client.chat_postMessage(
-            channel=user_id,
-            text=message
-        )
-    except SlackApiError as e:
-        print(f"❌ Error sending message: {e.response['error']}")
-        logging.error(e)
-
-
-def send_df_as_text(name, sheet_name, email) -> None:
-    """Send DataFrame as text to a user"""
-    user_id = get_user_id_by_email(email)
-    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
-
-    if not user_id:
-        print(f"❌ Could not find user ID for {name}")
-        return
-
-    df, percentage, min_date, max_date, attained, total_reviews = load_data_reviews(sheet_name, name)
-    df_audio, percentage_audio, min_date_audio, max_date_audio, attained_audio, total_reviews_audio = load_data_audio(
-        name)
-
-    if df.empty and df_audio.empty:
-        print(f"⚠️ No data for {name}")
-        return
-    min_month_name = min(min_date, min_date_audio).strftime("%B")
-    max_month_name = max(max_date, max_date_audio).strftime("%B")
-
-    def truncate_title(x):
-        """Truncate long titles"""
-        return x[:40] + "..." if isinstance(x, str) and len(x) > 40 else x
-
-    for dframe in [df, df_audio]:
-        if "Book Name & Link" in dframe.columns and not dframe.empty:
-            dframe["Book Name & Link"] = dframe["Book Name & Link"].apply(truncate_title)
-
-    display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    display_df = df[display_columns] if not df.empty and all(col in df.columns for col in display_columns) else df
-    display_df_audio = df_audio[display_columns] if not df_audio.empty and all(
-        col in df_audio.columns for col in display_columns) else df_audio
-
-    for dframe in [display_df, display_df_audio]:
-        if "Publishing Date" in dframe.columns and not dframe.empty:
-            dframe["Publishing Date"] = pd.to_datetime(dframe["Publishing Date"], errors='coerce').dt.strftime(
-                "%d-%B-%Y")
-
-    merged_df = pd.concat([display_df, display_df_audio], ignore_index=True)
-    display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    merged_df = merged_df[display_columns]
-    if not merged_df.empty:
-        markdown_table = merged_df.to_markdown(index=False)
-
-        if len({min_month_name, max_month_name}) > 1:
-            message = (
-                f"{general_message}\n\n"
-                f"Hi *{name.split()[0]}*! Here's your Trustpilot update from {min_month_name} to {max_month_name} {current_year} 📄\n\n"
-                f"*Summary:* {len(merged_df)} pending reviews\n\n"
-                f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-                f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
-                f"```\n{markdown_table}\n```"
-            )
-        else:
-            message = (
-                f"{general_message}\n\n"
-                f"Hi *{name.split()[0]}*! Here's your Trustpilot update for {min_month_name} {current_year} 📄\n\n"
-                f"*Summary:* {len(merged_df)} pending reviews\n\n"
-                f"*Review Retention:* {attained + attained_audio} out of {total_reviews + total_reviews_audio} "
-                f"({((attained + attained_audio) / (total_reviews + total_reviews_audio)):.1%})\n\n"
-                f"```\n{markdown_table}\n```"
-            )
-
-        try:
-            conversation = client.conversations_open(users=user_id)
-            channel_id = conversation['channel']['id']
-
-            response = client.chat_postMessage(
-                channel=channel_id,
-                text=message,
-                mrkdwn=True
-            )
-            send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"), f"✅ Review sent to {name}")
-        except SlackApiError as e:
-            print(f"❌ Error sending message to {name}: {e.response['error']}")
-            print(f"Detailed error: {str(e)}")
-            logging.error(e)
 
 
 def get_printing_data_reviews(month, year) -> pd.DataFrame:
@@ -1730,20 +1583,6 @@ def main():
                         st.dataframe(attained_reviews_per_pm)
                         st.dataframe(attained_details)
                 st.markdown("---")
-        # elif action == "Reviews" and choice and selected_month and status and number:
-        #     sheet_name = {
-        #         "UK": sheet_uk,
-        #         "USA": sheet_usa,
-        #         "AudioBook": sheet_audio
-        #     }.get(choice)
-        #     if sheet_name:
-        #         data = review_data(sheet_name, selected_month_number, number, status)
-        #
-        #         st.subheader(f"🔍 Review Data - {status} in {selected_month} ({country})")
-        #         if not data.empty:
-        #             st.dataframe(data)
-        #         else:
-        #             st.info(f"No matching reviews found for {selected_month_number} {number}")
         elif action == "Printing":
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
 
@@ -1927,33 +1766,6 @@ def main():
                             st.write(data1)
                             st.write(data2)
                             st.write(data3)
-
-                # st.subheader("🦅 USA Team")
-                # usa_selected = st.multiselect("Select USA team members:", list(name_usa.keys()))
-                #
-                # st.subheader("☕ UK Team")
-                # uk_selected = st.multiselect("Select UK team members:", list(names_uk.keys()))
-                #
-                # if st.button("Send Review Updates"):
-                #     progress_bar = st.progress(0)
-                #     total_members = len(usa_selected) + len(uk_selected)
-                #     count = 0
-                #
-                #     for name in usa_selected:
-                #         if name in name_usa:
-                #             send_df_as_text(name, sheet_usa, name_usa[name])
-                #             time.sleep(2)
-                #             count += 1
-                #             progress_bar.progress(count / total_members)
-                #
-                #     for name in uk_selected:
-                #         if name in names_uk:
-                #             send_df_as_text(name, sheet_uk, names_uk[name])
-                #             time.sleep(2)
-                #             count += 1
-                #             progress_bar.progress(count / total_members)
-                #
-                #     st.success(f"Sent review updates to {count} team members!")
 
             with tab2:
                 st.header("📄 Generate Summary Report")
