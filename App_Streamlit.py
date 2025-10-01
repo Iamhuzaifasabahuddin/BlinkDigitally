@@ -1,4 +1,5 @@
 import calendar
+import io
 import logging
 from datetime import datetime
 from io import BytesIO
@@ -1146,6 +1147,24 @@ def generate_year_summary(year):
     attained_details.index = range(1, len(attained_details) + 1)
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
+    attained_details["Trustpilot Review Date"] = pd.to_datetime(
+        attained_details["Trustpilot Review Date"], errors="coerce"
+    )
+
+    attained_reviews_per_month = (
+        attained_details.groupby(attained_details["Trustpilot Review Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="Total Attained Reviews")
+    )
+
+    attained_reviews_per_month["Month"] = attained_reviews_per_month[
+        "Trustpilot Review Date"
+    ].dt.strftime("%B %Y")
+
+    attained_reviews_per_month = attained_reviews_per_month[["Month", "Total Attained Reviews"]]
+    attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+    attained_details["Trustpilot Review Date"] = pd.to_datetime(attained_details["Trustpilot Review Date"],
+                                                                errors="coerce").dt.strftime("%d-%B-%Y")
     usa_review = {
         "Attained": usa_total_attained,
         "Sent": usa_review_sent,
@@ -1209,7 +1228,7 @@ def generate_year_summary(year):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month
 
 
 def logging_function() -> None:
@@ -1655,6 +1674,17 @@ def main():
                 else:
                     st.markdown("### 📄 Detailed Entry Data")
                     st.dataframe(data)
+                    buffer = io.BytesIO()
+                    data.to_excel(buffer, index=False)
+                    buffer.seek(0)
+
+                    st.download_button(
+                        label="📥 Download Excel",
+                        data=buffer,
+                        file_name=f"{choice}_{selected_month}_{number}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        help="Click to download the Excel report"
+                    )
 
                     brands = data_rm_dupes["Brand"].value_counts()
                     writers_clique = brands.get("Writers Clique", "N/A")
@@ -1790,6 +1820,17 @@ def main():
                         st.markdown("### 📄 Detailed Printing Data")
 
                         st.dataframe(data)
+                        buffer = io.BytesIO()
+                        data.to_excel(buffer, index=False)
+                        buffer.seek(0)
+
+                        st.download_button(
+                            label="📥 Download Excel",
+                            data=buffer,
+                            file_name=f"Printing_{selected_month}_{number}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            help="Click to download the Excel report"
+                        )
                         st.markdown("---")
 
                         st.markdown("### 📊 Summary Statistics")
@@ -1846,7 +1887,18 @@ def main():
 
             if not data.empty:
                 st.dataframe(data)
+                st.dataframe(data)
+                buffer = io.BytesIO()
+                data.to_excel(buffer, index=False)
+                buffer.seek(0)
 
+                st.download_button(
+                    label="📥 Download Excel",
+                    data=buffer,
+                    file_name=f"Copyright_{selected_month}_{number}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    help="Click to download the Excel report"
+                )
                 total_copyrights = len(data)
                 total_cost_copyright = total_copyrights * 65
                 country = data["Country"].value_counts()
@@ -2017,6 +2069,17 @@ def main():
                                 st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
                                 st.metric("Total Unique", total_unique_clients)
                                 st.dataframe(combined)
+                                buffer = io.BytesIO()
+                                combined.to_excel(buffer, index=False)
+                                buffer.seek(0)
+
+                                st.download_button(
+                                    label="📥 Download Excel",
+                                    data=buffer,
+                                    file_name=f"USA+UK_{selected_month}_{number}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    help="Click to download the Excel report"
+                                )
                             with col2:
                                 uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                                 if uk_pie:
@@ -2025,7 +2088,9 @@ def main():
                                 st.metric("Total Reviews", uk_total)
                                 st.metric("Total Attained", uk_attained)
                                 st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
+                                st.write("📊 **Reviews Per PM**")
                                 st.dataframe(attained_reviews_per_pm)
+                                st.write("🎯 **Reviews Per PM details**")
                                 st.dataframe(attained_df)
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
@@ -2234,7 +2299,7 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -2275,7 +2340,19 @@ def main():
                             st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
                             st.metric("Total Unique", total_unique_clients)
                             st.dataframe(combined)
+                            buffer = io.BytesIO()
+                            combined.to_excel(buffer, index=False)
+                            buffer.seek(0)
 
+                            st.download_button(
+                                label="📥 Download Excel",
+                                data=buffer,
+                                file_name=f"USA+UK_{number}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                help="Click to download the Excel report"
+                            )
+                            st.write("✅ **Total Reviews Per Month**")
+                            st.dataframe(attained_reviews_per_month)
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                             if uk_pie:
@@ -2284,7 +2361,9 @@ def main():
                             st.metric("Total Reviews", uk_total)
                             st.metric("Total Attained", uk_attained)
                             st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
+                            st.write("📊 **Reviews Per PM**")
                             st.dataframe(attained_reviews_per_pm)
+                            st.write("🎯 **Reviews Per PM details**")
                             st.dataframe(attained_df)
 
                         st.subheader("📱 Platform Distribution")
