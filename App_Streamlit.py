@@ -501,41 +501,54 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
     return data
 
 
-def printing_data_all(year) -> pd.DataFrame:
+def printing_data_all(year) -> tuple[pd.DataFrame, pd.DataFrame]:
     data = get_sheet_data(sheet_printing)
 
     if data.empty:
-        return data
+        return data, pd.DataFrame()  # return empty totals if no data
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
         end_col_index = columns.index("Fulfilled")
         data = data.iloc[:, :end_col_index + 1]
+
     data = data.astype(str)
 
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    data = data[(data["Order Date"].dt.year == year)]
+    # Filter by year
+    data = data[data["Order Date"].dt.year == year]
 
     if "Order Cost" in data.columns:
-        data["Order Cost"] = data["Order Cost"].astype(str)
         data["Order Cost"] = pd.to_numeric(
-            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        )
 
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
 
-    data = data.sort_values(by="Order Date", ascending=True)
+    data['Month'] = data['Order Date'].dt.to_period('M')
 
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
 
     data.index = range(1, len(data) + 1)
     data = data.fillna("N/A")
-    return data
+
+    return data, month_totals
+
 
 
 def get_copyright_data(month, year) -> tuple[pd.DataFrame, int, int]:
@@ -864,20 +877,20 @@ def summary(month, year):
     combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
 
     usa_attained_pm = (
-        usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+        usa_reviews_df
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
     )
     uk_attained_pm = (
-        uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+        uk_reviews_df
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
     )
 
     attained_reviews_per_pm = (
-        combined_data[combined_data["Trustpilot Review"] == "Attained"]
+        combined_data
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
@@ -1049,54 +1062,6 @@ def generate_year_summary(year):
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
 
-    # usa_reviews_df = load_reviews(sheet_usa, year)
-    #
-    # uk_reviews_df = load_reviews(sheet_uk, year)
-    # combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
-    #
-    # usa_attained_pm = (
-    #     usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
-    #     .groupby("Project Manager")["Trustpilot Review"]
-    #     .count()
-    #     .reset_index()
-    # )
-    # uk_attained_pm = (
-    #     uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
-    #     .groupby("Project Manager")["Trustpilot Review"]
-    #     .count()
-    #     .reset_index()
-    # )
-    #
-    # attained_reviews_per_pm = (
-    #     combined_data[combined_data["Trustpilot Review"] == "Attained"]
-    #     .groupby("Project Manager")["Trustpilot Review"]
-    #     .count()
-    #     .reset_index()
-    # )
-    #
-    # usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    # usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
-    # usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
-    #
-    # uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    # uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
-    # uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
-    #
-    # attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
-    # attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
-    #
-    # review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
-    #
-    # review_details_df["Trustpilot Review Date"] = pd.to_datetime(
-    #     review_details_df["Trustpilot Review Date"], errors="coerce"
-    # ).dt.strftime("%d-%B-%Y")
-    #
-    # attained_details = review_details_df[
-    #     review_details_df["Trustpilot Review"] == "Attained"
-    #     ][["Project Manager", "Name", "Brand", "Trustpilot Review Date"]]
-    #
-    # attained_details.index = range(1, len(attained_details) + 1)
-
     pm_list_usa = usa_clean["Project Manager"].dropna().unique()
     pm_list_uk = uk_clean["Project Manager"].dropna().unique()
 
@@ -1109,7 +1074,7 @@ def generate_year_summary(year):
     combined_data = pd.concat([usa_reviews_per_pm, uk_reviews_per_pm], ignore_index=True)
 
     usa_attained_pm = (
-        usa_reviews_per_pm[usa_reviews_per_pm["Trustpilot Review"] == "Attained"]
+        usa_reviews_per_pm
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
@@ -1119,7 +1084,7 @@ def generate_year_summary(year):
     usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
 
     uk_attained_pm = (
-        uk_reviews_per_pm[uk_reviews_per_pm["Trustpilot Review"] == "Attained"]
+        uk_reviews_per_pm
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
@@ -1129,7 +1094,7 @@ def generate_year_summary(year):
     uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
 
     attained_reviews_per_pm = (
-        combined_data[combined_data["Trustpilot Review"] == "Attained"]
+        combined_data
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
@@ -1179,7 +1144,7 @@ def generate_year_summary(year):
         "-ve Attained": uk_review_na
     }
 
-    printing_data = printing_data_all(year)
+    printing_data, monthly_printing = printing_data_all(year)
     Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
     Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
     Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
@@ -1228,7 +1193,7 @@ def generate_year_summary(year):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month
 
 
 def logging_function() -> None:
@@ -2299,7 +2264,7 @@ def main():
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -2452,7 +2417,7 @@ def main():
 
                             fig_gauge.update_layout(height=200)
                             st.plotly_chart(fig_gauge, use_container_width=True)
-
+                        st.dataframe(monthly_printing)
                         st.divider()
 
                         st.markdown('<h2 class="section-header">©️ Copyright Analytics</h2>', unsafe_allow_html=True)
