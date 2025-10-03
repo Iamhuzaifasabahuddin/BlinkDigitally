@@ -4,3 +4,6 @@ Email.py
 *.json
 Gspread.py
 Sms.py
+Test.py
+AI.py
+*.xls;xlsx;csvk
