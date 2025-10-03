@@ -1,11 +1,9 @@
 import calendar
 import logging
 import os
-import tempfile
 from datetime import datetime
 
 import gspread
-import matplotlib.pyplot as plt
 import pandas as pd
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
@@ -96,6 +94,12 @@ current_month_name = calendar.month_name[current_month]
 current_year = datetime.today().year
 
 
+def normalize_name(name):
+    """Normalize a name to consistent format (Title Case, stripped whitespace)"""
+    if pd.isna(name) or name == "":
+        return ""
+    return str(name).strip().title()
+
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     """Clean the data from Google Sheets using gspread"""
     data = get_sheet_data(sheet_name)
@@ -109,6 +113,9 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
 
+    if "Project Manager" in data.columns:
+        data["Project Manager"] = data["Project Manager"].apply(normalize_name)
+
     # Handle date columns
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
@@ -120,9 +127,12 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     return data
 
 
-def load_data_reviews(sheet_name, name) -> tuple:
+def load_pending_reviews(sheet_name: str, name: str) -> tuple:
     """Load and filter data for a specific project manager"""
     data = clean_data_reviews(sheet_name)
+
+    # Normalize the input name for consistent comparison
+    name = normalize_name(name)
 
     if "Name" in data.columns:
         data = data.drop_duplicates(subset=["Name"])
@@ -131,18 +141,8 @@ def load_data_reviews(sheet_name, name) -> tuple:
     if data.empty:
         return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
 
-    # Filter data based on criteria
-    data_count = data_original[
-        (data_original["Project Manager"] == name) &
-        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        (data_original["Brand"].isin(
-            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
-        (data_original["Status"] == "Published")
-        ]
-
     data = data_original[
         (data_original["Project Manager"] == name) &
-        # ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
         ((data_original["Trustpilot Review"] == "Pending")) &
         (data_original["Brand"].isin(
             ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
@@ -151,46 +151,115 @@ def load_data_reviews(sheet_name, name) -> tuple:
 
     data = data.sort_values(by="Publishing Date", ascending=True)
 
-    # Clean strings and drop missing
-    data_original["Trustpilot Review"] = data_original["Trustpilot Review"].astype(str).str.strip().str.lower()
-    data_original["Project Manager"] = data_original["Project Manager"].astype(str).str.strip()
-    name = name.strip()
-
-    # Drop rows where essential fields are missing
-    data_original = data_original.dropna(subset=["Trustpilot Review", "Project Manager"])
-
-    # Now calculate attained count
-    attained = len(
-        data_original[
-            (data_original["Trustpilot Review"] == "attained") &
-            (data_original["Project Manager"] == name)
-            ]
-    )
-
-    # Calculate statistics
-    total_percentage = 0
-    # attained = len(
-    #     data_original[(data_original["Trustpilot Review"] == "Attained") & (data_original["Project Manager"] == name)]
-    # )
-
-    total_reviews = len(data_count) + attained
-
     min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
     max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
 
-    if total_reviews > 0:
-        total_percentage = (attained / total_reviews)
-
     data.index = range(1, len(data) + 1)
-    return data, total_percentage, min_date, max_date, attained, total_reviews
+    return data, min_date, max_date
 
 
-def load_data_audio(name) -> tuple:
-    """Load and filter audio book data for a specific project manager"""
-    return load_data_reviews(sheet_audio, name)
+def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=None) -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+
+    # Normalize Project Manager names
+    if "Project Manager" in data.columns:
+        data["Project Manager"] = data["Project Manager"].apply(normalize_name)
+
+    # Normalize the input name
+    name = normalize_name(name)
+
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns and month_number:
+            data = data[(data["Trustpilot Review Date"].dt.month == month_number) & (
+                    data["Trustpilot Review Date"].dt.year == year)]
+        else:
+            data = data[(data["Trustpilot Review Date"].dt.year == year)]
+
+        data_original = data
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            ((data_original["Trustpilot Review"] == "Attained")) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        return pd.DataFrame()
 
 
-def get_user_id_by_email(email):
+def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None):
+    data = clean_data_reviews(sheet_name)
+
+    # Normalize the input name
+    name = normalize_name(name)
+
+    if "Name" in data.columns:
+        data = data.drop_duplicates(subset=["Name"])
+
+    if data.empty:
+        return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    try:
+        if "Trustpilot Review Date" in data.columns and month_number:
+            data = data[(data["Trustpilot Review Date"].dt.month == month_number) & (
+                    data["Trustpilot Review Date"].dt.year == year)]
+        else:
+            data = data[(data["Publishing Date"].dt.year == year)]
+        data_original = data
+        data_count = data_original[
+            (data_original["Project Manager"] == name) &
+            ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+            (data_original["Status"] == "Published")
+            ]
+
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            ((data_original["Trustpilot Review"] == "Pending")) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+            (data_original["Status"] == "Published")
+            ]
+
+        data = data.sort_values(by="Publishing Date", ascending=True)
+
+        total_reviews = len(data_count)
+
+        min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
+        max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
+
+        data.index = range(1, len(data) + 1)
+        return data, total_reviews
+    except Exception as e:
+        return pd.DataFrame()
+
+def get_user_id_by_email(email: str):
     try:
         response = client.users_lookupByEmail(email=email)
         return response['user']['id']
@@ -200,7 +269,7 @@ def get_user_id_by_email(email):
         return None
 
 
-def send_dm(user_id, message):
+def send_dm(user_id: str, message: str):
     try:
         response = client.chat_postMessage(
             channel=user_id,
@@ -211,7 +280,7 @@ def send_dm(user_id, message):
         logging.error(e)
 
 
-def send_df_as_text(name, sheet_name, email, channel) -> None:
+def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> None:
     """Send DataFrame as text to a user"""
     user_id = get_user_id_by_email(email)
     # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
@@ -220,7 +289,7 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, percentage, min_date, max_date, attained, total_reviews = load_data_reviews(sheet_name, name)
+    df, min_date, max_date, total_reviews = load_pending_reviews(sheet_name, name)
 
     if df.empty:
         print(f"⚠️ No data for {name}")
@@ -240,10 +309,8 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
         """Truncate long titles"""
         return x[:20] + "..." if isinstance(x, str) and len(x) > 20 else x
 
-
     if "Book Name & Link" in df.columns and not df.empty:
         df["Book Name & Link"] = df["Book Name & Link"].apply(truncate_title)
-
 
     if "Publishing Date" in df.columns and not df.empty:
         df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
@@ -284,101 +351,15 @@ def send_df_as_text(name, sheet_name, email, channel) -> None:
             logging.error(e)
 
 
-def load_total_reviews(sheet_name: str, name):
-    data = clean_data_reviews(sheet_name)
-
-    if "Name" in data.columns:
-        data = data.drop_duplicates(subset=["Name"])
-
-    data_original = data
-    if data.empty:
-        return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
-
-    # Filter data based on criteria
-    data_count = data_original[
-        (data_original["Project Manager"] == name) &
-        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        (data_original["Brand"].isin(
-            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
-        (data_original["Status"] == "Published")
-        ]
-
-    data = data_original[
-        (data_original["Project Manager"] == name) &
-        # ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
-        ((data_original["Trustpilot Review"] == "Pending")) &
-        (data_original["Brand"].isin(
-            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
-        (data_original["Status"] == "Published")
-        ]
-
-    data = data.sort_values(by="Publishing Date", ascending=True)
-
-    # Clean strings and drop missing
-    data_original["Trustpilot Review"] = data_original["Trustpilot Review"].astype(str).str.strip().str.lower()
-    data_original["Project Manager"] = data_original["Project Manager"].astype(str).str.strip()
-    name = name.strip()
-
-    data_original = data_original.dropna(subset=["Trustpilot Review", "Project Manager"])
-    total_reviews = len(data_count)
-
-    min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
-    max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
-
-    data.index = range(1, len(data) + 1)
-    return data, total_reviews
-
-
-def load_reviews(sheet_name, name, year, month_number=None) -> pd.DataFrame:
-    data = get_sheet_data(sheet_name)
-    if data.empty:
-        return pd.DataFrame()
-
-    columns = list(data.columns)
-    if "Issues" in columns:
-        end_col_index = columns.index("Issues")
-        data = data.iloc[:, :end_col_index + 1]
-    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
-    for col in date_columns:
-        if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
-
-    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
-        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
-
-    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
-        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
-    try:
-        if "Trustpilot Review Date" in data.columns and month_number:
-            data = data[(data["Trustpilot Review Date"].dt.month == month_number) & (
-                    data["Trustpilot Review Date"].dt.year == year)]
-        else:
-            data = data[(data["Trustpilot Review Date"].dt.year == year)]
-
-        data_original = data
-        data = data_original[
-            (data_original["Project Manager"] == name) &
-            ((data_original["Trustpilot Review"] == "Attained")) &
-            (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
-            ]
-
-        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
-        data = data.drop_duplicates(subset=["Name"])
-        data.index = range(1, len(data) + 1)
-        return data
-    except Exception as e:
-        return pd.DataFrame()
-
-def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month=None) -> None:
+def send_pm_attained_reviews(pm_name: str, email: str, sheet_name: str, year: int, channel: str, month=None) -> None:
     """Send attained Trustpilot reviews for a specific Project Manager"""
     user_id = get_user_id_by_email(email)
     # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
     if not user_id:
         print(f"❌ Could not find user ID for {pm_name}")
         return
-    df, total_reviews = load_total_reviews(sheet_name, pm_name)
-    review_data = load_reviews(sheet_name, name,  year, month)
+    df, total_reviews = load_total_reviews(sheet_name, pm_name, year, month)
+    review_data = load_attained_reviews(sheet_name, name, year, month)
 
     review_details_df = review_data
     review_details_df["Trustpilot Review Date"] = pd.to_datetime(
@@ -421,7 +402,6 @@ def send_pm_attained_reviews(pm_name, email, sheet_name, year, channel, month=No
         logging.error(e)
 
 
-
 def logging_function() -> None:
     """Creates a console and file logging handler that logs messages
         Returns:
@@ -442,8 +422,8 @@ def logging_function() -> None:
 
 if __name__ == '__main__':
     for name, email in name_usa.items():
-        send_df_as_text(name, sheet_usa, email, channel_usa)
-        # send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
+        # send_df_as_text(name, sheet_usa, email, channel_usa)
+        send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
 
     # for name, email in names_uk.items():
     #     send_df_as_text(name, sheet_uk, email, channel_uk)

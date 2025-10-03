@@ -92,6 +92,13 @@ WC: https://writersclique.com/
 AS: https://authorssolution.co.uk/"""
 
 
+def normalize_name(name):
+    """Normalize a name to consistent format (Title Case, stripped whitespace)"""
+    if pd.isna(name) or name == "":
+        return ""
+    return str(name).strip().title()
+
+
 @st.cache_data(ttl=120)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """Get data from Google Sheets using gspread"""
@@ -106,12 +113,14 @@ def get_sheet_data(sheet_name: str) -> pd.DataFrame:
         rows = raw_data[1:]
 
         data = pd.DataFrame(rows, columns=headers)
+        if "Project Manager" in data.columns:
+            data["Project Manager"] = data["Project Manager"].apply(normalize_name)
+
         return data
     except Exception as e:
         print(f"Error getting data from sheet {sheet_name}: {e}")
         logging.error(f"Error getting data from sheet {sheet_name}: {e}")
         return pd.DataFrame()
-
 
 def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     """Clean and prepare the dataframe"""
