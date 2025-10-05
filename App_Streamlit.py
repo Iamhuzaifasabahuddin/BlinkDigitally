@@ -1569,7 +1569,10 @@ def main():
                         unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                         unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
                         total_unique_clients = data['Name'].nunique()
-
+                        clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(
+                            name="Clients")
+                        merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
+                        merged_df.index = range(1, len(merged_df) + 1)
                         col1, col2 = st.columns(2)
                         with col1:
                             st.markdown("---")
@@ -1603,7 +1606,7 @@ def main():
                             for status_type, count_s in publishing.items():
                                 st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
                             st.write("🤼 **Clients Per PM**")
-                            st.dataframe(unique_clients_count_per_pm)
+                            st.dataframe(merged_df)
                             st.markdown(f"""
                                 - ✅ **Total Unique:** `{total_unique_clients}` """
                                         )
@@ -1673,7 +1676,6 @@ def main():
                             ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
                              "Book Publication"])]
 
-                        # Review statistics
                         review_counts = filtered_data["Trustpilot Review"].value_counts()
                         sent = review_counts.get("Sent", 0)
                         pending = review_counts.get("Pending", 0)
@@ -1685,6 +1687,9 @@ def main():
                             'Name'].nunique().reset_index()
                         unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                         unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                        clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(name="Clients")
+                        merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
+                        merged_df.index = range(1, len(merged_df) + 1)
                         total_unique_clients = data['Name'].nunique()
                         col1, col2 = st.columns(2)
                         with col1:
@@ -1727,8 +1732,9 @@ def main():
                             st.markdown("**Publishing Status**")
                             for status_type, count_s in publishing.items():
                                 st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
+
                             st.write("🤼 **Clients Per PM**")
-                            st.dataframe(unique_clients_count_per_pm)
+                            st.dataframe(merged_df)
                             st.write("👏 **Reviews Per PM**")
                             st.dataframe(attained_pm)
                             st.dataframe(attained_details_total)
@@ -2056,6 +2062,11 @@ def main():
                                     'Name'].nunique().reset_index()
                                 unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                                 unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                                clients_list = combined.groupby('Project Manager')["Name"].apply(list).reset_index(
+                                    name="Clients")
+                                merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
+                                                                              how='left')
+                                merged_df.index = range(1, len(merged_df) + 1)
                                 st.dataframe(combined)
                                 buffer = io.BytesIO()
                                 combined.to_excel(buffer, index=False)
@@ -2077,7 +2088,7 @@ def main():
                                 st.metric("Total Attained", uk_attained)
                                 st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
                                 st.write("🤼 **Clients Per PM**")
-                                st.dataframe(unique_clients_count_per_pm)
+                                st.dataframe(merged_df)
                                 st.write("📊 **Reviews Per PM**")
                                 st.dataframe(attained_reviews_per_pm)
                                 st.write("🎯 **Reviews Per PM details**")
@@ -2333,6 +2344,11 @@ def main():
                                 'Name'].nunique().reset_index()
                             unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                             unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                            clients_list = combined.groupby('Project Manager')["Name"].apply(list).reset_index(
+                                name="Clients")
+                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
+                                                                          how='left')
+                            merged_df.index = range(1, len(merged_df) + 1)
                             st.dataframe(combined)
                             buffer = io.BytesIO()
                             combined.to_excel(buffer, index=False)
@@ -2356,7 +2372,7 @@ def main():
                             st.metric("Total Attained", uk_attained)
                             st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
                             st.write("🤼 **Clients Per PM**")
-                            st.dataframe(unique_clients_count_per_pm)
+                            st.dataframe(merged_df)
                             st.write("📊 **Reviews Per PM**")
                             st.dataframe(attained_reviews_per_pm)
                             st.write("🎯 **Reviews Per PM details**")
