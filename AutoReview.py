@@ -230,7 +230,7 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
                     data["Trustpilot Review Date"].dt.year == year)]
         else:
             data = data[(data["Publishing Date"].dt.year == year)]
-        data_original = data
+        data_original = data.copy()
         data_count = data_original[
             (data_original["Project Manager"] == name) &
             ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &

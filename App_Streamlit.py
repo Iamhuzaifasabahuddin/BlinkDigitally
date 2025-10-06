@@ -265,7 +265,7 @@ def load_reviews_year(sheet_name, year, name) -> pd.DataFrame:
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
 
-        data_original = data
+        data_original = data.copy()
         data = data_original[
             (data_original["Project Manager"] == name) &
             ((data_original["Trustpilot Review"] == "Attained")) &
@@ -1619,7 +1619,7 @@ def main():
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_details["Brand"].value_counts()
                                 st.dataframe(
-                                    attained_brands.reset_index().rename(columns={"index": "Brand", "Brand": "Count"}))
+                                    attained_brands)
                     st.markdown("---")
 
             with tab2:
@@ -1728,6 +1728,29 @@ def main():
                             with st.expander(f"🤵🏻 Clients List {choice} {number2}"):
                                 st.dataframe(data_rm_dupes)
 
+                            with st.expander("👏 Reviews Per Month"):
+                                attained_months_copy = attained_details_total.copy()
+                                attained_months_copy["Trustpilot Review Date"] = pd.to_datetime(
+                                    attained_months_copy["Trustpilot Review Date"], errors="coerce"
+                                )
+
+                                attained_reviews_per_month = (
+                                    attained_months_copy.groupby(
+                                        attained_months_copy["Trustpilot Review Date"].dt.to_period("M"))
+                                    .size()
+                                    .reset_index(name="Total Attained Reviews")
+                                )
+
+
+                                attained_reviews_per_month["Month"] = attained_reviews_per_month[
+                                    "Trustpilot Review Date"
+                                ].dt.strftime("%B %Y")
+
+                                attained_reviews_per_month.index = range(1, len(attained_reviews_per_month)+1)
+                                attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date", axis=1)
+
+                                st.dataframe(attained_reviews_per_month)
+
                         with col2:
                             st.markdown("---")
                             st.markdown("#### 🔍 Review & Publishing Status")
@@ -1750,13 +1773,13 @@ def main():
                                                            """)
 
                             with st.expander("👏 Reviews Per PM"):
-                                st.dataframe(attained_reviews_per_pm)
-                                st.dataframe(attained_details)
+                                st.dataframe(attained_pm)
+                                st.dataframe(attained_details_total)
 
                             with st.expander("🏷️ Reviews Per Brand"):
-                                attained_brands = attained_details["Brand"].value_counts()
+                                attained_brands = attained_details_total["Brand"].value_counts()
                                 st.dataframe(
-                                    attained_brands.reset_index().rename(columns={"index": "Brand", "Brand": "Count"}))
+                                    attained_brands)
                         st.markdown("---")
 
             with tab3:
@@ -2120,8 +2143,7 @@ def main():
 
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_df["Brand"].value_counts()
-                                    st.dataframe(attained_brands.reset_index().rename(
-                                        columns={"index": "Brand", "Brand": "Count"}))
+                                    st.dataframe(attained_brands)
 
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
@@ -2417,8 +2439,7 @@ def main():
 
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_df["Brand"].value_counts()
-                                st.dataframe(attained_brands.reset_index().rename(
-                                    columns={"index": "Brand", "Brand": "Count"}))
+                                st.dataframe(attained_brands)
 
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
