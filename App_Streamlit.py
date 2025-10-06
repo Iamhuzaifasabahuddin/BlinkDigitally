@@ -1606,13 +1606,20 @@ def main():
                             for status_type, count_s in publishing.items():
                                 st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
                             st.write("🤼 **Clients Per PM**")
-                            st.dataframe(merged_df)
-                            st.markdown(f"""
-                                - ✅ **Total Unique:** `{total_unique_clients}` """
-                                        )
-                            st.write("👏 **Reviews Per PM**")
-                            st.dataframe(attained_reviews_per_pm)
-                            st.dataframe(attained_details)
+                            with st.expander("📊 View Clients Per PM Data"):
+                                st.dataframe(merged_df)
+                                st.markdown(f"""
+                                - ✅ **Total Unique:** `{total_unique_clients}`
+                                """)
+
+                            with st.expander("👏 Reviews Per PM"):
+                                st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_details)
+
+                            with st.expander("🏷️ Reviews Per Brand"):
+                                attained_brands = attained_details["Brand"].value_counts()
+                                st.dataframe(
+                                    attained_brands.reset_index().rename(columns={"index": "Brand", "Brand": "Count"}))
                     st.markdown("---")
 
             with tab2:
@@ -1717,7 +1724,9 @@ def main():
                             - 🔉 **Findaway Voices:** `{platforms.get("FAV", "N/A")}`
                             """)
                             data_rm_dupes.index = range(1, len(data_rm_dupes) + 1)
-                            st.dataframe(data_rm_dupes)
+
+                            with st.expander(f"🤵🏻 Clients List {choice} {number2}"):
+                                st.dataframe(data_rm_dupes)
 
                         with col2:
                             st.markdown("---")
@@ -1734,10 +1743,20 @@ def main():
                                 st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
 
                             st.write("🤼 **Clients Per PM**")
-                            st.dataframe(merged_df)
-                            st.write("👏 **Reviews Per PM**")
-                            st.dataframe(attained_pm)
-                            st.dataframe(attained_details_total)
+                            with st.expander("📊 View Clients Per PM Data"):
+                                st.dataframe(merged_df)
+                                st.markdown(f"""
+                                                           - ✅ **Total Unique:** `{total_unique_clients}`
+                                                           """)
+
+                            with st.expander("👏 Reviews Per PM"):
+                                st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_details)
+
+                            with st.expander("🏷️ Reviews Per Brand"):
+                                attained_brands = attained_details["Brand"].value_counts()
+                                st.dataframe(
+                                    attained_brands.reset_index().rename(columns={"index": "Brand", "Brand": "Count"}))
                         st.markdown("---")
 
             with tab3:
@@ -2067,7 +2086,8 @@ def main():
                                 merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
                                                                               how='left')
                                 merged_df.index = range(1, len(merged_df) + 1)
-                                st.dataframe(combined)
+                                with st.expander("🤵🏻 Total Clients"):
+                                    st.dataframe(combined)
                                 buffer = io.BytesIO()
                                 combined.to_excel(buffer, index=False)
                                 buffer.seek(0)
@@ -2088,11 +2108,21 @@ def main():
                                 st.metric("Total Attained", uk_attained)
                                 st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
                                 st.write("🤼 **Clients Per PM**")
-                                st.dataframe(merged_df)
-                                st.write("📊 **Reviews Per PM**")
-                                st.dataframe(attained_reviews_per_pm)
-                                st.write("🎯 **Reviews Per PM details**")
-                                st.dataframe(attained_df)
+                                with st.expander("📊 View Clients Per PM Data"):
+                                    st.dataframe(merged_df)
+                                    st.markdown(f"""
+                                    - ✅ **Total Unique:** `{total_unique_clients}`
+                                    """)
+
+                                with st.expander("👏 Reviews Per PM"):
+                                    st.dataframe(attained_reviews_per_pm)
+                                    st.dataframe(attained_df)
+
+                                with st.expander("🏷️ Reviews Per Brand"):
+                                    attained_brands = attained_df["Brand"].value_counts()
+                                    st.dataframe(attained_brands.reset_index().rename(
+                                        columns={"index": "Brand", "Brand": "Count"}))
+
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                             st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
@@ -2349,7 +2379,10 @@ def main():
                             merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
                                                                           how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
-                            st.dataframe(combined)
+
+                            with st.expander("🤵🏻 Total Clients"):
+                                st.dataframe(combined)
+
                             buffer = io.BytesIO()
                             combined.to_excel(buffer, index=False)
                             buffer.seek(0)
@@ -2372,11 +2405,20 @@ def main():
                             st.metric("Total Attained", uk_attained)
                             st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
                             st.write("🤼 **Clients Per PM**")
-                            st.dataframe(merged_df)
-                            st.write("📊 **Reviews Per PM**")
-                            st.dataframe(attained_reviews_per_pm)
-                            st.write("🎯 **Reviews Per PM details**")
-                            st.dataframe(attained_df)
+                            with st.expander("📊 View Clients Per PM Data"):
+                                st.dataframe(merged_df)
+                                st.markdown(f"""
+                                                                - ✅ **Total Unique:** `{total_unique_clients}`
+                                                                """)
+
+                            with st.expander("👏 Reviews Per PM"):
+                                st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_df)
+
+                            with st.expander("🏷️ Reviews Per Brand"):
+                                attained_brands = attained_df["Brand"].value_counts()
+                                st.dataframe(attained_brands.reset_index().rename(
+                                    columns={"index": "Brand", "Brand": "Count"}))
 
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
