@@ -2394,8 +2394,8 @@ def main():
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 help="Click to download the Excel report"
                             )
-                            st.write("✅ **Total Reviews Per Month**")
-                            st.dataframe(attained_reviews_per_month)
+                            with st.expander("🎯 Total Reviews Per Month"):
+                                st.dataframe(attained_reviews_per_month)
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                             if uk_pie:
@@ -2506,7 +2506,8 @@ def main():
 
                             fig_gauge.update_layout(height=200)
                             st.plotly_chart(fig_gauge, use_container_width=True)
-                        st.dataframe(monthly_printing)
+                        with st.expander("🖨 Monthly Printing Data"):
+                            st.dataframe(monthly_printing)
                         st.divider()
 
                         st.markdown('<h2 class="section-header">©️ Copyright Analytics</h2>', unsafe_allow_html=True)
