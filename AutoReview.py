@@ -10,7 +10,7 @@ from google.oauth2.service_account import Credentials
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-load_dotenv('Info.env')
+load_dotenv('.testing/Info.env')
 SLACK_BOT_TOKEN = os.getenv("SLACK")
 client = WebClient(token=SLACK_BOT_TOKEN)
 channel_usa = os.getenv("CHANNEL_USA")
@@ -25,7 +25,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 def get_gspread_client():
     """Initialize and return gspread client with service account credentials"""
     try:
-        credentials = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+        credentials = Credentials.from_service_account_file(".testing/credentials.json", scopes=SCOPES)
         gc = gspread.authorize(credentials)
         return gc
     except Exception as e:

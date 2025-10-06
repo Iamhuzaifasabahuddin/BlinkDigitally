@@ -16,11 +16,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.platypus.flowables import HRFlowable
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
 
 st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
-client = WebClient(token=st.secrets["Slack"]["Slack"])
 
 creds_dict = {
     "type": st.secrets["connections"]["gsheets"]["type"],
@@ -55,7 +52,6 @@ sheet_sales = "Sales"
 
 month_list = list(calendar.month_name)[1:]
 current_month = datetime.today().month
-# current_month = 4  # For testing specific month
 current_month_name = calendar.month_name[current_month]
 current_year = datetime.today().year
 
@@ -65,31 +61,6 @@ st.markdown("""
     header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
-
-name_usa = {
-    "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
-    "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
-    "Ahsan Javed": "ahsan.javed@topsoftdigitals.pk",
-    "Shozab Hasan": "shozab.hasan@topsoftdigitals.pk",
-    "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
-    "Shaikh Arsalan": "shaikh.arsalan@topsoftdigitals.pk",
-    "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
-    "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
-    "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
-    "Valencia Angelo": "valencia.angelo@topsoftdigitals.pk"
-}
-
-names_uk = {
-    "Hadia Ghazanfar": "hadia.ghazanfar@topsoftdigitals.pk",
-    "Youha": "youha.khan@topsoftdigitals.pk",
-    "Syed Ahsan Shahzad": "ahsan.shahzad@topsoftdigitals.pk"
-}
-
-general_message = """Hiya
-:bangbang: Please ask the following Clients for their feedback about their respective projects for the ones marked as _*Pending*_ & for those marked as _*Sent*_ please remind the clients once again that their feedback truly matters and helps us grow and make essential changes to make the process even more fluid!
-BM: https://bookmarketeers.com/
-WC: https://writersclique.com/
-AS: https://authorssolution.co.uk/"""
 
 
 def normalize_name(name):
@@ -122,6 +93,7 @@ def get_sheet_data(sheet_name: str) -> pd.DataFrame:
         logging.error(f"Error getting data from sheet {sheet_name}: {e}")
         return pd.DataFrame()
 
+
 def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     """Clean and prepare the dataframe"""
     if data.empty:
@@ -145,7 +117,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def load_data(sheet_name, month_number, year) -> pd.DataFrame:
+def load_data(sheet_name: str, month_number: int, year: int) -> pd.DataFrame:
     """Load data from Google Sheets with optional month filtering"""
     try:
         data = get_sheet_data(sheet_name)
@@ -168,7 +140,8 @@ def load_data(sheet_name, month_number, year) -> pd.DataFrame:
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
-def load_data_year(sheet_name, year) -> pd.DataFrame:
+
+def load_data_year(sheet_name: str, year: int) -> pd.DataFrame:
     """Load data from Google Sheets with optional month filtering"""
     try:
         data = get_sheet_data(sheet_name)
@@ -189,7 +162,8 @@ def load_data_year(sheet_name, year) -> pd.DataFrame:
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
-def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
+
+def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
     data = get_sheet_data(sheet_name)
     if data.empty:
         return pd.DataFrame()
@@ -240,7 +214,7 @@ def load_reviews(sheet_name, year, month_number=None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def load_reviews_year(sheet_name, year, name) -> pd.DataFrame:
+def load_reviews_year(sheet_name: str, year: int, name: str) -> pd.DataFrame:
     data = get_sheet_data(sheet_name)
     if data.empty:
         return pd.DataFrame()
@@ -282,8 +256,7 @@ def load_reviews_year(sheet_name, year, name) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-
-def get_printing_data(month, year) -> pd.DataFrame:
+def get_printing_data(month: int, year: int) -> pd.DataFrame:
     """Get printing data filtered by month"""
     try:
         data = get_sheet_data(sheet_printing)
@@ -300,7 +273,9 @@ def get_printing_data(month, year) -> pd.DataFrame:
 
         if month and "Order Date" in data.columns:
             data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
-
+        if data.empty:
+            print("Testing")
+            return pd.DataFrame()
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
             data["Order Cost"] = pd.to_numeric(
@@ -344,12 +319,12 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     return data
 
 
-def get_printing_data_reviews(month, year) -> pd.DataFrame:
+def get_printing_data_reviews(month: int, year: int) -> pd.DataFrame:
     """Get printing data for the current month"""
     data = get_sheet_data(sheet_printing)
 
     if data.empty:
-        return data
+        return pd.Dataframe()
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
@@ -383,11 +358,11 @@ def get_printing_data_reviews(month, year) -> pd.DataFrame:
     return data
 
 
-def printing_data_all(year) -> tuple[pd.DataFrame, pd.DataFrame]:
+def printing_data_all(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     data = get_sheet_data(sheet_printing)
 
     if data.empty:
-        return data, pd.DataFrame()  # return empty totals if no data
+        return pd.DataFrame(), pd.DataFrame()
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
@@ -400,7 +375,6 @@ def printing_data_all(year) -> tuple[pd.DataFrame, pd.DataFrame]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    # Filter by year
     data = data[data["Order Date"].dt.year == year]
 
     if "Order Cost" in data.columns:
@@ -432,13 +406,12 @@ def printing_data_all(year) -> tuple[pd.DataFrame, pd.DataFrame]:
     return data, month_totals
 
 
-
-def get_copyright_data(month, year) -> tuple[pd.DataFrame, int, int]:
+def get_copyright_data(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
     """Get copyright data for the current month"""
     data = get_sheet_data(sheet_copyright)
 
     if data.empty:
-        return data, 0
+        return pd.DataFrame(), 0, 0
 
     columns = list(data.columns)
     if "Country" in columns:
@@ -464,11 +437,11 @@ def get_copyright_data(month, year) -> tuple[pd.DataFrame, int, int]:
     return data, result_count, result_count_no
 
 
-def copyright_all(year) -> tuple[pd.DataFrame, int, int]:
+def copyright_all(year: int) -> tuple[pd.DataFrame, int, int]:
     data = get_sheet_data(sheet_copyright)
 
     if data.empty:
-        return data, 0
+        return pd.DataFrame(), 0, 0
 
     columns = list(data.columns)
     if "Country" in columns:
@@ -494,10 +467,10 @@ def copyright_all(year) -> tuple[pd.DataFrame, int, int]:
     return data, result_count, result_count_no
 
 
-def get_A_plus_data(month, year) -> tuple[pd.DataFrame, int]:
+def get_A_plus_data(month: int, year: int) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
     if data.empty:
-        return data
+        return pd.DataFrame()
 
     columns = list(data.columns)
     if "Issues" in columns:
@@ -523,10 +496,10 @@ def get_A_plus_data(month, year) -> tuple[pd.DataFrame, int]:
     return data, result_count
 
 
-def get_A_plus_all(year) -> tuple[pd.DataFrame, int]:
+def get_A_plus_all(year: int) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
     if data.empty:
-        return data
+        return pd.DataFrame()
 
     columns = list(data.columns)
     if "Issues" in columns:
@@ -579,45 +552,41 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
         df[(df['Month'] == month_2) & (df['Year'] == year2)]['Name'].str.strip()
     )
 
-    names_in_both = month_1_names.intersection(month_2_names)
+    if month_1_names & month_2_names:
+        names_in_both = month_1_names.intersection(month_2_names)
 
-    counts = {}
-    for name in names_in_both:
-        month_1_count = df[
-            (df['Month'] == month_1) &
-            (df['Year'] == year1) &
-            (df['Name'].str.strip() == name)
-            ].shape[0]
+        counts = {}
+        for name in names_in_both:
+            month_1_count = df[
+                (df['Month'] == month_1) &
+                (df['Year'] == year1) &
+                (df['Name'].str.strip() == name)
+                ].shape[0]
 
-        month_2_count = df[
-            (df['Month'] == month_2) &
-            (df['Year'] == year2) &
-            (df['Name'].str.strip() == name)
-            ].shape[0]
+            month_2_count = df[
+                (df['Month'] == month_2) &
+                (df['Year'] == year2) &
+                (df['Name'].str.strip() == name)
+                ].shape[0]
 
-        counts[name] = {
-            f"{month_1}-{year1}": month_1_count,
-            f"{month_2}-{year2}": month_2_count,
-        }
+            counts[name] = {
+                f"{month_1}-{year1}": month_1_count,
+                f"{month_2}-{year2}": month_2_count,
+            }
 
-    return names_in_both, counts, len(names_in_both)
-
-
-def format_review_counts_reviews(review_counts):
-    """Format review counts as a string"""
-    if review_counts.empty:
-        return "No data"
-    return ", ".join([f"{status}: {count}" for status, count in review_counts.items()])
+        return names_in_both, counts, len(names_in_both)
+    else:
+        return set(), {}, 0
 
 
-def create_review_pie_chart(review_data, title):
+def create_review_pie_chart(review_data: dict[str, int], title: str):
     """Create pie chart for review distribution"""
     if isinstance(review_data, dict):
         if not review_data or sum(review_data.values()) == 0:
             return None
         values = list(review_data.values())
         labels = list(review_data.keys())
-    else:  # Case 2: If review_data is a Pandas Series
+    else:
         if review_data.empty or review_data.sum() == 0:
             return None
         values = review_data.values
@@ -641,7 +610,7 @@ def create_review_pie_chart(review_data, title):
     return fig
 
 
-def create_platform_comparison_chart(usa_data, uk_data):
+def create_platform_comparison_chart(usa_data: dict[str, int], uk_data: dict[str, int]):
     """Create comparison chart for platforms"""
     platforms = ['Amazon', 'Barnes & Noble', 'Ingram Spark', 'FAV']
 
@@ -659,7 +628,7 @@ def create_platform_comparison_chart(usa_data, uk_data):
     return fig
 
 
-def create_brand_chart(usa_brands, uk_brands):
+def create_brand_chart(usa_brands: dict[str, int], uk_brands: dict[str, int]):
     """Create brand distribution chart"""
     all_brands = list(usa_brands.keys()) + list(uk_brands.keys())
     all_values = list(usa_brands.values()) + list(uk_brands.values())
@@ -675,7 +644,7 @@ def create_brand_chart(usa_brands, uk_brands):
     return fig
 
 
-def summary(month, year):
+def summary(month: int, year: int):
     uk_clean = clean_data_reviews(sheet_uk)
     usa_clean = clean_data_reviews(sheet_usa)
 
@@ -711,7 +680,8 @@ def summary(month, year):
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
 
-    combined = pd.concat([usa_clean[["Name", "Brand","Project Manager", "Email"]], uk_clean[["Name", "Brand","Project Manager", "Email"]]])
+    combined = pd.concat([usa_clean[["Name", "Brand", "Project Manager", "Email"]],
+                          uk_clean[["Name", "Brand", "Project Manager", "Email"]]])
     combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
@@ -868,7 +838,7 @@ def summary(month, year):
     return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details
 
 
-def generate_year_summary(year):
+def generate_year_summary(year: int):
     uk_clean = clean_data_reviews(sheet_uk)
     usa_clean = clean_data_reviews(sheet_usa)
 
@@ -901,7 +871,8 @@ def generate_year_summary(year):
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
 
-    combined = pd.concat([usa_clean[["Name", "Brand","Project Manager", "Email"]], uk_clean[["Name", "Brand","Project Manager", "Email"]]])
+    combined = pd.concat([usa_clean[["Name", "Brand", "Project Manager", "Email"]],
+                          uk_clean[["Name", "Brand", "Project Manager", "Email"]]])
     combined.index = range(1, len(combined) + 1)
 
     brands = usa_clean["Brand"].value_counts()
@@ -1422,7 +1393,7 @@ def get_min_year() -> int:
     return 2025
 
 
-def sales(month, year):
+def sales(month: int, year: int) -> pd.DataFrame:
     data = get_sheet_data(sheet_sales)
 
     if data.empty:
@@ -1447,7 +1418,7 @@ def sales(month, year):
     return data
 
 
-def main():
+def main() -> None:
     with st.container():
         st.title("📊 Blink Digitally Publishing Dashboard")
         action = st.selectbox("What would you like to do?",
@@ -1653,7 +1624,8 @@ def main():
                         review_details_total["Trustpilot Review Date"], errors="coerce"
                     ).dt.strftime("%d-%B-%Y")
 
-                    attained_details_total = review_details_total[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
+                    attained_details_total = review_details_total[
+                        ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
 
                     attained_details_total.index = range(1, len(attained_details_total) + 1)
                     if data.empty:
@@ -1674,7 +1646,6 @@ def main():
                             help="Click to download the Excel report"
                         )
 
-
                         brands = data_rm_dupes["Brand"].value_counts()
                         platforms = data["Platform"].value_counts()
                         publishing = data_rm_dupes["Status"].value_counts()
@@ -1694,7 +1665,8 @@ def main():
                             'Name'].nunique().reset_index()
                         unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                         unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
-                        clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(name="Clients")
+                        clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(
+                            name="Clients")
                         merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
                         merged_df.index = range(1, len(merged_df) + 1)
                         total_unique_clients = data['Name'].nunique()
@@ -1741,13 +1713,13 @@ def main():
                                     .reset_index(name="Total Attained Reviews")
                                 )
 
-
                                 attained_reviews_per_month["Month"] = attained_reviews_per_month[
                                     "Trustpilot Review Date"
                                 ].dt.strftime("%B %Y")
 
-                                attained_reviews_per_month.index = range(1, len(attained_reviews_per_month)+1)
-                                attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date", axis=1)
+                                attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+                                attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date",
+                                                                                             axis=1)
 
                                 st.dataframe(attained_reviews_per_month)
 
@@ -1919,14 +1891,14 @@ def main():
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
             with tab2:
                 number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), step=1)
-                data = printing_data_all(number2)
+                data, _ = printing_data_all(number2)
                 if not data.empty:
                     st.markdown(f"### 📄 Total Printing Data for {number2}")
                     st.dataframe(data)
                 else:
                     st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
-                data = printing_data_all(2025)
+                data, _ = printing_data_all(number2)
                 search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")
 
                 if search_term:
@@ -2444,10 +2416,6 @@ def main():
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                         st.plotly_chart(platform_chart, use_container_width=True)
-
-                        st.subheader("📱 Platform Distribution")
-                        platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
-                        st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
 
                         st.subheader("🏷️ Brand Performance")
                         brand_chart = create_brand_chart(usa_brands, uk_brands)
