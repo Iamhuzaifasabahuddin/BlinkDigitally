@@ -106,7 +106,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data[["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
         ["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].astype(str)
@@ -125,6 +125,9 @@ def load_data(sheet_name: str, month_number: int, year: int) -> pd.DataFrame:
 
         if "Publishing Date" in data.columns:
             data = data[(data["Publishing Date"].dt.month == month_number) & (data["Publishing Date"].dt.year == year)]
+
+        if data.empty:
+            return pd.DataFrame()
 
         data = data.sort_values(by="Publishing Date", ascending=True)
 
@@ -149,6 +152,9 @@ def load_data_year(sheet_name: str, year: int) -> pd.DataFrame:
 
         if "Publishing Date" in data.columns:
             data = data[data["Publishing Date"].dt.year == year]
+
+        if data.empty:
+            return pd.DataFrame()
 
         data = data.sort_values(by="Publishing Date", ascending=True)
 
@@ -175,7 +181,7 @@ def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
         ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
@@ -189,14 +195,13 @@ def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
         else:
             data = data[(data["Trustpilot Review Date"].dt.year == year)]
 
+        if data.empty:
+            return pd.DataFrame()
+
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
 
-        # for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
-        #     if col in data.columns:
-        #         data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
         if "Name" in data.columns:
             if "Trustpilot Review" in data.columns and "Trustpilot Review Date" in data.columns:
-                # Sort so Attained comes first, then most recent date
                 data = (
                     data.sort_values(
                         by=["Trustpilot Review", "Trustpilot Review Date"],
@@ -226,7 +231,7 @@ def load_reviews_year(sheet_name: str, year: int, name: str) -> pd.DataFrame:
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
         ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
@@ -237,12 +242,15 @@ def load_reviews_year(sheet_name: str, year: int, name: str) -> pd.DataFrame:
         if "Trustpilot Review Date" in data.columns:
             data = data[(data["Trustpilot Review Date"].dt.year == year)]
 
+        else:
+            return pd.DataFrame()
+
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
 
         data_original = data.copy()
         data = data_original[
             (data_original["Project Manager"] == name) &
-            ((data_original["Trustpilot Review"] == "Attained")) &
+            (data_original["Trustpilot Review"] == "Attained") &
             (data_original["Brand"].isin(
                 ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
             ]
@@ -269,12 +277,11 @@ def get_printing_data(month: int, year: int) -> pd.DataFrame:
         data = data.astype(str)
         for col in ["Order Date", "Shipping Date", "Fulfilled"]:
             if col in data.columns:
-                data[col] = pd.to_datetime(data[col], errors="coerce")
+                data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
         if month and "Order Date" in data.columns:
             data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
         if data.empty:
-            print("Testing")
             return pd.DataFrame()
         if "Order Cost" in data.columns:
             data["Order Cost"] = data["Order Cost"].astype(str)
@@ -311,7 +318,7 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
 
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data = data.sort_values(by="Publishing Date", ascending=True)
     data.index = range(1, len(data) + 1)
@@ -319,12 +326,12 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     return data
 
 
-def get_printing_data_reviews(month: int, year: int) -> pd.DataFrame:
+def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
     """Get printing data for the current month"""
     data = get_sheet_data(sheet_printing)
 
     if data.empty:
-        return pd.Dataframe()
+        return pd.DataFrame()
 
     columns = list(data.columns)
     if "Fulfilled" in columns:
@@ -334,7 +341,7 @@ def get_printing_data_reviews(month: int, year: int) -> pd.DataFrame:
 
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
 
@@ -358,7 +365,7 @@ def get_printing_data_reviews(month: int, year: int) -> pd.DataFrame:
     return data
 
 
-def printing_data_all(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     data = get_sheet_data(sheet_printing)
 
     if data.empty:
@@ -373,9 +380,12 @@ def printing_data_all(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data = data[data["Order Date"].dt.year == year]
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
 
     if "Order Cost" in data.columns:
         data["Order Cost"] = pd.to_numeric(
@@ -406,7 +416,7 @@ def printing_data_all(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     return data, month_totals
 
 
-def get_copyright_data(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
+def get_copyright_month(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
     """Get copyright data for the current month"""
     data = get_sheet_data(sheet_copyright)
 
@@ -420,7 +430,7 @@ def get_copyright_data(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
     data = data.astype(str)
 
     if "Submission Date" in data.columns:
-        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
         data = data[
             (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == year)]
 
@@ -437,7 +447,7 @@ def get_copyright_data(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
     return data, result_count, result_count_no
 
 
-def copyright_all(year: int) -> tuple[pd.DataFrame, int, int]:
+def copyright_year(year: int) -> tuple[pd.DataFrame, int, int]:
     data = get_sheet_data(sheet_copyright)
 
     if data.empty:
@@ -450,7 +460,7 @@ def copyright_all(year: int) -> tuple[pd.DataFrame, int, int]:
     data = data.astype(str)
 
     if "Submission Date" in data.columns:
-        data["Submission Date"] = pd.to_datetime(data["Submission Date"], errors='coerce')
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
         data = data[
             (data["Submission Date"].dt.year == year)]
     data = data.sort_values(by=["Submission Date"], ascending=True)
@@ -467,10 +477,10 @@ def copyright_all(year: int) -> tuple[pd.DataFrame, int, int]:
     return data, result_count, result_count_no
 
 
-def get_A_plus_data(month: int, year: int) -> tuple[pd.DataFrame, int]:
+def get_A_plus_month(month: int, year: int) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
     if data.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), 0
 
     columns = list(data.columns)
     if "Issues" in columns:
@@ -479,7 +489,7 @@ def get_A_plus_data(month: int, year: int) -> tuple[pd.DataFrame, int]:
     data = data.astype(str)
 
     if "A+ Content Date" in data.columns:
-        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], errors='coerce')
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], format="%d-%B-%Y", errors='coerce')
         data = data[
             (data["A+ Content Date"].dt.month == month) & (data["A+ Content Date"].dt.year == year)]
     data = data.sort_values(by=["A+ Content Date"], ascending=True)
@@ -496,10 +506,10 @@ def get_A_plus_data(month: int, year: int) -> tuple[pd.DataFrame, int]:
     return data, result_count
 
 
-def get_A_plus_all(year: int) -> tuple[pd.DataFrame, int]:
+def get_A_plus_year(year: int) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
     if data.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), 0
 
     columns = list(data.columns)
     if "Issues" in columns:
@@ -508,7 +518,7 @@ def get_A_plus_all(year: int) -> tuple[pd.DataFrame, int]:
     data = data.astype(str)
 
     if "A+ Content Date" in data.columns:
-        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], errors='coerce')
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], format="%d-%B-%Y", errors='coerce')
         data = data[
             (data["A+ Content Date"].dt.year == year)]
     data = data.sort_values(by=["A+ Content Date"], ascending=True)
@@ -538,7 +548,7 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
         logging.warning("Missing 'Name' or 'Date' columns or data is empty.")
         return set(), {}, 0
 
-    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], errors='coerce')
+    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], format="%d-%B-%Y", errors='coerce')
     df = df.dropna(subset=['Publishing Date', 'Name'])
 
     df['Month'] = df['Publishing Date'].dt.month_name()
@@ -581,16 +591,12 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
 
 def create_review_pie_chart(review_data: dict[str, int], title: str):
     """Create pie chart for review distribution"""
+    global labels, values
     if isinstance(review_data, dict):
         if not review_data or sum(review_data.values()) == 0:
             return None
         values = list(review_data.values())
         labels = list(review_data.keys())
-    else:
-        if review_data.empty or review_data.sum() == 0:
-            return None
-        values = review_data.values
-        labels = review_data.index
 
     custom_colors = {
         "Attained": "#7dff8d",
@@ -785,7 +791,7 @@ def summary(month: int, year: int):
         "-ve Attained": uk_review_na
     }
 
-    printing_data = get_printing_data_reviews(month, year)
+    printing_data = get_printing_data_month(month, year)
     Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
     Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
     Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
@@ -797,7 +803,7 @@ def summary(month: int, year: int):
     if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
         printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
 
-    copyright_data, result_count, result_count_no = get_copyright_data(month, year)
+    copyright_data, result_count, result_count_no = get_copyright_month(month, year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
     country = copyright_data["Country"].value_counts()
@@ -805,7 +811,7 @@ def summary(month: int, year: int):
     canada = country.get("Canada", "N/A")
     uk = country.get("UK", "N/A")
 
-    a_plus, a_plus_count = get_A_plus_data(month, year)
+    a_plus, a_plus_count = get_A_plus_month(month, year)
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
                   'Aurora Writers': aurora_writers}
@@ -997,7 +1003,7 @@ def generate_year_summary(year: int):
         "-ve Attained": uk_review_na
     }
 
-    printing_data, monthly_printing = printing_data_all(year)
+    printing_data, monthly_printing = printing_data_year(year)
     Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
     Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
     Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
@@ -1009,7 +1015,7 @@ def generate_year_summary(year: int):
     if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
         printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
 
-    copyright_data, result_count, result_count_no = copyright_all(year)
+    copyright_data, result_count, result_count_no = copyright_year(year)
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
     country = copyright_data["Country"].value_counts()
@@ -1017,7 +1023,7 @@ def generate_year_summary(year: int):
     canada = country.get("Canada", "N/A")
     uk = country.get("UK", "N/A")
 
-    a_plus, a_plus_count = get_A_plus_all(year)
+    a_plus, a_plus_count = get_A_plus_year(year)
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
                   'Aurora Writers': aurora_writers}
@@ -1461,7 +1467,7 @@ def main() -> None:
 
                 if sheet_name:
                     data = load_data(sheet_name, selected_month_number, number)
-                    data_rm_dupes = data
+                    data_rm_dupes = data.copy()
                     if "Name" in data_rm_dupes.columns:
                         data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"])
                     review_data = load_reviews(sheet_name, number, selected_month_number)
@@ -1601,7 +1607,7 @@ def main() -> None:
                 if number2 and sheet_name:
 
                     data = load_data_year(sheet_name, number2)
-                    data_rm_dupes = data
+                    data_rm_dupes = data.copy()
                     if "Name" in data_rm_dupes.columns:
                         data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"])
 
@@ -1842,10 +1848,6 @@ def main() -> None:
 
                         Lowest_copies = data["No of Copies"].min()
 
-                        # data['Cost_Per_Copy'] = data['Order Cost'] / data['No of Copies']
-                        #
-                        # da
-
                         Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
 
                         st.markdown("### 📄 Detailed Printing Data")
@@ -1891,14 +1893,14 @@ def main() -> None:
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
             with tab2:
                 number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), step=1)
-                data, _ = printing_data_all(number2)
+                data, _ = printing_data_year(number2)
                 if not data.empty:
                     st.markdown(f"### 📄 Total Printing Data for {number2}")
                     st.dataframe(data)
                 else:
                     st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
-                data, _ = printing_data_all(number2)
+                data, _ = printing_data_year(number2)
                 search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")
 
                 if search_term:
@@ -1914,7 +1916,7 @@ def main() -> None:
         elif action == "Copyright" and selected_month and number:
             st.subheader(f"© Copyright Summary for {selected_month}")
 
-            data, result, result_no = get_copyright_data(selected_month_number, number)
+            data, result, result_no = get_copyright_month(selected_month_number, number)
 
             if not data.empty:
                 st.dataframe(data)
@@ -1988,8 +1990,7 @@ def main() -> None:
                                                                            selected_month_2, number2)
 
                             if not data1:
-                                print(
-                                    f"No Similar Clients found for {selected_month_1} N {selected_month_2} for {choice}")
+                                st.info("No similarities found")
                             st.write(data1)
                             st.write(data2)
                             st.write(data3)

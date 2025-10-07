@@ -21,7 +21,6 @@ SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 
-# Initialize gspread client
 def get_gspread_client():
     """Initialize and return gspread client with service account credentials"""
     try:
@@ -100,6 +99,7 @@ def normalize_name(name):
         return ""
     return str(name).strip().title()
 
+
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     """Clean the data from Google Sheets using gspread"""
     data = get_sheet_data(sheet_name)
@@ -119,7 +119,7 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     # Handle date columns
     for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data = data.sort_values(by="Publishing Date", ascending=True)
     data.index = range(1, len(data) + 1)
@@ -137,7 +137,7 @@ def load_pending_reviews(sheet_name: str, name: str) -> tuple:
     if "Name" in data.columns:
         data = data.drop_duplicates(subset=["Name"])
 
-    data_original = data
+    data_original = data.copy()
     if data.empty:
         return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
 
@@ -178,7 +178,7 @@ def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=No
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
         ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
@@ -192,7 +192,7 @@ def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=No
         else:
             data = data[(data["Trustpilot Review Date"].dt.year == year)]
 
-        data_original = data
+        data_original = data.copy()
         data = data_original[
             (data_original["Project Manager"] == name) &
             ((data_original["Trustpilot Review"] == "Attained")) &
@@ -202,6 +202,9 @@ def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=No
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
         data = data.drop_duplicates(subset=["Name"])
+        data["Trustpilot Review Date"] = pd.to_datetime(
+            data["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
         data.index = range(1, len(data) + 1)
         return data
     except Exception as e:
@@ -222,7 +225,7 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
     for col in date_columns:
         if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors="coerce")
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     try:
         if "Trustpilot Review Date" in data.columns and month_number:
@@ -238,26 +241,12 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
                 ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
             (data_original["Status"] == "Published")
             ]
-
-        data = data_original[
-            (data_original["Project Manager"] == name) &
-            ((data_original["Trustpilot Review"] == "Pending")) &
-            (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
-            (data_original["Status"] == "Published")
-            ]
-
-        data = data.sort_values(by="Publishing Date", ascending=True)
-
         total_reviews = len(data_count)
-
-        min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
-        max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
-
-        data.index = range(1, len(data) + 1)
-        return data, total_reviews
+        return total_reviews
     except Exception as e:
+        print(f"Error {e}")
         return pd.DataFrame()
+
 
 def get_user_id_by_email(email: str):
     try:
@@ -358,14 +347,10 @@ def send_pm_attained_reviews(pm_name: str, email: str, sheet_name: str, year: in
     if not user_id:
         print(f"❌ Could not find user ID for {pm_name}")
         return
-    df, total_reviews = load_total_reviews(sheet_name, pm_name, year, month)
-    review_data = load_attained_reviews(sheet_name, name, year, month)
+    total_reviews = load_total_reviews(sheet_name, pm_name, year, month)
+    review_data = load_attained_reviews(sheet_name, pm_name, year, month)
 
-    review_details_df = review_data
-    review_details_df["Trustpilot Review Date"] = pd.to_datetime(
-        review_details_df["Trustpilot Review Date"], errors="coerce"
-    ).dt.strftime("%d-%B-%Y")
-
+    review_details_df = review_data.copy()
     attained_details = review_details_df[["Name", "Brand", "Trustpilot Review Date"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
@@ -396,6 +381,7 @@ def send_pm_attained_reviews(pm_name: str, email: str, sheet_name: str, year: in
         )
         send_dm(get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk"),
                 f"✅ Attained review details sent for {pm_name}")
+        print(f"✅ Attained review details sent for {pm_name}")
 
     except SlackApiError as e:
         print(f"❌ Error sending message for {pm_name}: {e.response['error']}")
