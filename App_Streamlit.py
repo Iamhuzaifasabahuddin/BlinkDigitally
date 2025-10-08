@@ -730,6 +730,12 @@ def summary(month: int, year: int):
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
 
+    combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    pending_sent_details = combined_pending_sent[
+        (combined_pending_sent["Trustpilot Review"] == "Sent") | (combined_pending_sent["Trustpilot Review"] == "Pending")]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+    pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+
     usa_reviews_df = load_reviews(sheet_usa, year, month)
     uk_reviews_df = load_reviews(sheet_uk, year, month)
     combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
@@ -841,7 +847,7 @@ def summary(month: int, year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, pending_sent_details
 
 
 def generate_year_summary(year: int):
@@ -920,6 +926,12 @@ def generate_year_summary(year: int):
         uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
+
+    combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    pending_sent_details = combined_pending_sent[
+        (combined_pending_sent["Trustpilot Review"] == "Sent") | (combined_pending_sent["Trustpilot Review"] == "Pending")]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+    pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
     pm_list_usa = usa_clean["Project Manager"].dropna().unique()
     pm_list_uk = uk_clean["Project Manager"].dropna().unique()
@@ -1052,7 +1064,7 @@ def generate_year_summary(year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details
 
 
 def logging_function() -> None:
@@ -1530,7 +1542,7 @@ def main() -> None:
                              "Book Publication"])]
                         sent = filtered_data["Trustpilot Review"].value_counts().get("Sent", 0)
                         pending = filtered_data["Trustpilot Review"].value_counts().get("Pending", 0)
-
+                        pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (filtered_data["Trustpilot Review"] == "Pending")]
                         review = {
                             "Sent": sent,
                             "Pending": pending,
@@ -1559,6 +1571,7 @@ def main() -> None:
                                         - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
                                         - 🟢 **'Attained' Reviews:** `{attained}`
                                         - 📊 **Attainment Rate:** `{percentage}%`
+                                        - 👥 **Total Unique:** `{total_unique_clients}`
 
                                         **Brands**
                                         - 📘 **BookMarketeers:** `{bookmarketeers}`
@@ -1585,13 +1598,15 @@ def main() -> None:
                             st.write("🤼 **Clients Per PM**")
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
-                                st.markdown(f"""
-                                - ✅ **Total Unique:** `{total_unique_clients}`
-                                """)
+                            with st.expander("❓ Pending & Sent Reviews"):
+                                pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+                                pending_sent_details.index = range(1, len(pending_sent_details)+1)
+                                st.dataframe(pending_sent_details)
 
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_details)
+
 
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_details["Brand"].value_counts()
@@ -1659,7 +1674,7 @@ def main() -> None:
                         filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                             ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
                              "Book Publication"])]
-
+                        pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (filtered_data["Trustpilot Review"] == "Pending")]
                         review_counts = filtered_data["Trustpilot Review"].value_counts()
                         sent = review_counts.get("Sent", 0)
                         pending = review_counts.get("Pending", 0)
@@ -1746,14 +1761,14 @@ def main() -> None:
                             st.write("🤼 **Clients Per PM**")
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
-                                st.markdown(f"""
-                                                           - ✅ **Total Unique:** `{total_unique_clients}`
-                                                           """)
-
+                            with st.expander("❓ Pending & Sent Reviews"):
+                                pending_sent_details = pending_sent_details[
+                                    ["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+                                pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+                                st.dataframe(pending_sent_details)
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_pm)
                                 st.dataframe(attained_details_total)
-
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_details_total["Brand"].value_counts()
                                 st.dataframe(
@@ -2031,7 +2046,7 @@ def main() -> None:
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
@@ -2069,10 +2084,10 @@ def main() -> None:
                                     st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
 
                                 st.subheader("🇺🇸 USA Reviews")
-                                st.metric("Total Reviews", usa_total)
-                                st.metric("Total Attained", usa_attained)
-                                st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
-                                st.metric("Total Unique", total_unique_clients)
+                                st.metric("📊 Total Reviews", usa_total)
+                                st.metric("✅ Total Attained", usa_attained)
+                                st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
+                                st.metric("👥 Total Unique", total_unique_clients)
                                 unique_clients_count_per_pm = combined.groupby('Project Manager')[
                                     'Name'].nunique().reset_index()
                                 unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
@@ -2100,16 +2115,14 @@ def main() -> None:
                                 if uk_pie:
                                     st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                                 st.subheader("🇬🇧 UK Reviews")
-                                st.metric("Total Reviews", uk_total)
-                                st.metric("Total Attained", uk_attained)
-                                st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
+                                st.metric("📊 Total Reviews", uk_total)
+                                st.metric("✅ Total Attained", uk_attained)
+                                st.metric("🎯Attained Percentage", f"{uk_attained_pct:.1f}%")
                                 st.write("🤼 **Clients Per PM**")
                                 with st.expander("📊 View Clients Per PM Data"):
                                     st.dataframe(merged_df)
-                                    st.markdown(f"""
-                                    - ✅ **Total Unique:** `{total_unique_clients}`
-                                    """)
-
+                                with st.expander("❓ Pending & Sent Reviews"):
+                                    st.dataframe(pending_sent_details)
                                 with st.expander("👏 Reviews Per PM"):
                                     st.dataframe(attained_reviews_per_pm)
                                     st.dataframe(attained_df)
@@ -2325,7 +2338,7 @@ def main() -> None:
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -2333,7 +2346,6 @@ def main() -> None:
                                                                              printing_stats, copyright_stats, a_plus,
                                                                              selected_month, number)
 
-                        # Calculate metrics for display
                         usa_total = sum(usa_review_data.values())
                         usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
 
@@ -2361,10 +2373,10 @@ def main() -> None:
                                 st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
 
                             st.subheader("🇺🇸 USA Reviews")
-                            st.metric("Total Reviews", usa_total)
-                            st.metric("Total Attained", usa_attained)
-                            st.metric("Attained Percentage", f"{usa_attained_pct:.1f}%")
-                            st.metric("Total Unique", total_unique_clients)
+                            st.metric("📊 Total Reviews", usa_total)
+                            st.metric("✅ Total Attained", usa_attained)
+                            st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
+                            st.metric("👥 Total Unique", total_unique_clients)
                             unique_clients_count_per_pm = combined.groupby('Project Manager')[
                                 'Name'].nunique().reset_index()
                             unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
@@ -2396,20 +2408,17 @@ def main() -> None:
                             if uk_pie:
                                 st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                             st.subheader("🇬🇧 UK Reviews")
-                            st.metric("Total Reviews", uk_total)
-                            st.metric("Total Attained", uk_attained)
-                            st.metric("Attained Percentage", f"{uk_attained_pct:.1f}%")
+                            st.metric("📊 Total Reviews", uk_total)
+                            st.metric("✅ Total Attained", uk_attained)
+                            st.metric("🎯 Attained Percentage", f"{uk_attained_pct:.1f}%")
                             st.write("🤼 **Clients Per PM**")
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
-                                st.markdown(f"""
-                                                                - ✅ **Total Unique:** `{total_unique_clients}`
-                                                                """)
-
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_df)
-
+                            with st.expander("❓ Pending & Sent Reviews"):
+                                st.dataframe(pending_sent_details)
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_df["Brand"].value_counts()
                                 st.dataframe(attained_brands)
