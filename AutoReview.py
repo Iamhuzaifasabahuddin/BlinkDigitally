@@ -143,7 +143,7 @@ def load_pending_reviews(sheet_name: str, name: str) -> tuple:
 
     data = data_original[
         (data_original["Project Manager"] == name) &
-        ((data_original["Trustpilot Review"] == "Pending")) &
+        (data_original["Trustpilot Review"] == "Pending") &
         (data_original["Brand"].isin(
             ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
         (data_original["Status"] == "Published")
@@ -271,14 +271,14 @@ def send_dm(user_id: str, message: str):
 
 def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> None:
     """Send DataFrame as text to a user"""
-    user_id = get_user_id_by_email(email)
-    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    # user_id = get_user_id_by_email(email)
+    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, min_date, max_date, total_reviews = load_pending_reviews(sheet_name, name)
+    df, min_date, max_date= load_pending_reviews(sheet_name, name)
 
     if df.empty:
         print(f"⚠️ No data for {name}")
@@ -304,11 +304,10 @@ def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> Non
     if "Publishing Date" in df.columns and not df.empty:
         df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
 
-    display_columns = ["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]
-    merged_df = df[[col for col in display_columns if col in df.columns]]
+    merged_df = df[["Name", "Brand", "Book Name & Link", "Publishing Date", "Trustpilot Review"]]
 
     if not merged_df.empty:
-        markdown_table = merged_df.to_markdown(index=False)
+        markdown_table = merged_df.to_markdown(index=True)
 
         if len({min_month_name, max_month_name}) > 1:
             message = (
@@ -326,10 +325,10 @@ def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> Non
             )
 
         try:
-            # conversation = client.conversations_open(users=user_id)
-            # channel_id = conversation['channel']['id']
+            conversation = client.conversations_open(users=user_id)
+            channel_id = conversation['channel']['id']
             response = client.chat_postMessage(
-                channel=channel,
+                channel=channel_id,
                 text=message,
                 mrkdwn=True
             )
@@ -408,8 +407,8 @@ def logging_function() -> None:
 
 if __name__ == '__main__':
     for name, email in name_usa.items():
-        # send_df_as_text(name, sheet_usa, email, channel_usa)
-        send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
+        send_df_as_text(name, sheet_usa, email, channel_usa)
+        # send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
 
     # for name, email in names_uk.items():
     #     send_df_as_text(name, sheet_uk, email, channel_uk)
