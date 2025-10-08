@@ -271,8 +271,8 @@ def send_dm(user_id: str, message: str):
 
 def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> None:
     """Send DataFrame as text to a user"""
-    # user_id = get_user_id_by_email(email)
-    user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
+    user_id = get_user_id_by_email(email)
+    # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
 
     if not user_id:
         print(f"❌ Could not find user ID for {name}")
@@ -325,10 +325,10 @@ def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> Non
             )
 
         try:
-            conversation = client.conversations_open(users=user_id)
-            channel_id = conversation['channel']['id']
+            # conversation = client.conversations_open(users=user_id)
+            # channel_id = conversation['channel']['id']
             response = client.chat_postMessage(
-                channel=channel_id,
+                channel=channel,
                 text=message,
                 mrkdwn=True
             )

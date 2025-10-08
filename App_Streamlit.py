@@ -733,7 +733,7 @@ def summary(month: int, year: int):
     combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
     pending_sent_details = combined_pending_sent[
         (combined_pending_sent["Trustpilot Review"] == "Sent") | (combined_pending_sent["Trustpilot Review"] == "Pending")]
-    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
     usa_reviews_df = load_reviews(sheet_usa, year, month)
@@ -779,7 +779,7 @@ def summary(month: int, year: int):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -930,7 +930,7 @@ def generate_year_summary(year: int):
     combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
     pending_sent_details = combined_pending_sent[
         (combined_pending_sent["Trustpilot Review"] == "Sent") | (combined_pending_sent["Trustpilot Review"] == "Pending")]
-    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
     pm_list_usa = usa_clean["Project Manager"].dropna().unique()
@@ -978,7 +978,7 @@ def generate_year_summary(year: int):
 
     attained_details = review_details_df[
         review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_details.index = range(1, len(attained_details) + 1)
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
@@ -1499,7 +1499,7 @@ def main() -> None:
 
                     attained_details = review_details_df[
                         review_details_df["Trustpilot Review"] == "Attained"
-                        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
+                        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
 
                     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -1599,9 +1599,11 @@ def main() -> None:
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
                             with st.expander("❓ Pending & Sent Reviews"):
-                                pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+                                pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
                                 pending_sent_details.index = range(1, len(pending_sent_details)+1)
                                 st.dataframe(pending_sent_details)
+                                breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
+                                st.dataframe(breakdown_pending_sent)
 
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
@@ -1646,7 +1648,7 @@ def main() -> None:
                     ).dt.strftime("%d-%B-%Y")
 
                     attained_details_total = review_details_total[
-                        ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links"]]
+                        ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
 
                     attained_details_total.index = range(1, len(attained_details_total) + 1)
                     if data.empty:
@@ -1763,9 +1765,11 @@ def main() -> None:
                                 st.dataframe(merged_df)
                             with st.expander("❓ Pending & Sent Reviews"):
                                 pending_sent_details = pending_sent_details[
-                                    ["Name", "Brand", "Project Manager", "Trustpilot Review"]]
+                                    ["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
                                 pending_sent_details.index = range(1, len(pending_sent_details) + 1)
                                 st.dataframe(pending_sent_details)
+                                breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
+                                st.dataframe(breakdown_pending_sent)
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_pm)
                                 st.dataframe(attained_details_total)
@@ -2123,6 +2127,8 @@ def main() -> None:
                                     st.dataframe(merged_df)
                                 with st.expander("❓ Pending & Sent Reviews"):
                                     st.dataframe(pending_sent_details)
+                                    breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
+                                    st.dataframe(breakdown_pending_sent)
                                 with st.expander("👏 Reviews Per PM"):
                                     st.dataframe(attained_reviews_per_pm)
                                     st.dataframe(attained_df)
@@ -2419,6 +2425,8 @@ def main() -> None:
                                 st.dataframe(attained_df)
                             with st.expander("❓ Pending & Sent Reviews"):
                                 st.dataframe(pending_sent_details)
+                                breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
+                                st.dataframe(breakdown_pending_sent)
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_df["Brand"].value_counts()
                                 st.dataframe(attained_brands)
