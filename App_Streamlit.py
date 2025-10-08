@@ -680,8 +680,8 @@ def summary(month: int, year: int):
         return
     if usa_clean.empty and uk_clean.empty:
         return
-    usa_clean = usa_clean.drop_duplicates(subset=["Name"])
-    uk_clean = uk_clean.drop_duplicates(subset=["Name"])
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="last")
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="last")
     total_usa = usa_clean["Name"].nunique()
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
@@ -877,8 +877,8 @@ def generate_year_summary(year: int):
     if usa_clean.empty and uk_clean.empty:
         return
 
-    usa_clean = usa_clean.drop_duplicates(subset=["Name"])
-    uk_clean = uk_clean.drop_duplicates(subset=["Name"])
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="last")
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="last")
     total_usa = usa_clean["Name"].nunique()
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
@@ -1481,7 +1481,7 @@ def main() -> None:
                     data = load_data(sheet_name, selected_month_number, number)
                     data_rm_dupes = data.copy()
                     if "Name" in data_rm_dupes.columns:
-                        data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"])
+                        data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
                     review_data = load_reviews(sheet_name, number, selected_month_number)
 
                     attained_reviews_per_pm = (
@@ -1587,6 +1587,10 @@ def main() -> None:
                                         - ⚡ **Ingram Spark:** `{ingram}`
                                         - 🔉 **Findaway Voices:** `{fav}`
                                         """)
+                            data_rm_dupes.index = range(1, len(data_rm_dupes) + 1)
+
+                            with st.expander(f"🤵🏻 Clients List {choice} {selected_month} {number}"):
+                                st.dataframe(data_rm_dupes)
                         with col2:
                             st.markdown("---")
                             st.markdown("#### 🔍 Review & Publishing Status Breakdown")
@@ -1626,7 +1630,7 @@ def main() -> None:
                     data = load_data_year(sheet_name, number2)
                     data_rm_dupes = data.copy()
                     if "Name" in data_rm_dupes.columns:
-                        data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"])
+                        data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
 
                     pm_list = data["Project Manager"].dropna().unique()
                     reviews_per_pm = [load_reviews_year(choice, number2, pm) for pm in pm_list]

@@ -134,9 +134,6 @@ def load_pending_reviews(sheet_name: str, name: str) -> tuple:
     # Normalize the input name for consistent comparison
     name = normalize_name(name)
 
-    if "Name" in data.columns:
-        data = data.drop_duplicates(subset=["Name"])
-
     data_original = data.copy()
     if data.empty:
         return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
@@ -150,7 +147,8 @@ def load_pending_reviews(sheet_name: str, name: str) -> tuple:
         ]
 
     data = data.sort_values(by="Publishing Date", ascending=True)
-
+    if "Name" in data.columns:
+        data = data.drop_duplicates(subset=["Name"], keep="last")
     min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
     max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
 
@@ -168,11 +166,9 @@ def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=No
         end_col_index = columns.index("Issues")
         data = data.iloc[:, :end_col_index + 1]
 
-    # Normalize Project Manager names
     if "Project Manager" in data.columns:
         data["Project Manager"] = data["Project Manager"].apply(normalize_name)
 
-    # Normalize the input name
     name = normalize_name(name)
 
     date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
@@ -214,11 +210,10 @@ def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=No
 def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None):
     data = clean_data_reviews(sheet_name)
 
-    # Normalize the input name
     name = normalize_name(name)
 
     if "Name" in data.columns:
-        data = data.drop_duplicates(subset=["Name"])
+        data = data.drop_duplicates(subset=["Name"], keep="last")
 
     if data.empty:
         return pd.DataFrame(), 0, pd.NaT, pd.NaT, 0, 0
@@ -269,7 +264,7 @@ def send_dm(user_id: str, message: str):
         logging.error(e)
 
 
-def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> None:
+def send_pending_reviews_per_pm(name: str, sheet_name: str, email: str, channel: str) -> None:
     """Send DataFrame as text to a user"""
     user_id = get_user_id_by_email(email)
     # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
@@ -278,7 +273,7 @@ def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> Non
         print(f"❌ Could not find user ID for {name}")
         return
 
-    df, min_date, max_date= load_pending_reviews(sheet_name, name)
+    df, min_date, max_date = load_pending_reviews(sheet_name, name)
 
     if df.empty:
         print(f"⚠️ No data for {name}")
@@ -339,7 +334,8 @@ def send_df_as_text(name: str, sheet_name: str, email: str, channel: str) -> Non
             logging.error(e)
 
 
-def send_pm_attained_reviews(pm_name: str, email: str, sheet_name: str, year: int, channel: str, month=None) -> None:
+def send_attained_reviews_per_pm(pm_name: str, email: str, sheet_name: str, year: int, channel: str,
+                                 month=None) -> None:
     """Send attained Trustpilot reviews for a specific Project Manager"""
     user_id = get_user_id_by_email(email)
     # user_id = get_user_id_by_email("huzaifa.sabah@topsoftdigitals.pk")
@@ -407,12 +403,12 @@ def logging_function() -> None:
 
 if __name__ == '__main__':
     for name, email in name_usa.items():
-        send_df_as_text(name, sheet_usa, email, channel_usa)
-        # send_pm_attained_reviews(name, email, sheet_usa, 2025, channel_usa)
+        send_pending_reviews_per_pm(name, sheet_usa, email, channel_usa)
+        # send_attained_reviews_per_pm(name, email, sheet_usa, 2025, channel_usa)
 
     # for name, email in names_uk.items():
-    #     send_df_as_text(name, sheet_uk, email, channel_uk)
-    #     # send_pm_attained_reviews(name, email, sheet_uk, 2025, channel_uk)
+    #     send_pending_reviews_per_pm(name, sheet_uk, email, channel_uk)
+    #     # send_attained_reviews_per_pm(name, email, sheet_uk, 2025, channel_uk)
 
     # summary(5, 2025)
     # generate_year_summary(2025)
