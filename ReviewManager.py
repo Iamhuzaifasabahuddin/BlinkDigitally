@@ -153,6 +153,31 @@ def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     data.index = range(1, len(data) + 1)
     return data
 
+def load_sent_reviews(sheet_name: str, name: str):
+    data = clean_data_reviews(sheet_name)
+    name = normalize_name(name)
+    data_original = data.copy()
+
+    if data.empty:
+        return pd.DataFrame(), pd.NaT, pd.NaT
+
+    data = data_original[
+        (data_original["Project Manager"] == name) &
+        ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
+        (data_original["Brand"].isin(
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+        (data_original["Status"] == "Published")
+        ]
+
+    data = data.sort_values(by="Publishing Date", ascending=True)
+    if "Name" in data.columns:
+        data = data.drop_duplicates(subset=["Name"], keep="last")
+
+    min_date = data["Publishing Date"].min() if not data.empty else pd.NaT
+    max_date = data["Publishing Date"].max() if not data.empty else pd.NaT
+    data.index = range(1, len(data) + 1)
+
+    return data, min_date, max_date
 
 def load_pending_reviews(sheet_name: str, name: str) -> tuple:
     data = clean_data_reviews(sheet_name)
@@ -456,6 +481,7 @@ def main():
 
         if review_type == "Pending":
             df, min_date, max_date = load_pending_reviews(sheet_name, selected_pm)
+            df2, _, _ =load_sent_reviews(sheet_name, selected_pm)
             if not df.empty:
                 st.success(f"Found {len(df)} pending reviews for {selected_pm}")
                 if pd.notna(min_date) and pd.notna(max_date):
@@ -464,7 +490,17 @@ def main():
                 df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
                 df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
                          "Trustpilot Review Links"]]
-                st.dataframe(df, use_container_width=True)
+                with st.expander("❓ Pending Reviews"):
+                    st.dataframe(df, use_container_width=True)
+
+            else:
+                st.warning(f"No pending reviews found for {selected_pm}")
+
+            if not df2.empty:
+                df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                df2 = df2[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"]]
+                with st.expander("❓❓ Pending Reviews Total"):
+                    st.dataframe(df2, use_container_width=True)
             else:
                 st.warning(f"No pending reviews found for {selected_pm}")
         else:
@@ -477,14 +513,15 @@ def main():
                 total = total_reviews + len(df)
                 percent = len(df) / total if total > 0 else 0
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Attained Reviews", len(df))
-                col2.metric("Pending Reviews", total_reviews)
-                col3.metric("Total Reviews", f"{total}")
-                col4.metric("Retention Rate", f"{percent:.1%}")
+                col1.metric("✅ Attained Reviews", len(df))
+                col2.metric("❓ Pending Reviews", total_reviews)
+                col3.metric("🤵🏻 Total Reviews", f"{total}")
+                col4.metric("🎯 Retention Rate", f"{percent:.1%}")
                 df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
                 df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
                          "Trustpilot Review Links"]]
-                st.dataframe(df, use_container_width=True)
+                with st.expander(f"✅ Attained Reviews {month} {year}"):
+                    st.dataframe(df, use_container_width=True)
             else:
                 st.warning(f"No attained reviews found for {selected_pm}")
 
@@ -531,10 +568,10 @@ def main():
             total = total_reviews + len(df)
             percent = len(df) / total if total > 0 else 0
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Attained", len(df))
-            col2.metric("Pending", total_reviews)
-            col3.metric("Total", total)
-            col4.metric("Retention", f"{percent:.1%}")
+            col1.metric("✅ Attained", len(df))
+            col2.metric("❓ Pending", total_reviews)
+            col3.metric("🤵🏻 Total", total)
+            col4.metric("🎯 Retention", f"{percent:.1%}")
             df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
             df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
                      "Trustpilot Review Links"]]
