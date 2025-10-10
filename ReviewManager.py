@@ -562,7 +562,7 @@ def main():
                 st.session_state.fetched = True
                 pkt = pytz.timezone("Asia/Karachi")
                 now_pkt = datetime.now(pkt)
-                st.session_state.last_fetch_time = now_pkt.strftime("%I:%M %p")
+                st.session_state.last_fetch_time = now_pkt.strftime("%d-%B-%Y @ %I:%M %p ")
                 st.rerun()
 
             if st.session_state.fetched:
