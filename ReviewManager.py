@@ -417,6 +417,93 @@ def send_attained_reviews_per_pm(pm_name: str, email: str, sheet_name: str, year
         logging.error(e)
         return False
 
+def printing_data_month(month: int, year: int) -> pd.DataFrame:
+    """Get printing data filtered by month"""
+    try:
+        data = get_sheet_data("Printing")
+
+        columns = list(data.columns)
+        if "Accepted" in columns:
+            end_col_index = columns.index("Accepted")
+            data = data.iloc[:, :end_col_index + 1]
+
+        data = data.astype(str)
+        for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+        if month and "Order Date" in data.columns:
+            data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
+        if data.empty:
+            return pd.DataFrame()
+        if "Order Cost" in data.columns:
+            data["Order Cost"] = data["Order Cost"].astype(str)
+            data["Order Cost"] = pd.to_numeric(
+                data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+
+        data = data.sort_values(by="Order Date", ascending=True)
+
+        data["No of Copies"] = data["No of Copies"].astype(float)
+        for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+        data.index = range(1, len(data) + 1)
+
+        return data
+    except Exception as e:
+        st.error(f"Error loading printing data: {e}")
+        return pd.DataFrame()
+
+def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    data = get_sheet_data("Printing")
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[data["Order Date"].dt.year == year]
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        )
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
+
+    data['Month'] = data['Order Date'].dt.to_period('M')
+
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, month_totals
+
 
 def main():
     if "authenticated_normal" not in st.session_state:
@@ -427,7 +514,7 @@ def main():
     authenticated = st.session_state.authenticated_normal or st.session_state.authenticated_admin
 
     if not authenticated:
-        st.title("🔑 Trustpilot Review Manager")
+        st.title("🔑 Printing Data & Trustpilot Review Manager")
         password = st.text_input("Enter Password", type="password")
 
         if st.button("Login"):
@@ -445,7 +532,7 @@ def main():
                 st.error("Incorrect password.")
         st.stop()
 
-    st.title("⭐ Trustpilot Review Manager")
+    st.title("⭐ Printing Data & Trustpilot Review Manager")
     st.markdown("---")
 
     with st.sidebar:
@@ -461,7 +548,7 @@ def main():
                 time.sleep(2)
                 st.rerun()
         else:
-            action = st.radio("Select Action", ["View Reviews"])
+            action = st.radio("Select Action", ["View Reviews", "Printing Data"])
 
         st.markdown("---")
         st.info("💡 Use this app to manage and send Trustpilot reviews to project managers.")
@@ -518,7 +605,7 @@ def main():
                 st.warning(f"No total pending reviews found for {selected_pm}")
 
         with review_type_A:
-            year = st.number_input("Select Year", min_value=2020, max_value=current_year, value=current_year)
+            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
             month = st.selectbox("Select Month (Optional)", ["All"] + list(calendar.month_name)[1:])
             month_number = None if month == "All" else list(calendar.month_name).index(month)
 
@@ -544,6 +631,56 @@ def main():
                     st.dataframe(df, use_container_width=True)
             else:
                 st.warning(f"No attained reviews found for {selected_pm}")
+
+    elif action == "Printing Data":
+        month_list = list(calendar.month_name)[1:]
+        current_month = datetime.today().strftime("%B")
+
+        tab_m, tab_y = st.tabs(["Monthly", "Yearly"])
+
+        with tab_m:
+
+            month = st.selectbox(
+                "Select Month:",
+                month_list,
+                index=month_list.index(current_month)
+            )
+            month_number = month_list.index(month) + 1
+            year = st.number_input(
+                "Select Year:",
+                min_value=2025,
+                max_value=current_year,
+                value=current_year,
+                key="year1"
+            )
+            df = printing_data_month(month_number, year)
+
+            if not df.empty:
+                st.subheader(f"🖨️ Printing Data for {month} {year}")
+                df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
+                st.dataframe(df, use_container_width=True)
+
+            else:
+                st.warning(f"No printing data found for {month} {year}")
+        with tab_y:
+            year2 = st.number_input(
+                "Select Year:",
+                min_value=2025,
+                max_value=current_year,
+                value=current_year,
+                key="year2"
+            )
+            df2, _ = printing_data_year(year2)
+
+            if not df.empty:
+                st.subheader(f"🖨️ Printing Data for {year}")
+                df2 = df2[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "No of Copies", "Order Date",
+                         "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
+                         "Type", "Accepted"]]
+                st.dataframe(df2, use_container_width=True)
+
+            else:
+                st.warning(f"No printing data found for {year}")
 
     elif action == "Send Pending Reviews":
         if not st.session_state.authenticated_admin:

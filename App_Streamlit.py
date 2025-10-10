@@ -264,46 +264,6 @@ def load_reviews_year(sheet_name: str, year: int, name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_printing_data(month: int, year: int) -> pd.DataFrame:
-    """Get printing data filtered by month"""
-    try:
-        data = get_sheet_data(sheet_printing)
-
-        columns = list(data.columns)
-        if "Fulfilled" in columns:
-            end_col_index = columns.index("Fulfilled")
-            data = data.iloc[:, :end_col_index + 1]
-
-        data = data.astype(str)
-        for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-            if col in data.columns:
-                data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
-
-        if month and "Order Date" in data.columns:
-            data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
-        if data.empty:
-            return pd.DataFrame()
-        if "Order Cost" in data.columns:
-            data["Order Cost"] = data["Order Cost"].astype(str)
-            data["Order Cost"] = pd.to_numeric(
-                data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
-
-        data = data.sort_values(by="Order Date", ascending=True)
-
-        data["No of Copies"] = data["No of Copies"].astype(float)
-        for col in ["Order Date", "Shipping Date", "Fulfilled"]:
-            if col in data.columns:
-                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
-
-        data.index = range(1, len(data) + 1)
-        data = data.fillna("N/A")
-
-        return data
-    except Exception as e:
-        st.error(f"Error loading printing data: {e}")
-        return pd.DataFrame()
-
-
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     """Clean the data from Google Sheets"""
     data = get_sheet_data(sheet_name)
@@ -360,7 +320,6 @@ def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
             data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
 
     data.index = range(1, len(data) + 1)
-    data = data.fillna("N/A")
 
     return data
 
@@ -411,7 +370,6 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
             data[col] = data[col].dt.strftime("%d-%B-%Y")
 
     data.index = range(1, len(data) + 1)
-    data = data.fillna("N/A")
 
     return data, month_totals
 
@@ -1855,7 +1813,7 @@ def main() -> None:
                 if selected_month and number:
                     st.subheader(f"🖨️ Printing Summary for {selected_month}")
 
-                    data = get_printing_data(selected_month_number, number)
+                    data = get_printing_data_month(selected_month_number, number)
 
                     if not data.empty:
 
