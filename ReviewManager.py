@@ -6,6 +6,7 @@ from datetime import datetime
 
 import gspread
 import pandas as pd
+import pytz
 import streamlit as st
 from google.oauth2.service_account import Credentials
 from slack_sdk import WebClient
@@ -541,7 +542,7 @@ def main():
 
         if st.session_state.authenticated_admin:
             action = st.radio("Select Action",
-                              ["View Reviews", "Send Pending Reviews", "Send Attained Reviews", "Bulk Send"])
+                              ["View Reviews", "Send Pending Reviews", "Send Attained Reviews", "Bulk Send", "Printing Data"])
             if st.button("🔃 Fetch Latest"):
                 st.cache_data.clear()
                 st.info(f"Fetching latest reviews for {region}")
@@ -549,6 +550,25 @@ def main():
                 st.rerun()
         else:
             action = st.radio("Select Action", ["View Reviews", "Printing Data"])
+
+            if "fetched" not in st.session_state:
+                st.session_state.fetched = False
+            if "last_fetch_time" not in st.session_state:
+                st.session_state.last_fetch_time = None
+
+            if st.button("🔃 Fetch Latest"):
+                st.cache_data.clear()
+                st.info(f"Fetching latest reviews for {region} ...")
+                st.session_state.fetched = True
+                pkt = pytz.timezone("Asia/Karachi")
+                now_pkt = datetime.now(pkt)
+                st.session_state.last_fetch_time = now_pkt.strftime("%I:%M %p")
+                st.rerun()
+
+            if st.session_state.fetched:
+                st.success(f"✅ Latest reviews fetched for {region} at {st.session_state.last_fetch_time} PKST")
+                st.session_state.fetched = False
+
 
         st.markdown("---")
         st.info("💡 Use this app to manage and send Trustpilot reviews to project managers.")

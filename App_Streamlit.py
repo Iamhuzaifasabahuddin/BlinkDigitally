@@ -305,6 +305,7 @@ def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
 
     data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
 
+    data = data.sort_values(by="Order Date", ascending=True)
     if "Order Cost" in data.columns:
         data["Order Cost"] = data["Order Cost"].astype(str)
         data["Order Cost"] = pd.to_numeric(
@@ -343,6 +344,7 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     data = data[data["Order Date"].dt.year == year]
 
+    data = data.sort_values(by="Order Date", ascending=True)
     if data.empty:
         return pd.DataFrame(), pd.DataFrame()
 
@@ -354,6 +356,7 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
+
 
     data['Month'] = data['Order Date'].dt.to_period('M')
 
