@@ -294,8 +294,8 @@ def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
         return pd.DataFrame()
 
     columns = list(data.columns)
-    if "Fulfilled" in columns:
-        end_col_index = columns.index("Fulfilled")
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
         data = data.iloc[:, :end_col_index + 1]
         data = data.astype(str)
 
@@ -331,8 +331,8 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         return pd.DataFrame(), pd.DataFrame()
 
     columns = list(data.columns)
-    if "Fulfilled" in columns:
-        end_col_index = columns.index("Fulfilled")
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
         data = data.iloc[:, :end_col_index + 1]
 
     data = data.astype(str)
