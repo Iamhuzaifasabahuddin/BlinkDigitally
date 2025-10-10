@@ -455,6 +455,11 @@ def main():
         if st.session_state.authenticated_admin:
             action = st.radio("Select Action",
                               ["View Reviews", "Send Pending Reviews", "Send Attained Reviews", "Bulk Send"])
+            if st.button("🔃 Fetch Latest"):
+                st.cache_data.clear()
+                st.info(f"Fetching latest reviews for {region}")
+                time.sleep(2)
+                st.rerun()
         else:
             action = st.radio("Select Action", ["View Reviews"])
 
@@ -504,7 +509,7 @@ def main():
             else:
                 st.warning(f"No pending reviews found for {selected_pm}")
         else:
-            year = st.number_input("Select Year", min_value=2020, max_value=current_year, value=current_year)
+            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
             month = st.selectbox("Select Month (Optional)", ["All"] + list(calendar.month_name)[1:])
             month_number = None if month == "All" else list(calendar.month_name).index(month)
             df = load_attained_reviews(sheet_name, selected_pm, year, month_number)
@@ -558,7 +563,7 @@ def main():
         with col1:
             selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
         with col2:
-            year = st.number_input("Select Year", min_value=2020, max_value=current_year, value=current_year)
+            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
 
         email = pm_names[selected_pm]
         df = load_attained_reviews(sheet_name, selected_pm, year)
@@ -612,7 +617,7 @@ def main():
                 st.success(f"✅ Sent to {success_count}/{total_pms} project managers")
 
         else:
-            year = st.number_input("Select Year", min_value=2020, max_value=current_year, value=current_year)
+            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
             if st.button("📤 Send to All PMs", type="primary"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
