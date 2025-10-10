@@ -501,7 +501,7 @@ def main():
                 df = df[[
                     "Name", "Brand", "Publishing Date", "Status",
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
-                ]]
+                ]].rename(columns={"Status": "Publishing Status"})
                 with st.expander("❓ Pending Reviews"):
                     st.dataframe(df, use_container_width=True)
             else:
@@ -511,7 +511,7 @@ def main():
                 df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
                 df2 = df2[[
                     "Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"
-                ]]
+                ]].rename(columns={"Status": "Publishing Status"})
                 with st.expander("📦 Pending Reviews Total"):
                     st.dataframe(df2, use_container_width=True)
             else:
@@ -539,7 +539,7 @@ def main():
                 df = df[[
                     "Name", "Brand", "Publishing Date", "Status",
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
-                ]]
+                ]].rename(columns={"Status": "Publishing Status"})
                 with st.expander(f"✅ Attained Reviews {month} {year}"):
                     st.dataframe(df, use_container_width=True)
             else:
