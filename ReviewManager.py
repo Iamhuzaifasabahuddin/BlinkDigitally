@@ -479,52 +479,67 @@ def main():
     if action == "View Reviews":
         st.header(f"📊 View Reviews - {region}")
         col1, col2 = st.columns(2)
+
         with col1:
             selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
-        with col2:
-            review_type = st.radio("Review Type", ["Pending", "Attained"])
 
-        if review_type == "Pending":
+        with col2:
+            pass
+
+        review_type_P, review_type_A = st.tabs(["Pending", "Attained"])
+
+        with review_type_P:
             df, min_date, max_date = load_pending_reviews(sheet_name, selected_pm)
-            df2, _, _ =load_sent_reviews(sheet_name, selected_pm)
+            df2, _, _ = load_sent_reviews(sheet_name, selected_pm)
+
             if not df.empty:
                 st.success(f"Found {len(df)} pending reviews for {selected_pm}")
                 if pd.notna(min_date) and pd.notna(max_date):
                     st.info(f"Date Range: {min_date.strftime('%B %Y')} - {max_date.strftime('%B %Y')}")
 
                 df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-                df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
-                         "Trustpilot Review Links"]]
+                df = df[[
+                    "Name", "Brand", "Publishing Date", "Status",
+                    "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
+                ]]
                 with st.expander("❓ Pending Reviews"):
                     st.dataframe(df, use_container_width=True)
-
             else:
                 st.warning(f"No pending reviews found for {selected_pm}")
 
             if not df2.empty:
                 df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-                df2 = df2[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"]]
-                with st.expander("❓❓ Pending Reviews Total"):
+                df2 = df2[[
+                    "Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"
+                ]]
+                with st.expander("📦 Pending Reviews Total"):
                     st.dataframe(df2, use_container_width=True)
             else:
-                st.warning(f"No pending reviews found for {selected_pm}")
-        else:
-            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
+                st.warning(f"No total pending reviews found for {selected_pm}")
+
+        with review_type_A:
+            year = st.number_input("Select Year", min_value=2020, max_value=current_year, value=current_year)
             month = st.selectbox("Select Month (Optional)", ["All"] + list(calendar.month_name)[1:])
             month_number = None if month == "All" else list(calendar.month_name).index(month)
+
             df = load_attained_reviews(sheet_name, selected_pm, year, month_number)
             total_reviews = load_total_reviews(sheet_name, selected_pm, year, month_number)
+
             if not df.empty:
                 total = total_reviews + len(df)
                 percent = len(df) / total if total > 0 else 0
+
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("✅ Attained Reviews", len(df))
                 col2.metric("❓ Pending Reviews", total_reviews)
                 col3.metric("🤵🏻 Total Reviews", f"{total}")
                 col4.metric("🎯 Retention Rate", f"{percent:.1%}")
+
                 df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-                df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
-                         "Trustpilot Review Links"]]
+                df = df[[
+                    "Name", "Brand", "Publishing Date", "Status",
+                    "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
+                ]]
                 with st.expander(f"✅ Attained Reviews {month} {year}"):
                     st.dataframe(df, use_container_width=True)
             else:
