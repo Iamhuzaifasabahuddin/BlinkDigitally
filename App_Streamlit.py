@@ -562,7 +562,7 @@ def create_review_pie_chart(review_data: dict[str, int], title: str):
     custom_colors = {
         "Attained": "#7dff8d",
         "Pending": "#ffc444",
-        "-ve Attained": "#ff4b4b",
+        "Negative": "#ff4b4b",
         "Sent": "#77e5f7"
     }
 
@@ -679,7 +679,7 @@ def summary(month: int, year: int):
         usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
         usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
         usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
-        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
     else:
         usa_review_sent = usa_review_pending = usa_review_na = 0
 
@@ -687,7 +687,7 @@ def summary(month: int, year: int):
         uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
         uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
         uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
-        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
 
@@ -702,23 +702,23 @@ def summary(month: int, year: int):
     combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
 
     usa_attained_pm = (
-        usa_reviews_df
+        usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
     )
     uk_attained_pm = (
-        uk_reviews_df
+        uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
         .reset_index()
     )
 
     attained_reviews_per_pm = (
-        combined_data
+        combined_data[combined_data["Trustpilot Review"] == "Attained"]
         .groupby("Project Manager")["Trustpilot Review"]
         .count()
-        .reset_index()
+        .reset_index(name="Attained Reviews")
     )
 
     usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
@@ -739,22 +739,23 @@ def summary(month: int, year: int):
         review_details_df["Trustpilot Review Date"], errors="coerce"
     ).dt.strftime("%d-%B-%Y")
 
-    attained_details = review_details_df[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
-
+    attained_details = review_details_df[
+        review_details_df["Trustpilot Review"] == "Attained"
+        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
     attained_details.index = range(1, len(attained_details) + 1)
 
     usa_review = {
         "Attained": usa_total_attained,
         "Sent": usa_review_sent,
         "Pending": usa_review_pending,
-        "-ve Attained": usa_review_na
+        "Negative": usa_review_na
     }
 
     uk_review = {
         "Attained": uk_total_attained,
         "Sent": uk_review_sent,
         "Pending": uk_review_pending,
-        "-ve Attained": uk_review_na
+        "Negative": uk_review_na
     }
 
     printing_data = get_printing_data_month(month, year)
@@ -875,7 +876,7 @@ def generate_year_summary(year: int):
         usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
         usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
         usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
-        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
     else:
         usa_review_sent = usa_review_pending = usa_review_na = 0
 
@@ -883,7 +884,7 @@ def generate_year_summary(year: int):
         uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
         uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
         uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
-        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("-ve Attained", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
 
@@ -965,14 +966,14 @@ def generate_year_summary(year: int):
         "Attained": usa_total_attained,
         "Sent": usa_review_sent,
         "Pending": usa_review_pending,
-        "-ve Attained": usa_review_na
+        "Negative": usa_review_na
     }
 
     uk_review = {
         "Attained": uk_total_attained,
         "Sent": uk_review_sent,
         "Pending": uk_review_pending,
-        "-ve Attained": uk_review_na
+        "Negative": uk_review_na
     }
 
     printing_data, monthly_printing = printing_data_year(year)
@@ -1399,6 +1400,9 @@ def sales(month: int, year: int) -> pd.DataFrame:
 def main() -> None:
     with st.container():
         st.title("📊 Blink Digitally Publishing Dashboard")
+        if st.button("🔃 Fetch Latest"):
+            st.cache_data.clear()
+            st.success("Fetched new data")
         action = st.selectbox("What would you like to do?",
                               ["View Data", "Sales", "Printing", "Copyright", "Generate Similarity & Summary",
                                "Year Summary"],
@@ -1457,7 +1461,10 @@ def main() -> None:
                         review_details_df["Trustpilot Review Date"], errors="coerce"
                     ).dt.strftime("%d-%B-%Y")
 
-                    attained_details = review_details_df[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+                    attained_details = review_details_df[
+                        review_details_df["Trustpilot Review"] == "Attained"
+                        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                           "Status"]]
 
                     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -1574,7 +1581,7 @@ def main() -> None:
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_details)
-
+                                st.dataframe(attained_details["Status"].value_counts())
 
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_details["Brand"].value_counts()
@@ -1739,6 +1746,7 @@ def main() -> None:
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_pm)
                                 st.dataframe(attained_details_total)
+                                st.dataframe(attained_details_total["Status"].value_counts())
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_details_total["Brand"].value_counts()
                                 st.dataframe(
@@ -2097,6 +2105,7 @@ def main() -> None:
                                 with st.expander("👏 Reviews Per PM"):
                                     st.dataframe(attained_reviews_per_pm)
                                     st.dataframe(attained_df)
+                                    st.dataframe(attained_df["Status"].value_counts())
 
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_df["Brand"].value_counts()
@@ -2388,6 +2397,7 @@ def main() -> None:
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_df)
+                                st.dataframe(attained_df["Status"].value_counts())
                             with st.expander("❓ Pending & Sent Reviews"):
                                 st.dataframe(pending_sent_details)
                                 breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
