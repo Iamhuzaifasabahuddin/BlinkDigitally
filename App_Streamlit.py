@@ -957,6 +957,7 @@ def generate_year_summary(year: int):
     ].dt.strftime("%B %Y")
 
     attained_reviews_per_month = attained_reviews_per_month[["Month", "Total Attained Reviews"]]
+    attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews", ascending=False)
     attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
     attained_details["Trustpilot Review Date"] = pd.to_datetime(attained_details["Trustpilot Review Date"],
                                                                 errors="coerce").dt.strftime("%d-%B-%Y")
@@ -1561,7 +1562,6 @@ def main() -> None:
 
                             for status_type, count_s in publishing.items():
                                 st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
-                            st.write("🤼 **Clients Per PM**")
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
                             with st.expander("❓ Pending & Sent Reviews"):
@@ -1706,7 +1706,7 @@ def main() -> None:
                                 attained_reviews_per_month["Month"] = attained_reviews_per_month[
                                     "Trustpilot Review Date"
                                 ].dt.strftime("%B %Y")
-
+                                attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews", ascending=False)
                                 attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
                                 attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date",
                                                                                              axis=1)
@@ -1727,7 +1727,6 @@ def main() -> None:
                             for status_type, count_s in publishing.items():
                                 st.markdown(f"- 📘 **{status_type}**: `{count_s}`")
 
-                            st.write("🤼 **Clients Per PM**")
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
                             with st.expander("❓ Pending & Sent Reviews"):
@@ -2088,7 +2087,7 @@ def main() -> None:
                                 st.metric("📊 Total Reviews", uk_total)
                                 st.metric("✅ Total Attained", uk_attained)
                                 st.metric("🎯Attained Percentage", f"{uk_attained_pct:.1f}%")
-                                st.write("🤼 **Clients Per PM**")
+
                                 with st.expander("📊 View Clients Per PM Data"):
                                     st.dataframe(merged_df)
                                 with st.expander("❓ Pending & Sent Reviews"):
@@ -2383,7 +2382,7 @@ def main() -> None:
                             st.metric("📊 Total Reviews", uk_total)
                             st.metric("✅ Total Attained", uk_attained)
                             st.metric("🎯 Attained Percentage", f"{uk_attained_pct:.1f}%")
-                            st.write("🤼 **Clients Per PM**")
+
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
                             with st.expander("👏 Reviews Per PM"):
