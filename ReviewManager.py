@@ -418,9 +418,16 @@ def send_attained_reviews_per_pm(pm_name: str, email: str, sheet_name: str, year
         logging.error(e)
         return False
 
-def printing_data_month(month: int, year: int) -> pd.DataFrame:
+def printing_data_month(month: int, year: int, choice: str) -> pd.DataFrame:
     """Get printing data filtered by month"""
     try:
+        usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+        uk_brands = ["Authors Solution", "Book Publication"]
+
+        if choice == "USA":
+            selected_brands = usa_brands
+        else:
+            selected_brands = uk_brands
         data = get_sheet_data("Printing")
 
         columns = list(data.columns)
@@ -434,7 +441,7 @@ def printing_data_month(month: int, year: int) -> pd.DataFrame:
                 data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
         if month and "Order Date" in data.columns:
-            data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
+            data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year) & (data["Brand"].isin(selected_brands))]
         if data.empty:
             return pd.DataFrame()
         if "Order Cost" in data.columns:
@@ -456,9 +463,16 @@ def printing_data_month(month: int, year: int) -> pd.DataFrame:
         st.error(f"Error loading printing data: {e}")
         return pd.DataFrame()
 
-def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def printing_data_year(year: int, choice: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     data = get_sheet_data("Printing")
+    usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+    uk_brands = ["Authors Solution", "Book Publication"]
 
+    if choice == "USA":
+        selected_brands = usa_brands
+    else:
+        selected_brands = uk_brands
+    data = get_sheet_data("Printing")
     if data.empty:
         return pd.DataFrame(), pd.DataFrame()
 
@@ -473,7 +487,7 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         if col in data.columns:
             data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
-    data = data[data["Order Date"].dt.year == year]
+    data = data[(data["Order Date"].dt.year == year) & (data["Brand"].isin(selected_brands))]
 
     if data.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -505,6 +519,32 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     return data, month_totals
 
+def get_printing_upcoming(choice: str):
+    data = get_sheet_data("Printing")
+    usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+    uk_brands = ["Authors Solution", "Book Publication"]
+
+    if choice == "USA":
+        selected_brands = usa_brands
+    else:
+        selected_brands = uk_brands
+    data = get_sheet_data("Printing")
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+
+    data = data[(data["Type"] == "Upcoming") & (data["Brand"].isin(selected_brands))]
+    data.index = range(1, len(data) + 1)
+    return data
 
 def main():
     if "authenticated_normal" not in st.session_state:
@@ -656,7 +696,7 @@ def main():
         month_list = list(calendar.month_name)[1:]
         current_month = datetime.today().strftime("%B")
 
-        tab_m, tab_y = st.tabs(["Monthly", "Yearly"])
+        tab_m, tab_y, tab_u = st.tabs(["Monthly", "Yearly", "Upcoming"])
 
         with tab_m:
 
@@ -673,11 +713,11 @@ def main():
                 value=current_year,
                 key="year1"
             )
-            df = printing_data_month(month_number, year)
+            df = printing_data_month(month_number, year, region)
 
             if not df.empty:
                 st.subheader(f"🖨️ Printing Data for {month} {year}")
-                df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
+                df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "Format", "Ink Type", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
                 st.dataframe(df, use_container_width=True)
 
             else:
@@ -690,17 +730,29 @@ def main():
                 value=current_year,
                 key="year2"
             )
-            df2, _ = printing_data_year(year2)
+            df2, _ = printing_data_year(year2, region)
 
             if not df.empty:
                 st.subheader(f"🖨️ Printing Data for {year}")
-                df2 = df2[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "No of Copies", "Order Date",
+                df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
                          "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
                          "Type", "Accepted"]]
                 st.dataframe(df2, use_container_width=True)
 
             else:
                 st.warning(f"No printing data found for {year}")
+
+        with tab_u:
+            df3 = get_printing_upcoming(region)
+
+            if not df3.empty:
+                df3 = df3[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
+                           "No of Copies",
+                           "Delivery Method", "Status",
+                           "Type"]]
+                st.dataframe(df3, use_container_width=True)
+            else:
+                st.info("No upcoming printings ahead!")
 
     elif action == "Send Pending Reviews":
         if not st.session_state.authenticated_admin:
