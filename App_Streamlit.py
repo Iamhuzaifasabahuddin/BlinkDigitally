@@ -730,6 +730,7 @@ def summary(month: int, year: int):
     uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
 
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+    attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
     review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
@@ -942,6 +943,7 @@ def generate_year_summary(year: int):
         ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_details.index = range(1, len(attained_details) + 1)
+    attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
     attained_details["Trustpilot Review Date"] = pd.to_datetime(
@@ -1465,7 +1467,9 @@ def main() -> None:
                     attained_details.index = range(1, len(attained_details) + 1)
 
                     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+                    attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
                     attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
 
                     if data.empty:
                         st.info(f"No data available for {selected_month} {number} for {choice}")
@@ -1518,11 +1522,14 @@ def main() -> None:
                             'Name'].nunique().reset_index()
                         unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
                         unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+
                         total_unique_clients = data['Name'].nunique()
+
                         clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(
                             name="Clients")
                         merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
                         merged_df.index = range(1, len(merged_df) + 1)
+
                         col1, col2 = st.columns(2)
                         with col1:
                             st.markdown("---")
@@ -1604,18 +1611,19 @@ def main() -> None:
                         .reset_index()
                     )
                     attained_pm.columns = ["Project Manager", "Attained Reviews"]
+                    attained_pm = attained_pm.sort_values(by="Attained Reviews", ascending=False)
                     attained_pm.index = range(1, len(attained_pm) + 1)
                     total_attained = attained_pm["Attained Reviews"].sum()
-                    review_details_total = reviews_per_pm.sort_values(by="Project Manager", ascending=True)
 
+                    review_details_total = reviews_per_pm.sort_values(by="Project Manager", ascending=True)
                     review_details_total["Trustpilot Review Date"] = pd.to_datetime(
                         review_details_total["Trustpilot Review Date"], errors="coerce"
                     ).dt.strftime("%d-%B-%Y")
 
                     attained_details_total = review_details_total[
                         ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
-
                     attained_details_total.index = range(1, len(attained_details_total) + 1)
+
                     if data.empty:
                         st.warning(f"⚠️ No Data Available for {choice} in {number2}")
                     else:
