@@ -739,9 +739,7 @@ def summary(month: int, year: int):
         review_details_df["Trustpilot Review Date"], errors="coerce"
     ).dt.strftime("%d-%B-%Y")
 
-    attained_details = review_details_df[
-        review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+    attained_details = review_details_df[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
 
     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -938,9 +936,7 @@ def generate_year_summary(year: int):
         review_details_df["Trustpilot Review Date"], errors="coerce"
     ).dt.strftime("%d-%B-%Y")
 
-    attained_details = review_details_df[
-        review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+    attained_details = review_details_df[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
     attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
     attained_details.index = range(1, len(attained_details) + 1)
     attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
@@ -1460,9 +1456,7 @@ def main() -> None:
                         review_details_df["Trustpilot Review Date"], errors="coerce"
                     ).dt.strftime("%d-%B-%Y")
 
-                    attained_details = review_details_df[
-                        review_details_df["Trustpilot Review"] == "Attained"
-                        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+                    attained_details = review_details_df[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
 
                     attained_details.index = range(1, len(attained_details) + 1)
 
@@ -1776,7 +1770,6 @@ def main() -> None:
                                 st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
                                 st.dataframe(search_df)
 
-                                # Download search results
                                 buffer = io.BytesIO()
                                 search_df.to_excel(buffer, index=False)
                                 buffer.seek(0)
