@@ -1,0 +1,60 @@
+name: Release Notification
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Get commit info
+        id: commit_info
+        run: |
+          # Get the full commit message (subject + body)
+          COMMIT_MESSAGE=$(git log -1 --pretty=format:'%B')
+          
+          # Get commit SHA (short version)
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          
+          # Export to GitHub output (escape newlines)
+          {
+            echo "COMMIT_MESSAGE<<EOF"
+            echo "$COMMIT_MESSAGE"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          channel-id: ${{ secrets.CHANNEL_ID }}
+          slack-message: |
+            🚀 *New Release: ${{ steps.version.outputs.VERSION }}*
+            
+            *Repository:* ${{ github.repository }}
+            *Released by:* ${{ github.actor }}
+            *Commit:* `${{ steps.tag_info.outputs.COMMIT_SHA }}`
+            
+            *Release Notes:*
+            ```
+            ${{ steps.tag_info.outputs.TAG_MESSAGE }}
+            ```
+            
+            *Latest Commit:* ${{ steps.tag_info.outputs.COMMIT_MESSAGE }}
+            
+            <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.VERSION }}|📦 View Release> | <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|💻 View Commit>
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

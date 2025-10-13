@@ -585,9 +585,17 @@ def main():
                               ["View Reviews", "Send Pending Reviews", "Send Attained Reviews", "Bulk Send", "Printing Data"])
             if st.button("🔃 Fetch Latest"):
                 st.cache_data.clear()
-                st.info(f"Fetching latest reviews for {region}")
-                time.sleep(2)
+                st.info(f"Fetching latest reviews for {region} ...")
+                st.session_state.fetched = True
+                pkt = pytz.timezone("Asia/Karachi")
+                now_pkt = datetime.now(pkt)
+                st.session_state.last_fetch_time = now_pkt.strftime("%d-%B-%Y @ %I:%M %p")
                 st.rerun()
+
+            if st.session_state.fetched:
+                st.success(f"✅ Latest reviews fetched for {region} at {st.session_state.last_fetch_time} PKST")
+                st.session_state.fetched = False
+
         else:
             action = st.radio("Select Action", ["View Reviews", "Printing Data"])
 
@@ -602,7 +610,7 @@ def main():
                 st.session_state.fetched = True
                 pkt = pytz.timezone("Asia/Karachi")
                 now_pkt = datetime.now(pkt)
-                st.session_state.last_fetch_time = now_pkt.strftime("%d-%B-%Y @ %I:%M %p ")
+                st.session_state.last_fetch_time = now_pkt.strftime("%d-%B-%Y @ %I:%M %p")
                 st.rerun()
 
             if st.session_state.fetched:
