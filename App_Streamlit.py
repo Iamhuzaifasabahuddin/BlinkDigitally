@@ -219,7 +219,7 @@ def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def load_reviews_year(sheet_name: str, year: int, name: str) -> pd.DataFrame:
+def load_reviews_year(sheet_name: str, year: int, name: str, type_: str = "Attained") -> pd.DataFrame:
     data = get_sheet_data(sheet_name)
     if data.empty:
         return pd.DataFrame()
@@ -250,7 +250,7 @@ def load_reviews_year(sheet_name: str, year: int, name: str) -> pd.DataFrame:
         data_original = data.copy()
         data = data_original[
             (data_original["Project Manager"] == name) &
-            (data_original["Trustpilot Review"] == "Attained") &
+            (data_original["Trustpilot Review"] == type_) &
             (data_original["Brand"].isin(
                 ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
             ]
@@ -356,7 +356,6 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
-
 
     data['Month'] = data['Order Date'].dt.to_period('M')
 
@@ -611,6 +610,11 @@ def create_brand_chart(usa_brands: dict[str, int], uk_brands: dict[str, int]):
     return fig
 
 
+def safe_concat(dfs):
+    dfs = [df for df in dfs if not df.empty]
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+
 def summary(month: int, year: int):
     uk_clean = clean_data_reviews(sheet_uk)
     usa_clean = clean_data_reviews(sheet_usa)
@@ -690,72 +694,121 @@ def summary(month: int, year: int):
         uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
-
     combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
-    pending_sent_details = combined_pending_sent[
-        (combined_pending_sent["Trustpilot Review"] == "Sent") | (combined_pending_sent["Trustpilot Review"] == "Pending")]
+    pending_sent_details = combined_pending_sent[(combined_pending_sent["Trustpilot Review"] == "Sent") | (
+            combined_pending_sent["Trustpilot Review"] == "Pending")]
     pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
     usa_reviews_df = load_reviews(sheet_usa, year, month)
     uk_reviews_df = load_reviews(sheet_uk, year, month)
-    combined_data = pd.concat([usa_reviews_df, uk_reviews_df], ignore_index=True)
+    combined_data = safe_concat([usa_reviews_df, uk_reviews_df])
 
-    usa_attained_pm = (
-        usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
-        .groupby("Project Manager")["Trustpilot Review"]
-        .count()
-        .reset_index()
-    )
-    uk_attained_pm = (
-        uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
-        .groupby("Project Manager")["Trustpilot Review"]
-        .count()
-        .reset_index()
-    )
+    if not usa_reviews_df.empty:
+        usa_attained_pm = (
+            usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+        usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
 
-    attained_reviews_per_pm = (
-        combined_data[combined_data["Trustpilot Review"] == "Attained"]
-        .groupby("Project Manager")["Trustpilot Review"]
-        .count()
-        .reset_index(name="Attained Reviews")
-    )
+        usa_negative_pm = (
+            usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Negative"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        usa_negative_pm.index = range(1, len(usa_negative_pm) + 1)
+        usa_total_negative = usa_negative_pm["Negative Reviews"].sum()
+    else:
+        usa_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        usa_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        usa_total_attained = 0
+        usa_total_negative = 0
 
-    usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
-    usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    if not uk_reviews_df.empty:
+        uk_attained_pm = (
+            uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+        uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
 
-    uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
-    uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+        uk_negative_pm = (
+            uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Negative"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        uk_negative_pm.index = range(1, len(uk_negative_pm) + 1)
+        uk_total_negative = uk_negative_pm["Negative Reviews"].sum()
+    else:
+        uk_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        uk_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        uk_total_attained = 0
+        uk_total_negative = 0
 
-    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
-    attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
-    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+    if not combined_data.empty:
+        attained_reviews_per_pm = (
+            combined_data[combined_data["Trustpilot Review"] == "Attained"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index(name="Attained Reviews")
+        )
+        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
+        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
-    review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        negative_reviews_per_pm = (
+            combined_data[combined_data["Trustpilot Review"] == "Negative"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index(name="Negative Reviews")
+        )
+        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(by="Negative Reviews", ascending=False)
+        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
 
-    review_details_df["Trustpilot Review Date"] = pd.to_datetime(
-        review_details_df["Trustpilot Review Date"], errors="coerce"
-    ).dt.strftime("%d-%B-%Y")
+        review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            review_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
 
-    attained_details = review_details_df[
-        review_details_df["Trustpilot Review"] == "Attained"
-        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
-    attained_details.index = range(1, len(attained_details) + 1)
+        attained_details = review_details_df[
+            review_details_df["Trustpilot Review"] == "Attained"
+            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+        attained_details.index = range(1, len(attained_details) + 1)
+
+        negative_details = review_details_df[
+            review_details_df["Trustpilot Review"] == "Negative"
+            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+        negative_details.index = range(1, len(negative_details) + 1)
+
+    else:
+        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        attained_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        negative_details = attained_details.copy()
 
     usa_review = {
         "Attained": usa_total_attained,
         "Sent": usa_review_sent,
         "Pending": usa_review_pending,
-        "Negative": usa_review_na
+        "Negative": usa_review_na + usa_total_negative
     }
 
     uk_review = {
         "Attained": uk_total_attained,
         "Sent": uk_review_sent,
         "Pending": uk_review_pending,
-        "Negative": uk_review_na
+        "Negative": uk_review_na + uk_total_negative
     }
 
     printing_data = get_printing_data_month(month, year)
@@ -774,9 +827,9 @@ def summary(month: int, year: int):
     Total_copyrights = len(copyright_data)
     Total_cost_copyright = Total_copyrights * 65
     country = copyright_data["Country"].value_counts()
-    usa = country.get("USA", "N/A")
-    canada = country.get("Canada", "N/A")
-    uk = country.get("UK", "N/A")
+    usa = country.get("USA", 0)
+    canada = country.get("Canada", 0)
+    uk = country.get("UK", 0)
 
     a_plus, a_plus_count = get_A_plus_month(month, year)
 
@@ -808,7 +861,7 @@ def summary(month: int, year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, pending_sent_details
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, pending_sent_details, negative_reviews_per_pm, negative_details
 
 
 def generate_year_summary(year: int):
@@ -890,90 +943,195 @@ def generate_year_summary(year: int):
 
     combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
     pending_sent_details = combined_pending_sent[
-        (combined_pending_sent["Trustpilot Review"] == "Sent") | (combined_pending_sent["Trustpilot Review"] == "Pending")]
+        (combined_pending_sent["Trustpilot Review"] == "Sent") | (
+                    combined_pending_sent["Trustpilot Review"] == "Pending")]
     pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
     pm_list_usa = usa_clean["Project Manager"].dropna().unique()
     pm_list_uk = uk_clean["Project Manager"].dropna().unique()
 
-    usa_reviews_per_pm = [load_reviews_year(sheet_usa, year, pm) for pm in pm_list_usa]
-    usa_reviews_per_pm = pd.concat([df for df in usa_reviews_per_pm if not df.empty], ignore_index=True)
+    usa_reviews_per_pm = safe_concat([load_reviews_year(sheet_usa, year, pm, "Attained") for pm in pm_list_usa])
+    uk_reviews_per_pm = safe_concat([load_reviews_year(sheet_uk, year, pm, "Attained") for pm in pm_list_uk])
+    combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
 
-    uk_reviews_per_pm = [load_reviews_year(sheet_uk, year, pm) for pm in pm_list_uk]
-    uk_reviews_per_pm = pd.concat([df for df in uk_reviews_per_pm if not df.empty], ignore_index=True)
+    if not usa_reviews_per_pm.empty:
+        usa_attained_pm = (
+            usa_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+        usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    else:
+        usa_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        usa_total_attained = 0
 
-    combined_data = pd.concat([usa_reviews_per_pm, uk_reviews_per_pm], ignore_index=True)
+    if not uk_reviews_per_pm.empty:
+        uk_attained_pm = (
+            uk_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+        uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+    else:
+        uk_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        uk_total_attained = 0
 
-    usa_attained_pm = (
-        usa_reviews_per_pm
-        .groupby("Project Manager")["Trustpilot Review"]
-        .count()
-        .reset_index()
-    )
-    usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
-    usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    if not combined_data.empty:
+        attained_reviews_per_pm = (
+            combined_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
+        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
-    uk_attained_pm = (
-        uk_reviews_per_pm
-        .groupby("Project Manager")["Trustpilot Review"]
-        .count()
-        .reset_index()
-    )
-    uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
-    uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
-    uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+        review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            review_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
 
-    attained_reviews_per_pm = (
-        combined_data
-        .groupby("Project Manager")["Trustpilot Review"]
-        .count()
-        .reset_index()
-    )
+        attained_details = review_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        attained_details.index = range(1, len(attained_details) + 1)
 
-    review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
-    review_details_df["Trustpilot Review Date"] = pd.to_datetime(
-        review_details_df["Trustpilot Review Date"], errors="coerce"
-    ).dt.strftime("%d-%B-%Y")
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        )
 
-    attained_details = review_details_df[["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
-    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
-    attained_details.index = range(1, len(attained_details) + 1)
-    attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
-    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+        attained_reviews_per_month = (
+            attained_details.groupby(attained_details["Trustpilot Review Date"].dt.to_period("M"))
+            .size()
+            .reset_index(name="Total Attained Reviews")
+        )
 
-    attained_details["Trustpilot Review Date"] = pd.to_datetime(
-        attained_details["Trustpilot Review Date"], errors="coerce"
-    )
+        attained_reviews_per_month["Month"] = attained_reviews_per_month[
+            "Trustpilot Review Date"
+        ].dt.strftime("%B %Y")
 
-    attained_reviews_per_month = (
-        attained_details.groupby(attained_details["Trustpilot Review Date"].dt.to_period("M"))
-        .size()
-        .reset_index(name="Total Attained Reviews")
-    )
+        attained_reviews_per_month = attained_reviews_per_month[["Month", "Total Attained Reviews"]]
+        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews",
+                                                                            ascending=False)
+        attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
 
-    attained_reviews_per_month["Month"] = attained_reviews_per_month[
-        "Trustpilot Review Date"
-    ].dt.strftime("%B %Y")
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
 
-    attained_reviews_per_month = attained_reviews_per_month[["Month", "Total Attained Reviews"]]
-    attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews", ascending=False)
-    attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
-    attained_details["Trustpilot Review Date"] = pd.to_datetime(attained_details["Trustpilot Review Date"],
-                                                                errors="coerce").dt.strftime("%d-%B-%Y")
+    else:
+        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        attained_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        attained_reviews_per_month = pd.DataFrame(columns=["Month", "Total Attained Reviews"])
+
+    usa_negative_per_pm = [load_reviews_year(sheet_usa, year, pm, "Negative") for pm in pm_list_usa]
+    usa_negative_per_pm = safe_concat([df for df in usa_negative_per_pm if not df.empty])
+
+    uk_negative_per_pm = [load_reviews_year(sheet_uk, year, pm, "Negative") for pm in pm_list_uk]
+    uk_negative_per_pm = safe_concat([df for df in uk_negative_per_pm if not df.empty])
+
+    combined_negative_data = safe_concat([usa_negative_per_pm, uk_negative_per_pm])
+
+    if not usa_negative_per_pm.empty:
+        usa_negative_pm = (
+            usa_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        usa_negative_pm.index = range(1, len(usa_negative_pm) + 1)
+        usa_total_negative = usa_negative_pm["Negative Reviews"].sum()
+    else:
+        usa_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        usa_total_negative = 0
+
+    if not uk_negative_per_pm.empty:
+        uk_negative_pm = (
+            uk_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        uk_negative_pm.index = range(1, len(uk_negative_pm) + 1)
+        uk_total_negative = uk_negative_pm["Negative Reviews"].sum()
+    else:
+        uk_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        uk_total_negative = 0
+
+    if not combined_negative_data.empty:
+
+        negative_reviews_per_pm = (
+            combined_negative_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        negative_reviews_per_pm.columns = ["Project Manager", "Negative Reviews"]
+        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(by="Negative Reviews", ascending=False)
+        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
+
+        negative_details_df = combined_negative_data.sort_values(by="Project Manager", ascending=True)
+        negative_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        negative_details = negative_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        negative_details.index = range(1, len(negative_details) + 1)
+
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        )
+
+        negative_reviews_per_month = (
+            negative_details.groupby(negative_details["Trustpilot Review Date"].dt.to_period("M"))
+            .size()
+            .reset_index(name="Total Negative Reviews")
+        )
+
+        negative_reviews_per_month["Month"] = negative_reviews_per_month[
+            "Trustpilot Review Date"
+        ].dt.strftime("%B %Y")
+
+        negative_reviews_per_month = negative_reviews_per_month[["Month", "Total Negative Reviews"]]
+        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews",
+                                                                            ascending=False)
+        negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
+
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        negative_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
+
     usa_review = {
         "Attained": usa_total_attained,
         "Sent": usa_review_sent,
         "Pending": usa_review_pending,
-        "Negative": usa_review_na
+        "Negative": usa_total_negative
     }
 
     uk_review = {
         "Attained": uk_total_attained,
         "Sent": uk_review_sent,
         "Pending": uk_review_pending,
-        "Negative": uk_review_na
+        "Negative": uk_total_negative
     }
 
     printing_data, monthly_printing = printing_data_year(year)
@@ -1025,7 +1183,7 @@ def generate_year_summary(year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month
 
 
 def logging_function() -> None:
@@ -1106,16 +1264,13 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
 
     story.append(Spacer(1, 20))
 
-    # Calculate metrics
-    # USA reviews
     usa_total = usa_review_data.sum() if hasattr(usa_review_data, "sum") else sum(usa_review_data.values())
     if isinstance(usa_review_data, dict):
         usa_attained = usa_review_data.get("Attained", 0)
-    else:  # assume it's a Pandas object
+    else:
         usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
     usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
-    # UK reviews
     uk_total = uk_review_data.sum() if hasattr(uk_review_data, "sum") else sum(uk_review_data.values())
     if isinstance(uk_review_data, dict):
         uk_attained = uk_review_data.get("Attained", 0)
@@ -1448,30 +1603,57 @@ def main() -> None:
                         data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
                     review_data = load_reviews(sheet_name, number, selected_month_number)
 
-                    attained_reviews_per_pm = (
-                        review_data[review_data["Trustpilot Review"] == "Attained"]
-                        .groupby("Project Manager")["Trustpilot Review"]
-                        .count()
-                        .reset_index()
-                    )
+                    attained_reviews_per_pm = review_data[
+                        review_data["Trustpilot Review"] == "Attained"
+                        ].groupby("Project Manager")["Trustpilot Review"].count().reset_index()
 
                     review_details_df = review_data.sort_values(by="Project Manager", ascending=True)
-
                     review_details_df["Trustpilot Review Date"] = pd.to_datetime(
                         review_details_df["Trustpilot Review Date"], errors="coerce"
                     ).dt.strftime("%d-%B-%Y")
 
-                    attained_details = review_details_df[
-                        review_details_df["Trustpilot Review"] == "Attained"
-                        ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
-                           "Status"]]
+                    if not attained_reviews_per_pm.empty:
+                        attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+                        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(
+                            by="Attained Reviews", ascending=False
+                        )
+                        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
-                    attained_details.index = range(1, len(attained_details) + 1)
+                        attained_details = review_details_df[
+                            review_details_df["Trustpilot Review"] == "Attained"
+                            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                               "Status"]].copy()
+                        attained_details.index = range(1, len(attained_details) + 1)
+                    else:
+                        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+                        attained_details = pd.DataFrame(columns=[
+                            "Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                            "Status"
+                        ])
 
-                    attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
-                    attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
-                    attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
 
+                    negative_reviews_per_pm = review_data[
+                        review_data["Trustpilot Review"] == "Negative"
+                        ].groupby("Project Manager")["Trustpilot Review"].count().reset_index()
+
+                    if not negative_reviews_per_pm.empty:
+                        negative_reviews_per_pm.columns = ["Project Manager", "Negative Reviews"]
+                        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(
+                            by="Negative Reviews", ascending=False
+                        )
+                        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
+
+                        negative_details = review_details_df[
+                            review_details_df["Trustpilot Review"] == "Negative"
+                            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                               "Status"]].copy()
+                        negative_details.index = range(1, len(negative_details) + 1)
+                    else:
+                        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+                        negative_details = pd.DataFrame(columns=[
+                            "Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                            "Status"
+                        ])
 
                     if data.empty:
                         st.info(f"No data available for {selected_month} {number} for {choice}")
@@ -1509,15 +1691,18 @@ def main() -> None:
                              "Book Publication"])]
                         sent = filtered_data["Trustpilot Review"].value_counts().get("Sent", 0)
                         pending = filtered_data["Trustpilot Review"].value_counts().get("Pending", 0)
-                        pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (filtered_data["Trustpilot Review"] == "Pending")]
+                        pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (
+                                    filtered_data["Trustpilot Review"] == "Pending")]
                         review = {
                             "Sent": sent,
                             "Pending": pending,
-                            "Attained": attained_reviews_per_pm["Attained Reviews"].sum()
+                            "Attained": attained_reviews_per_pm["Attained Reviews"].sum(),
+                            "Negative": negative_reviews_per_pm["Negative Reviews"].sum()
                         }
                         publishing = data_rm_dupes["Status"].value_counts()
                         total_reviews = sum(review.values())
                         attained = attained_reviews_per_pm["Attained Reviews"].sum()
+                        negative = negative_reviews_per_pm["Negative Reviews"].sum()
                         percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
 
                         unique_clients_count_per_pm = data_rm_dupes.groupby('Project Manager')[
@@ -1540,6 +1725,7 @@ def main() -> None:
                                         - 🧾 **Total Entries:** `{len(data)}`
                                         - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
                                         - 🟢 **'Attained' Reviews:** `{attained}`
+                                        - 🔴 **'Negative' Reviews:** `{negative}`
                                         - 📊 **Attainment Rate:** `{percentage}%`
                                         - 👥 **Total Unique:** `{total_unique_clients}`
 
@@ -1572,21 +1758,27 @@ def main() -> None:
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
                             with st.expander("❓ Pending & Sent Reviews"):
-                                pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
-                                pending_sent_details.index = range(1, len(pending_sent_details)+1)
+                                pending_sent_details = pending_sent_details[
+                                    ["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
+                                pending_sent_details.index = range(1, len(pending_sent_details) + 1)
                                 st.dataframe(pending_sent_details)
                                 breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
                                 st.dataframe(breakdown_pending_sent)
 
-                            with st.expander("👏 Reviews Per PM"):
+                            with st.expander("👏 Attained Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_details)
                                 st.dataframe(attained_details["Status"].value_counts())
-
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_details["Brand"].value_counts()
                                 st.dataframe(
                                     attained_brands)
+                            with st.expander("❌ Negative Reviews Per PM"):
+                                st.dataframe(negative_reviews_per_pm)
+                                st.dataframe(negative_details)
+                                st.dataframe(negative_details["Status"].value_counts())
+
+
                     st.markdown("---")
 
             with tab2:
@@ -1602,28 +1794,128 @@ def main() -> None:
                         data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
 
                     pm_list = data["Project Manager"].dropna().unique()
-                    reviews_per_pm = [load_reviews_year(choice, number2, pm) for pm in pm_list]
+                    reviews_per_pm = [load_reviews_year(choice, number2, pm, "Attained") for pm in pm_list]
                     reviews_per_pm = pd.concat([df for df in reviews_per_pm if not df.empty], ignore_index=True)
 
-                    attained_pm = (
-                        reviews_per_pm
-                        .groupby("Project Manager")["Trustpilot Review"]
-                        .count()
-                        .reset_index()
-                    )
-                    attained_pm.columns = ["Project Manager", "Attained Reviews"]
-                    attained_pm = attained_pm.sort_values(by="Attained Reviews", ascending=False)
-                    attained_pm.index = range(1, len(attained_pm) + 1)
-                    total_attained = attained_pm["Attained Reviews"].sum()
+                    reviews_n_pm = [load_reviews_year(choice, number2, pm, "Negative") for pm in pm_list]
+                    reviews_n_pm = safe_concat([df for df in reviews_n_pm if not df.empty])
+
+                    if not reviews_n_pm.empty:
+                        negative_pm = (
+                            reviews_n_pm.groupby("Project Manager")["Trustpilot Review"]
+                            .count()
+                            .reset_index()
+                        )
+                    else:
+                        negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+
+                    if not reviews_per_pm.empty:
+                        attained_pm = (
+                            reviews_per_pm
+                            .groupby("Project Manager")["Trustpilot Review"]
+                            .count()
+                            .reset_index()
+                        )
+                    else:
+                        reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+
+                    if not attained_pm.empty:
+                        attained_pm.columns = ["Project Manager", "Attained Reviews"]
+                        attained_pm = attained_pm.sort_values(by="Attained Reviews", ascending=False)
+                        attained_pm.index = range(1, len(attained_pm) + 1)
+                        total_attained = attained_pm["Attained Reviews"].sum()
+                    else:
+                        attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+                        total_attained = 0
 
                     review_details_total = reviews_per_pm.sort_values(by="Project Manager", ascending=True)
                     review_details_total["Trustpilot Review Date"] = pd.to_datetime(
                         review_details_total["Trustpilot Review Date"], errors="coerce"
                     ).dt.strftime("%d-%B-%Y")
 
-                    attained_details_total = review_details_total[
-                        ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
-                    attained_details_total.index = range(1, len(attained_details_total) + 1)
+                    if not review_details_total.empty:
+                        attained_details_total = review_details_total[
+                            review_details_total["Trustpilot Review"] == "Attained"
+                            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                               "Status"]].copy()
+                        attained_details_total.index = range(1, len(attained_details_total) + 1)
+                    else:
+                        attained_details_total = pd.DataFrame(columns=[
+                            "Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                            "Status"
+                        ])
+
+                    if not negative_pm.empty:
+                        negative_pm.columns = ["Project Manager", "Negative Reviews"]
+                        negative_pm = negative_pm.sort_values(by="Negative Reviews", ascending=False)
+                        negative_pm.index = range(1, len(negative_pm) + 1)
+                        total_negative = negative_pm["Negative Reviews"].sum()
+                    else:
+                        negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+                        total_negative = 0
+
+                    review_details_negative = reviews_n_pm.sort_values(by="Project Manager", ascending=True)
+                    review_details_negative["Trustpilot Review Date"] = pd.to_datetime(
+                        review_details_negative["Trustpilot Review Date"], errors="coerce"
+                    ).dt.strftime("%d-%B-%Y")
+
+                    if not review_details_negative.empty:
+                        negative_details_total = review_details_negative[
+                            review_details_negative["Trustpilot Review"] == "Negative"
+                            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                               "Status"]].copy()
+                        negative_details_total.index = range(1, len(negative_details_total) + 1)
+                    else:
+                        negative_details_total = pd.DataFrame(columns=[
+                            "Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                            "Status"
+                        ])
+
+                    if not attained_details_total.empty:
+                        attained_months_copy = attained_details_total.copy()
+                        attained_months_copy["Trustpilot Review Date"] = pd.to_datetime(
+                            attained_months_copy["Trustpilot Review Date"], errors="coerce"
+                        )
+
+                        attained_reviews_per_month = (
+                            attained_months_copy.groupby(
+                                attained_months_copy["Trustpilot Review Date"].dt.to_period("M"))
+                            .size()
+                            .reset_index(name="Total Attained Reviews")
+                        )
+
+                        attained_reviews_per_month["Month"] = attained_reviews_per_month[
+                            "Trustpilot Review Date"].dt.strftime("%B %Y")
+                        attained_reviews_per_month = attained_reviews_per_month.sort_values(
+                            by="Total Attained Reviews", ascending=False
+                        )
+                        attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+                        attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date", axis=1)
+                    else:
+                        attained_reviews_per_month = pd.DataFrame(columns=["Month", "Total Attained Reviews"])
+
+                    if not negative_details_total.empty:
+                        negative_months_copy = negative_details_total.copy()
+                        negative_months_copy["Trustpilot Review Date"] = pd.to_datetime(
+                            negative_months_copy["Trustpilot Review Date"], errors="coerce"
+                        )
+
+                        negative_reviews_per_month = (
+                            negative_months_copy.groupby(
+                                negative_months_copy["Trustpilot Review Date"].dt.to_period("M"))
+                            .size()
+                            .reset_index(name="Total Negative Reviews")
+                        )
+
+                        negative_reviews_per_month["Month"] = negative_reviews_per_month[
+                            "Trustpilot Review Date"].dt.strftime("%B %Y")
+                        negative_reviews_per_month = negative_reviews_per_month.sort_values(
+                            by="Total Negative Reviews", ascending=False
+                        )
+                        negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
+                        negative_reviews_per_month = negative_reviews_per_month.drop("Trustpilot Review Date", axis=1)
+                    else:
+                        negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
 
                     if data.empty:
                         st.warning(f"⚠️ No Data Available for {choice} in {number2}")
@@ -1650,11 +1942,13 @@ def main() -> None:
                         filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                             ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
                              "Book Publication"])]
-                        pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (filtered_data["Trustpilot Review"] == "Pending")]
+                        pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (
+                                    filtered_data["Trustpilot Review"] == "Pending")]
                         review_counts = filtered_data["Trustpilot Review"].value_counts()
                         sent = review_counts.get("Sent", 0)
                         pending = review_counts.get("Pending", 0)
                         attained = total_attained
+                        negative = negative_pm["Negative Reviews"].sum()
                         total_reviews = sent + pending + attained
                         percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
 
@@ -1676,6 +1970,7 @@ def main() -> None:
                             - 👥 **Total Unique Clients:** `{total_unique_clients}`
                             - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
                             - 🟢 **'Attained' Reviews:** `{attained}`
+                            - 🔴 **'Negative' Reviews:** `{negative}`
                             - 📊 **Attainment Rate:** `{percentage}%`
 
                             **Brands**
@@ -1694,32 +1989,14 @@ def main() -> None:
                             """)
                             data_rm_dupes.index = range(1, len(data_rm_dupes) + 1)
 
+
                             with st.expander(f"🤵🏻 Clients List {choice} {number2}"):
                                 st.dataframe(data_rm_dupes)
 
-                            with st.expander("👏 Reviews Per Month"):
-                                attained_months_copy = attained_details_total.copy()
-                                attained_months_copy["Trustpilot Review Date"] = pd.to_datetime(
-                                    attained_months_copy["Trustpilot Review Date"], errors="coerce"
-                                )
-
-                                attained_reviews_per_month = (
-                                    attained_months_copy.groupby(
-                                        attained_months_copy["Trustpilot Review Date"].dt.to_period("M"))
-                                    .size()
-                                    .reset_index(name="Total Attained Reviews")
-                                )
-
-                                attained_reviews_per_month["Month"] = attained_reviews_per_month[
-                                    "Trustpilot Review Date"
-                                ].dt.strftime("%B %Y")
-                                attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews", ascending=False)
-                                attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
-                                attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date",
-                                                                                             axis=1)
-
+                            with st.expander("🟢 Attained Reviews Per Month"):
                                 st.dataframe(attained_reviews_per_month)
-
+                            with st.expander("🔴 Negative Reviews Per Month"):
+                                st.dataframe(negative_reviews_per_month)
                         with col2:
                             st.markdown("---")
                             st.markdown("#### 🔍 Review & Publishing Status")
@@ -1743,7 +2020,7 @@ def main() -> None:
                                 st.dataframe(pending_sent_details)
                                 breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
                                 st.dataframe(breakdown_pending_sent)
-                            with st.expander("👏 Reviews Per PM"):
+                            with st.expander("👏 Attained Reviews Per PM"):
                                 st.dataframe(attained_pm)
                                 st.dataframe(attained_details_total)
                                 st.dataframe(attained_details_total["Status"].value_counts())
@@ -1751,6 +2028,11 @@ def main() -> None:
                                 attained_brands = attained_details_total["Brand"].value_counts()
                                 st.dataframe(
                                     attained_brands)
+                            with st.expander("❌ Negative Reviews Per PM"):
+                                st.dataframe(negative_pm)
+                                st.dataframe(negative_details_total)
+                                st.dataframe(negative_details_total["Status"].value_counts())
+
                         st.markdown("---")
 
             with tab3:
@@ -2023,7 +2305,7 @@ def main() -> None:
                 else:
                     if st.button("Generate Summary"):
                         with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details = summary(
+                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details, negative_reviews_per_pm, negative_details = summary(
                                 selected_month_number, number)
                             pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                                  usa_brands, uk_brands,
@@ -2106,11 +2388,14 @@ def main() -> None:
                                     st.dataframe(attained_reviews_per_pm)
                                     st.dataframe(attained_df)
                                     st.dataframe(attained_df["Status"].value_counts())
-
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_df["Brand"].value_counts()
                                     st.dataframe(attained_brands)
 
+                                with st.expander("❌ Negative Reviews Per PM"):
+                                    st.dataframe(negative_reviews_per_pm)
+                                    st.dataframe(negative_details)
+                                    st.dataframe(negative_details["Status"].value_counts())
                             st.subheader("📱 Platform Distribution")
                             platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
                             st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
@@ -2318,7 +2603,7 @@ def main() -> None:
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -2381,8 +2666,11 @@ def main() -> None:
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 help="Click to download the Excel report"
                             )
-                            with st.expander("🎯 Total Reviews Per Month"):
+                            with st.expander("🟢 Attained Reviews Per Month"):
                                 st.dataframe(attained_reviews_per_month)
+
+                            with st.expander("🔴 Negative Reviews Per Month"):
+                                st.dataframe(negative_per_month)
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                             if uk_pie:
@@ -2394,17 +2682,22 @@ def main() -> None:
 
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
-                            with st.expander("👏 Reviews Per PM"):
-                                st.dataframe(attained_reviews_per_pm)
-                                st.dataframe(attained_df)
-                                st.dataframe(attained_df["Status"].value_counts())
                             with st.expander("❓ Pending & Sent Reviews"):
                                 st.dataframe(pending_sent_details)
                                 breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
                                 st.dataframe(breakdown_pending_sent)
+                            with st.expander("👏 Reviews Per PM"):
+                                st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_df)
+                                st.dataframe(attained_df["Status"].value_counts())
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_df["Brand"].value_counts()
                                 st.dataframe(attained_brands)
+                            with st.expander("❌ Negative Reviews Per PM"):
+                                st.dataframe(negative_reviews_per_pm)
+                                st.dataframe(negative_details)
+                                st.dataframe(negative_details["Status"].value_counts())
+
 
                         st.subheader("📱 Platform Distribution")
                         platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
