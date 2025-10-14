@@ -463,7 +463,7 @@ def printing_data_month(month: int, year: int, choice: str) -> pd.DataFrame:
         st.error(f"Error loading printing data: {e}")
         return pd.DataFrame()
 
-def printing_data_year(year: int, choice: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def printing_data_year(year: int, choice: str) -> pd.DataFrame:
     data = get_sheet_data("Printing")
     usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
     uk_brands = ["Authors Solution", "Book Publication"]
@@ -501,23 +501,13 @@ def printing_data_year(year: int, choice: str) -> tuple[pd.DataFrame, pd.DataFra
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
 
-    data['Month'] = data['Order Date'].dt.to_period('M')
-
-    month_totals = data.groupby('Month').agg(
-        Total_Copies=('No of Copies', 'sum'),
-        Total_Cost=('Order Cost', 'sum')
-    ).reset_index()
-
-    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
-    month_totals.index = range(1, len(month_totals) + 1)
-    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
     for col in ["Order Date", "Shipping Date", "Fulfilled"]:
         if col in data.columns:
             data[col] = data[col].dt.strftime("%d-%B-%Y")
 
     data.index = range(1, len(data) + 1)
 
-    return data, month_totals
+    return data
 
 def get_printing_upcoming(choice: str):
     data = get_sheet_data("Printing")
@@ -700,7 +690,7 @@ def main():
         month_list = list(calendar.month_name)[1:]
         current_month = datetime.today().strftime("%B")
 
-        tab_m, tab_y, tab_u = st.tabs(["Monthly", "Yearly", "Upcoming"])
+        tab_m, tab_y, tab_u, tab_s = st.tabs(["Monthly", "Yearly", "Upcoming", "Search"])
 
         with tab_m:
 
@@ -720,7 +710,7 @@ def main():
             df = printing_data_month(month_number, year, region)
 
             if not df.empty:
-                st.subheader(f"🖨️ Printing Data for {month} {year}")
+                st.subheader(f"🖨️ Printing Data for {month} {year} - {region}")
                 df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "Format", "Ink Type", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
                 st.dataframe(df, use_container_width=True)
 
@@ -734,10 +724,10 @@ def main():
                 value=current_year,
                 key="year2"
             )
-            df2, _ = printing_data_year(year2, region)
+            df2 = printing_data_year(year2, region)
 
             if not df.empty:
-                st.subheader(f"🖨️ Printing Data for {year}")
+                st.subheader(f"🖨️ Printing Data for {year} - {region}")
                 df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
                          "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
                          "Type", "Accepted"]]
@@ -757,6 +747,32 @@ def main():
                 st.dataframe(df3, use_container_width=True)
             else:
                 st.info("No upcoming printings ahead!")
+
+        with tab_s:
+            st.subheader(f"🔍 Search Data for {region}")
+
+            number3 = st.number_input("Enter Year for Search", min_value=2025, step=1,
+                                      value=current_year, key="year_search")
+
+            if number3 and sheet_name:
+                data = printing_data_year(number3, region)
+
+                if data.empty:
+                    st.warning(f"⚠️ No Data Available for {region} in {number3}")
+                else:
+                    search_term = st.text_input("Search by Name", placeholder="Enter client name to search",
+                                                key="search_term")
+
+                    if search_term:
+                        search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
+
+                        if search_df.empty:
+                            st.warning(f"⚠️ No results found for '{search_term}'")
+                        else:
+                            st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
+                            st.dataframe(search_df)
+                    else:
+                        st.info("👆 Enter a name above to search")
 
     elif action == "Send Pending Reviews":
         if not st.session_state.authenticated_admin:
