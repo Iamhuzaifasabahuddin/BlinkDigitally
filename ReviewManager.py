@@ -76,7 +76,8 @@ name_usa = {
     "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
     "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
     "Valencia Angelo": "valencia.angelo@topsoftdigitals.pk",
-    "Ukasha Asadullah": "ukasha.asadullah@topsoftdigitals.pk"
+    "Ukasha Asadullah": "ukasha.asadullah@topsoftdigitals.pk",
+    "Ahsan Javed": "ahsan.javed@topsoftdigitals.pk"
 }
 
 names_uk = {
@@ -474,7 +475,7 @@ def printing_data_year(year: int, choice: str) -> pd.DataFrame:
         selected_brands = uk_brands
     data = get_sheet_data("Printing")
     if data.empty:
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame()
 
     columns = list(data.columns)
     if "Accepted" in columns:
@@ -490,7 +491,7 @@ def printing_data_year(year: int, choice: str) -> pd.DataFrame:
     data = data[(data["Order Date"].dt.year == year) & (data["Brand"].isin(selected_brands))]
 
     if data.empty:
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame()
 
     if "Order Cost" in data.columns:
         data["Order Cost"] = pd.to_numeric(
