@@ -585,7 +585,7 @@ def get_names_in_year(sheet_name: str, year: int) :
     )
 
     monthly_counts['Active Months'] = (monthly_counts > 0).sum(axis=1)
-    multi_month_names = monthly_counts[monthly_counts['Active Months'] > 1]
+    multi_month_names = monthly_counts[monthly_counts['Active Months'] > 1].copy()
 
     multi_month_names['Total Published'] = multi_month_names.sum(axis=1)
     month_cols = multi_month_names.columns[:-2]
@@ -1668,7 +1668,7 @@ def main() -> None:
             )
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
         if action in ["Year Summary", "Copyright", "View Data", "Reviews", "Sales"]:
-            number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
+            number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
 
         if action == "View Data" and choice and selected_month and number:
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
@@ -1866,7 +1866,7 @@ def main() -> None:
 
             with tab2:
                 st.subheader(f"📂 Total Data for {choice}")
-                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), step=1, value=number,
+                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1,
                                           key="year_total")
 
                 if number2 and sheet_name:
@@ -2143,8 +2143,8 @@ def main() -> None:
             with tab3:
                 st.subheader(f"🔍 Search Data for {choice}")
 
-                number3 = st.number_input("Enter Year for Search", min_value=int(get_min_year()), step=1,
-                                          value=number, key="year_search")
+                number3 = st.number_input("Enter Year for Search", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1,
+                                           key="year_search")
 
                 if number3 and sheet_name:
                     data = load_data_year(sheet_name, number3)
@@ -2205,7 +2205,7 @@ def main() -> None:
                     index=current_month - 1,
                     placeholder="Select Month"
                 )
-                number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
+                number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
                 selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
 
                 if selected_month and number:
@@ -2271,7 +2271,7 @@ def main() -> None:
                     else:
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
             with tab2:
-                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), step=1)
+                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
                 data, _ = printing_data_year(number2)
                 if not data.empty:
                     st.markdown(f"### 📄 Total Printing Data for {number2}")
@@ -2352,14 +2352,14 @@ def main() -> None:
                     index=current_month - 2,
                     placeholder="Select Month 1"
                 )
-                number1 = st.number_input("Enter Year 1", min_value=int(get_min_year()), step=1)
+                number1 = st.number_input("Enter Year 1", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
                 selected_month_2 = st.selectbox(
                     "Select Month 2",
                     month_list,
                     index=current_month - 1,
                     placeholder="Select Month 2"
                 )
-                number2 = st.number_input("Enter Year 2", min_value=int(get_min_year()), step=1)
+                number2 = st.number_input("Enter Year 2", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
                 if sheet_name:
                     if st.button("Generate Similar Clients"):
                         with st.spinner(
@@ -2377,21 +2377,22 @@ def main() -> None:
             with tab2:
                 choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
                                       placeholder="Select Data to View", key="choice_2")
-                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), step=1, key="year_3")
+                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year,
+                                          step=1, key="year_3")
 
                 sheet_name = {
                     "UK": sheet_uk,
                     "USA": sheet_usa,
                 }.get(choice)
 
-                df_year,Total_year, year_count = get_names_in_year(sheet_name, number3)
-
-                if not df_year.empty and choice and number3:
-                    st.write(df_year)
-                    st.write(Total_year)
-                    st.write(year_count)
-                else:
-                    st.warning(f"No Similarities found for {number3}-{choice}")
+                if  sheet_name and number3:
+                    df_year,Total_year, year_count = get_names_in_year(sheet_name, number3)
+                    if not df_year.empty:
+                        st.write(df_year)
+                        st.write(Total_year)
+                        st.write(year_count)
+                    else:
+                        st.warning(f"No Similarities found for {number3}-{choice}")
 
         elif action == "Summary":
             st.header("📄 Generate Summary Report")
@@ -2401,7 +2402,7 @@ def main() -> None:
                 index=current_month - 1,
                 placeholder="Select Month"
             )
-            number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
+            number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
             uk_clean = clean_data_reviews(sheet_uk)
             usa_clean = clean_data_reviews(sheet_usa)
