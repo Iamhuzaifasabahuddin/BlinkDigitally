@@ -2386,7 +2386,7 @@ def main() -> None:
 
                 df_year,Total_year, year_count = get_names_in_year(sheet_name, number3)
 
-                if not df_year.empty:
+                if not df_year.empty and choice and number3:
                     st.write(df_year)
                     st.write(Total_year)
                     st.write(year_count)
