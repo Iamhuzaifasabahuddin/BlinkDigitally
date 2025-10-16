@@ -548,6 +548,60 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
     else:
         return set(), {}, 0
 
+def get_names_in_year(sheet_name: str, year: int) :
+    """
+    Finds names that appear in multiple months within the same year.
+
+    Returns:
+        - A DataFrame of names with counts per month
+        - A dictionary summary of names with their total appearances and months active
+        - Total count of such names
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Publishing Date' columns, or data is empty.")
+        return pd.DataFrame(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], format="%d-%B-%Y", errors='coerce')
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Year'] = df['Publishing Date'].dt.year
+
+    df = df[df['Year'] == year]
+
+    if df.empty:
+        logging.warning(f"No records found for year {year}.")
+        return pd.DataFrame(), {}, 0
+
+    monthly_counts = (
+        df.groupby(['Name', 'Month'])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(columns=[
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ], fill_value=0)
+    )
+
+    monthly_counts['Active Months'] = (monthly_counts > 0).sum(axis=1)
+    multi_month_names = monthly_counts[monthly_counts['Active Months'] > 1]
+
+    multi_month_names['Total Published'] = multi_month_names.sum(axis=1)
+    month_cols = multi_month_names.columns[:-2]
+    summary={}
+    for name in multi_month_names.index:
+        active_months = [month for month in month_cols if multi_month_names.at[name, month] > 0]
+
+        indexed_months = {i + 1: month for i, month in enumerate(active_months)}
+
+        summary[name] = {
+            "Months Active": indexed_months,
+            "Total Published": int(multi_month_names.at[name, "Total Published"]),
+            "Month Count": int(multi_month_names.at[name, "Active Months"]),
+        }
+
+    return multi_month_names, summary, len(multi_month_names)
 
 def create_review_pie_chart(review_data: dict[str, int], title: str):
     """Create pie chart for review distribution"""
@@ -1589,7 +1643,8 @@ def main() -> None:
             st.cache_data.clear()
             st.success("Fetched new data")
         action = st.selectbox("What would you like to do?",
-                              ["View Data", "Sales", "Printing", "Copyright", "Generate Similarity & Summary",
+                              ["View Data", "Sales", "Printing", "Copyright", "Generate Similarity",
+                               "Summary",
                                "Year Summary"],
                               index=None,
                               placeholder="Select Action")
@@ -2279,9 +2334,9 @@ def main() -> None:
                 st.markdown("---")
             else:
                 st.warning(f"⚠️ No Data Available for Copyright in {selected_month} {number}")
-        elif action == "Generate Similarity & Summary":
+        elif action == "Generate Similarity":
 
-            tab1, tab2 = st.tabs(["Queries", "Summary"])
+            tab1, tab2 = st.tabs(["Queries", "Yearly Queries"])
 
             with tab1:
                 st.header("Compare clients with months")
@@ -2320,310 +2375,328 @@ def main() -> None:
                             st.write(data3)
 
             with tab2:
-                st.header("📄 Generate Summary Report")
-                selected_month = st.selectbox(
-                    "Select Month",
-                    month_list,
-                    index=current_month - 1,
-                    placeholder="Select Month"
-                )
-                number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
-                selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
-                uk_clean = clean_data_reviews(sheet_uk)
-                usa_clean = clean_data_reviews(sheet_usa)
+                choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
+                                      placeholder="Select Data to View", key="choice_2")
+                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), step=1, key="year_3")
 
-                usa_clean = usa_clean[
-                    (usa_clean["Publishing Date"].dt.month == selected_month_number) &
-                    (usa_clean["Publishing Date"].dt.year == number)
-                    ]
-                uk_clean = uk_clean[
-                    (uk_clean["Publishing Date"].dt.month == selected_month_number) &
-                    (uk_clean["Publishing Date"].dt.year == number)
-                    ]
-                no_data = False
+                sheet_name = {
+                    "UK": sheet_uk,
+                    "USA": sheet_usa,
+                }.get(choice)
 
-                if usa_clean.empty:
-                    no_data = True
+                df_year,Total_year, year_count = get_names_in_year(sheet_name, number3)
 
-                if uk_clean.empty:
-                    no_data = True
-                if usa_clean.empty and uk_clean.empty:
-                    no_data = True
-
-                if no_data:
-                    st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
+                if not df_year.empty:
+                    st.write(df_year)
+                    st.write(Total_year)
+                    st.write(year_count)
                 else:
-                    if st.button("Generate Summary"):
-                        with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                            usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details, negative_reviews_per_pm, negative_details = summary(
-                                selected_month_number, number)
-                            pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
-                                                                                 usa_brands, uk_brands,
-                                                                                 usa_platforms, uk_platforms,
-                                                                                 printing_stats, copyright_stats,
-                                                                                 a_plus,
-                                                                                 selected_month, number)
+                    st.warning(f"No Similarities found for {number3}-{choice}")
 
-                            usa_total = sum(usa_review_data.values())
-                            usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
+        elif action == "Summary":
+            st.header("📄 Generate Summary Report")
+            selected_month = st.selectbox(
+                "Select Month",
+                month_list,
+                index=current_month - 1,
+                placeholder="Select Month"
+            )
+            number = st.number_input("Enter Year", min_value=int(get_min_year()), step=1)
+            selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
+            uk_clean = clean_data_reviews(sheet_uk)
+            usa_clean = clean_data_reviews(sheet_usa)
 
-                            usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
+            usa_clean = usa_clean[
+                (usa_clean["Publishing Date"].dt.month == selected_month_number) &
+                (usa_clean["Publishing Date"].dt.year == number)
+                ]
+            uk_clean = uk_clean[
+                (uk_clean["Publishing Date"].dt.month == selected_month_number) &
+                (uk_clean["Publishing Date"].dt.year == number)
+                ]
+            no_data = False
 
-                            uk_total = sum(uk_review_data.values())
-                            uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
+            if usa_clean.empty:
+                no_data = True
 
-                            uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
+            if uk_clean.empty:
+                no_data = True
+            if usa_clean.empty and uk_clean.empty:
+                no_data = True
 
-                            combined_total = usa_total + uk_total
-                            combined_attained = usa_attained + uk_attained
-                            combined_attained_pct = (
-                                    combined_attained / combined_total * 100) if combined_total > 0 else 0
+            if no_data:
+                st.error(f"Cannot generate summary — no data available for the month {selected_month} {number}.")
+            else:
+                if st.button("Generate Summary"):
+                    with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details, negative_reviews_per_pm, negative_details = summary(
+                            selected_month_number, number)
+                        pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
+                                                                             usa_brands, uk_brands,
+                                                                             usa_platforms, uk_platforms,
+                                                                             printing_stats, copyright_stats,
+                                                                             a_plus,
+                                                                             selected_month, number)
 
-                            st.header(f"{selected_month} {number} Summary Report")
+                        usa_total = sum(usa_review_data.values())
+                        usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
 
-                            st.divider()
+                        usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
 
-                            st.markdown('<h2 class="section-header">📝 Review Analytics</h2>', unsafe_allow_html=True)
+                        uk_total = sum(uk_review_data.values())
+                        uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
 
-                            col1, col2 = st.columns(2)
+                        uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
 
-                            with col1:
-                                usa_pie = create_review_pie_chart(usa_review_data, "USA Trustpilot Reviews")
-                                if usa_pie:
-                                    st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
+                        combined_total = usa_total + uk_total
+                        combined_attained = usa_attained + uk_attained
+                        combined_attained_pct = (
+                                combined_attained / combined_total * 100) if combined_total > 0 else 0
 
-                                st.subheader("🇺🇸 USA Reviews")
-                                st.metric("📊 Total Reviews", usa_total)
-                                st.metric("✅ Total Attained", usa_attained)
-                                st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
-                                st.metric("👥 Total Unique", total_unique_clients)
-                                unique_clients_count_per_pm = combined.groupby('Project Manager')[
-                                    'Name'].nunique().reset_index()
-                                unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
-                                unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
-                                clients_list = combined.groupby('Project Manager')["Name"].apply(list).reset_index(
-                                    name="Clients")
-                                merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
-                                                                              how='left')
-                                merged_df.index = range(1, len(merged_df) + 1)
-                                with st.expander("🤵🏻 Total Clients"):
-                                    st.dataframe(combined)
-                                buffer = io.BytesIO()
-                                combined.to_excel(buffer, index=False)
-                                buffer.seek(0)
+                        st.header(f"{selected_month} {number} Summary Report")
 
-                                st.download_button(
-                                    label="📥 Download Excel",
-                                    data=buffer,
-                                    file_name=f"USA+UK_{selected_month}_{number}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    help="Click to download the Excel report"
-                                )
-                            with col2:
-                                uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
-                                if uk_pie:
-                                    st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
-                                st.subheader("🇬🇧 UK Reviews")
-                                st.metric("📊 Total Reviews", uk_total)
-                                st.metric("✅ Total Attained", uk_attained)
-                                st.metric("🎯Attained Percentage", f"{uk_attained_pct:.1f}%")
+                        st.divider()
 
-                                with st.expander("📊 View Clients Per PM Data"):
-                                    st.dataframe(merged_df)
-                                with st.expander("❓ Pending & Sent Reviews"):
-                                    st.dataframe(pending_sent_details)
-                                    breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
-                                    st.dataframe(breakdown_pending_sent)
-                                with st.expander("👏 Reviews Per PM"):
-                                    st.dataframe(attained_reviews_per_pm)
-                                    st.dataframe(attained_df)
-                                    st.dataframe(attained_df["Status"].value_counts())
-                                with st.expander("🏷️ Reviews Per Brand"):
-                                    attained_brands = attained_df["Brand"].value_counts()
-                                    st.dataframe(attained_brands)
+                        st.markdown('<h2 class="section-header">📝 Review Analytics</h2>', unsafe_allow_html=True)
 
-                                with st.expander("❌ Negative Reviews Per PM"):
-                                    st.dataframe(negative_reviews_per_pm)
-                                    st.dataframe(negative_details)
-                                    st.dataframe(negative_details["Status"].value_counts())
-                            st.subheader("📱 Platform Distribution")
-                            platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
-                            st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
+                        col1, col2 = st.columns(2)
 
-                            st.subheader("🏷️ Brand Performance")
-                            brand_chart = create_brand_chart(usa_brands, uk_brands)
-                            st.plotly_chart(brand_chart, use_container_width=True, key="brand_chart")
+                        with col1:
+                            usa_pie = create_review_pie_chart(usa_review_data, "USA Trustpilot Reviews")
+                            if usa_pie:
+                                st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
 
-                            col1, col2 = st.columns(2)
+                            st.subheader("🇺🇸 USA Reviews")
+                            st.metric("📊 Total Reviews", usa_total)
+                            st.metric("✅ Total Attained", usa_attained)
+                            st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
+                            st.metric("👥 Total Unique", total_unique_clients)
+                            unique_clients_count_per_pm = combined.groupby('Project Manager')[
+                                'Name'].nunique().reset_index()
+                            unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
+                            unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                            clients_list = combined.groupby('Project Manager')["Name"].apply(list).reset_index(
+                                name="Clients")
+                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
+                                                                          how='left')
+                            merged_df.index = range(1, len(merged_df) + 1)
+                            with st.expander("🤵🏻 Total Clients"):
+                                st.dataframe(combined)
+                            buffer = io.BytesIO()
+                            combined.to_excel(buffer, index=False)
+                            buffer.seek(0)
 
-                            with col1:
-                                st.subheader("USA Brand Breakdown")
-                                usa_df = pd.DataFrame(list(usa_brands.items()), columns=['Brand', 'Count'])
-                                st.dataframe(usa_df, hide_index=True)
-                                total_count_usa = usa_df["Count"].sum()
-                                st.markdown(f"""
-                                - 📊 **Total Count Across Brands:** `{total_count_usa}`
-                                """)
+                            st.download_button(
+                                label="📥 Download Excel",
+                                data=buffer,
+                                file_name=f"USA+UK_{selected_month}_{number}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                help="Click to download the Excel report"
+                            )
+                        with col2:
+                            uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
+                            if uk_pie:
+                                st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
+                            st.subheader("🇬🇧 UK Reviews")
+                            st.metric("📊 Total Reviews", uk_total)
+                            st.metric("✅ Total Attained", uk_attained)
+                            st.metric("🎯Attained Percentage", f"{uk_attained_pct:.1f}%")
 
-                                st.subheader("USA Platform Breakdown")
-                                usa_platform_df = pd.DataFrame(list(usa_platforms.items()),
-                                                               columns=['Platform', 'Count'])
-                                st.dataframe(usa_platform_df, hide_index=True)
-                                total_count_usa_platforms = usa_platform_df["Count"].sum()
-                                st.markdown(f"""
-                                - 📊 **Total Count Across Platforms:** `{total_count_usa_platforms}`
-                                """)
-                            with col2:
-                                st.subheader("UK Brand Breakdown")
-                                uk_df = pd.DataFrame(list(uk_brands.items()), columns=['Brand', 'Count'])
-                                st.dataframe(uk_df, hide_index=True)
-                                total_count_uk = uk_df["Count"].sum()
-                                st.markdown(f"""
-                                - 📊 **Total Count Across Brands:** `{total_count_uk}`
-                                """)
-                                st.subheader("UK Platform Breakdown")
-                                uk_platform_df = pd.DataFrame(list(uk_platforms.items()), columns=['Platform', 'Count'])
-                                st.dataframe(uk_platform_df, hide_index=True)
-                                total_count_uk_platforms = uk_platform_df["Count"].sum()
-                                st.markdown(f"""
-                                - 📊 **Total Count Across Platforms:** `{total_count_uk_platforms}`
-                                """)
-                            st.divider()
+                            with st.expander("📊 View Clients Per PM Data"):
+                                st.dataframe(merged_df)
+                            with st.expander("❓ Pending & Sent Reviews"):
+                                st.dataframe(pending_sent_details)
+                                breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
+                                st.dataframe(breakdown_pending_sent)
+                            with st.expander("👏 Reviews Per PM"):
+                                st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_df)
+                                st.dataframe(attained_df["Status"].value_counts())
+                            with st.expander("🏷️ Reviews Per Brand"):
+                                attained_brands = attained_df["Brand"].value_counts()
+                                st.dataframe(attained_brands)
 
-                            st.markdown('<h2 class="section-header">🖨️ Printing Analytics</h2>', unsafe_allow_html=True)
+                            with st.expander("❌ Negative Reviews Per PM"):
+                                st.dataframe(negative_reviews_per_pm)
+                                st.dataframe(negative_details)
+                                st.dataframe(negative_details["Status"].value_counts())
+                        st.subheader("📱 Platform Distribution")
+                        platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
+                        st.plotly_chart(platform_chart, use_container_width=True, key="platform_chart")
 
-                            col1, col2, col3 = st.columns(3)
+                        st.subheader("🏷️ Brand Performance")
+                        brand_chart = create_brand_chart(usa_brands, uk_brands)
+                        st.plotly_chart(brand_chart, use_container_width=True, key="brand_chart")
 
-                            with col1:
-                                st.subheader("📊 Volume Metrics")
-                                st.metric("Total Copies", f"{printing_stats['Total_copies']:,}")
-                                st.metric("Highest Copies", printing_stats['Highest_copies'])
-                                st.metric("Lowest Copies", printing_stats['Lowest_copies'])
+                        col1, col2 = st.columns(2)
 
-                            with col2:
-                                st.subheader("💰 Cost Metrics")
-                                st.metric("Total Cost", f"${printing_stats['Total_cost']:,.2f}")
-                                st.metric("Highest Cost", f"${printing_stats['Highest_cost']:.2f}")
-                                st.metric("Lowest Cost", f"${printing_stats['Lowest_cost']:.2f}")
+                        with col1:
+                            st.subheader("USA Brand Breakdown")
+                            usa_df = pd.DataFrame(list(usa_brands.items()), columns=['Brand', 'Count'])
+                            st.dataframe(usa_df, hide_index=True)
+                            total_count_usa = usa_df["Count"].sum()
+                            st.markdown(f"""
+                                            - 📊 **Total Count Across Brands:** `{total_count_usa}`
+                                            """)
 
-                            with col3:
-                                st.subheader("📈 Efficiency")
-                                st.metric("Average Cost per Copy", f"${printing_stats['Average']:.2f}")
+                            st.subheader("USA Platform Breakdown")
+                            usa_platform_df = pd.DataFrame(list(usa_platforms.items()),
+                                                           columns=['Platform', 'Count'])
+                            st.dataframe(usa_platform_df, hide_index=True)
+                            total_count_usa_platforms = usa_platform_df["Count"].sum()
+                            st.markdown(f"""
+                                            - 📊 **Total Count Across Platforms:** `{total_count_usa_platforms}`
+                                            """)
+                        with col2:
+                            st.subheader("UK Brand Breakdown")
+                            uk_df = pd.DataFrame(list(uk_brands.items()), columns=['Brand', 'Count'])
+                            st.dataframe(uk_df, hide_index=True)
+                            total_count_uk = uk_df["Count"].sum()
+                            st.markdown(f"""
+                                            - 📊 **Total Count Across Brands:** `{total_count_uk}`
+                                            """)
+                            st.subheader("UK Platform Breakdown")
+                            uk_platform_df = pd.DataFrame(list(uk_platforms.items()), columns=['Platform', 'Count'])
+                            st.dataframe(uk_platform_df, hide_index=True)
+                            total_count_uk_platforms = uk_platform_df["Count"].sum()
+                            st.markdown(f"""
+                                            - 📊 **Total Count Across Platforms:** `{total_count_uk_platforms}`
+                                            """)
+                        st.divider()
 
-                                fig_gauge = go.Figure(go.Indicator(
-                                    mode="gauge+number",
-                                    value=printing_stats['Average'],
-                                    domain={'x': [0, 1], 'y': [0, 1]},
-                                    title={'text': "Avg Cost/Copy"},
-                                    gauge={
-                                        'axis': {'range': [None, 15]},
-                                        'bar': {'color': "darkblue"},
-                                        'steps': [
-                                            {'range': [0, 5], 'color': "lightgray"},
-                                            {'range': [5, 10], 'color': "gray"}],
-                                        'threshold': {
-                                            'line': {'color': "red", 'width': 4},
-                                            'thickness': 0.75,
-                                            'value': 10}}))
+                        st.markdown('<h2 class="section-header">🖨️ Printing Analytics</h2>', unsafe_allow_html=True)
 
-                                fig_gauge.update_layout(height=200)
-                                st.plotly_chart(fig_gauge, use_container_width=True)
+                        col1, col2, col3 = st.columns(3)
 
-                            st.divider()
+                        with col1:
+                            st.subheader("📊 Volume Metrics")
+                            st.metric("Total Copies", f"{printing_stats['Total_copies']:,}")
+                            st.metric("Highest Copies", printing_stats['Highest_copies'])
+                            st.metric("Lowest Copies", printing_stats['Lowest_copies'])
 
-                            st.markdown('<h2 class="section-header">©️ Copyright Analytics</h2>',
-                                        unsafe_allow_html=True)
+                        with col2:
+                            st.subheader("💰 Cost Metrics")
+                            st.metric("Total Cost", f"${printing_stats['Total_cost']:,.2f}")
+                            st.metric("Highest Cost", f"${printing_stats['Highest_cost']:.2f}")
+                            st.metric("Lowest Cost", f"${printing_stats['Lowest_cost']:.2f}")
 
-                            col1, col2 = st.columns(2)
+                        with col3:
+                            st.subheader("📈 Efficiency")
+                            st.metric("Average Cost per Copy", f"${printing_stats['Average']:.2f}")
 
-                            with col1:
-                                st.subheader("📋 Copyright Summary")
-                                st.metric("Total Copyrights", copyright_stats['Total_copyrights'])
-                                st.metric("Total Cost", f"${copyright_stats['Total_cost_copyright']:,}")
-                                st.metric("Success Rate",
-                                          f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
+                            fig_gauge = go.Figure(go.Indicator(
+                                mode="gauge+number",
+                                value=printing_stats['Average'],
+                                domain={'x': [0, 1], 'y': [0, 1]},
+                                title={'text': "Avg Cost/Copy"},
+                                gauge={
+                                    'axis': {'range': [None, 15]},
+                                    'bar': {'color': "darkblue"},
+                                    'steps': [
+                                        {'range': [0, 5], 'color': "lightgray"},
+                                        {'range': [5, 10], 'color': "gray"}],
+                                    'threshold': {
+                                        'line': {'color': "red", 'width': 4},
+                                        'thickness': 0.75,
+                                        'value': 10}}))
 
-                                success_rate = (
-                                        copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if \
-                                    copyright_stats['Total_copyrights'] > 0 else 0
-                                st.metric("Success Percentage", f"{success_rate:.1f}%")
-                                st.metric("Rejection Rate",
-                                          f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
+                            fig_gauge.update_layout(height=200)
+                            st.plotly_chart(fig_gauge, use_container_width=True)
 
-                                rejection_rate = (
-                                        copyright_stats['result_count_no'] / copyright_stats[
-                                    'Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
-                                st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
-                            with col2:
-                                st.subheader("🌍 Country Distribution")
+                        st.divider()
 
-                                copyright_countries = {
-                                    'USA': copyright_stats['usa_copyrights'],
-                                    'Canada': copyright_stats['canada_copyrights'],
-                                    'UK': copyright_stats['uk']
-                                }
+                        st.markdown('<h2 class="section-header">©️ Copyright Analytics</h2>',
+                                    unsafe_allow_html=True)
 
-                                fig_copyright = px.pie(
-                                    values=list(copyright_countries.values()),
-                                    names=list(copyright_countries.keys()),
-                                    title="Copyright Applications by Country",
-                                    color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
-                                )
-                                st.plotly_chart(fig_copyright, use_container_width=True, key="copyright_chart")
+                        col1, col2 = st.columns(2)
 
-                                cp1, cp2, cp3 = st.columns(3)
+                        with col1:
+                            st.subheader("📋 Copyright Summary")
+                            st.metric("Total Copyrights", copyright_stats['Total_copyrights'])
+                            st.metric("Total Cost", f"${copyright_stats['Total_cost_copyright']:,}")
+                            st.metric("Success Rate",
+                                      f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
 
-                                with cp1:
-                                    st.metric('Usa', copyright_stats['usa_copyrights'])
+                            success_rate = (
+                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if \
+                                copyright_stats['Total_copyrights'] > 0 else 0
+                            st.metric("Success Percentage", f"{success_rate:.1f}%")
+                            st.metric("Rejection Rate",
+                                      f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
 
-                                with cp2:
-                                    st.metric('Canada', copyright_stats['canada_copyrights'])
+                            rejection_rate = (
+                                    copyright_stats['result_count_no'] / copyright_stats[
+                                'Total_copyrights'] * 100) if copyright_stats['Total_copyrights'] > 0 else 0
+                            st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
+                        with col2:
+                            st.subheader("🌍 Country Distribution")
 
-                                with cp2:
-                                    st.metric('UK', copyright_stats['uk'])
+                            copyright_countries = {
+                                'USA': copyright_stats['usa_copyrights'],
+                                'Canada': copyright_stats['canada_copyrights'],
+                                'UK': copyright_stats['uk']
+                            }
 
-                            st.divider()
+                            fig_copyright = px.pie(
+                                values=list(copyright_countries.values()),
+                                names=list(copyright_countries.keys()),
+                                title="Copyright Applications by Country",
+                                color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
+                            )
+                            st.plotly_chart(fig_copyright, use_container_width=True, key="copyright_chart")
 
-                            cola = st.columns(1)
+                            cp1, cp2, cp3 = st.columns(3)
 
-                            with cola[0]:
-                                st.subheader("🅰➕ Content")
-                                st.metric("A+ Count", f"{a_plus} Published")
+                            with cp1:
+                                st.metric('Usa', copyright_stats['usa_copyrights'])
 
-                            st.divider()
+                            with cp2:
+                                st.metric('Canada', copyright_stats['canada_copyrights'])
 
-                            st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
+                            with cp2:
+                                st.metric('UK', copyright_stats['uk'])
 
-                            summary_col1, summary_col2, summary_col3 = st.columns(3)
+                        st.divider()
 
-                            with summary_col1:
-                                st.markdown("### 📝 Reviews")
-                                st.write(f"• **Combined Reviews**: {combined_total}")
-                                st.write(f"• **Success Rate**: {combined_attained_pct:.1f}%")
-                                st.write(f"• **USA Attained**: {usa_attained}")
-                                st.write(f"• **UK Attained**: {uk_attained}")
+                        cola = st.columns(1)
 
-                            with summary_col2:
-                                st.markdown("### 🖨️ Printing")
-                                st.write(f"• **Total Copies**: {printing_stats['Total_copies']:,}")
-                                st.write(f"• **Total Cost**: ${printing_stats['Total_cost']:,.2f}")
-                                st.write(f"• **Cost Efficiency**: ${printing_stats['Average']:.2f}/copy")
+                        with cola[0]:
+                            st.subheader("🅰➕ Content")
+                            st.metric("A+ Count", f"{a_plus} Published")
 
-                            with summary_col3:
-                                st.markdown("### ©️ Copyright")
-                                st.write(f"• **Applications**: {copyright_stats['Total_copyrights']}")
-                                st.write(f"• **Success Rate**: {success_rate:.1f}%")
-                                st.write(f"• **Rejection Rate**: {rejection_rate:.1f}%")
-                                st.write(f"• **Total Cost**: ${copyright_stats['Total_cost_copyright']:,}")
-                        st.success(f"Summary report for {selected_month} {number} generated!")
-                        st.download_button(
-                            label="📥 Download PDF Report",
-                            data=pdf_data,
-                            file_name=pdf_filename,
-                            mime="application/pdf",
-                            help="Click to download the PDF report"
-                        )
+                        st.divider()
 
+                        st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
+
+                        summary_col1, summary_col2, summary_col3 = st.columns(3)
+
+                        with summary_col1:
+                            st.markdown("### 📝 Reviews")
+                            st.write(f"• **Combined Reviews**: {combined_total}")
+                            st.write(f"• **Success Rate**: {combined_attained_pct:.1f}%")
+                            st.write(f"• **USA Attained**: {usa_attained}")
+                            st.write(f"• **UK Attained**: {uk_attained}")
+
+                        with summary_col2:
+                            st.markdown("### 🖨️ Printing")
+                            st.write(f"• **Total Copies**: {printing_stats['Total_copies']:,}")
+                            st.write(f"• **Total Cost**: ${printing_stats['Total_cost']:,.2f}")
+                            st.write(f"• **Cost Efficiency**: ${printing_stats['Average']:.2f}/copy")
+
+                        with summary_col3:
+                            st.markdown("### ©️ Copyright")
+                            st.write(f"• **Applications**: {copyright_stats['Total_copyrights']}")
+                            st.write(f"• **Success Rate**: {success_rate:.1f}%")
+                            st.write(f"• **Rejection Rate**: {rejection_rate:.1f}%")
+                            st.write(f"• **Total Cost**: ${copyright_stats['Total_cost_copyright']:,}")
+                    st.success(f"Summary report for {selected_month} {number} generated!")
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=pdf_data,
+                        file_name=pdf_filename,
+                        mime="application/pdf",
+                        help="Click to download the PDF report"
+                    )
         elif action == "Year Summary" and number:
 
             st.header("📄 Generate Year Summary Report")
