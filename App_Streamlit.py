@@ -2201,6 +2201,8 @@ def main() -> None:
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
 
             with tab1:
+                usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+                uk_brands = ["Authors Solution", "Book Publication"]
                 selected_month = st.selectbox(
                     "Select Month",
                     month_list,
@@ -2271,6 +2273,65 @@ def main() -> None:
         
                            """)
                         st.markdown("---")
+
+                        usa_data = data[data["Brand"].isin(usa_brands)]
+                        uk_data = data[data["Brand"].isin(uk_brands)]
+                        def show_country_stats(df, country_name):
+                            if df.empty:
+                                st.warning(f"⚠️ No data found for {country_name} brands.")
+                                return
+
+                            total_orders = len(df)
+                            total_copies = df["No of Copies"].sum()
+                            total_cost = df["Order Cost"].sum()
+                            highest_cost = df["Order Cost"].max()
+                            lowest_cost = df["Order Cost"].min()
+                            highest_copies = df["No of Copies"].max()
+                            lowest_copies = df["No of Copies"].min()
+                            avg_cost_per_copy = round(total_cost / total_copies, 2) if total_copies else 0
+
+                            st.markdown(f"### 🌍 {country_name} Printing Summary")
+                            st.markdown(f"""
+                            - 🧾 **Total Orders:** {total_orders}
+                            - 📦 **Total Copies Printed:** `{total_copies}`
+                            - 💰 **Total Cost:** `${total_cost:,.2f}`
+                            - 📈 **Highest Order Cost:** `${highest_cost:,.2f}`
+                            - 📉 **Lowest Order Cost:** `${lowest_cost:,.2f}`
+                            - 🔢 **Highest Copies in One Order:** `{highest_copies}`
+                            - 🧮 **Lowest Copies in One Order:** `{lowest_copies}`
+                            - 💵 **Average Cost per Copy:** `${avg_cost_per_copy:,.2f}`
+                            """)
+
+                            brand_spending = (
+                                df.groupby("Brand")["Order Cost"]
+                                .sum()
+                                .reset_index()
+                                .sort_values(by="Order Cost", ascending=False)
+                            )
+                            brand_spending["Order Cost"] = brand_spending["Order Cost"].map("${:,.2f}".format)
+                            brand_spending.index = range(1, len(brand_spending) + 1)
+
+                            brand_orders = (
+                                df.groupby("Brand")["No of Copies"]
+                                .sum()
+                                .reset_index()
+                                .sort_values(by="No of Copies", ascending=False)
+
+                            )
+                            brand_orders.index = range(1, len(brand_orders) + 1)
+
+                            st.markdown(f"#### 💼 Brand-wise Spending for {country_name}")
+                            st.dataframe(brand_spending, use_container_width=True)
+                            st.markdown(f"#### 💼 Brand-wise Orders for {country_name}")
+                            st.dataframe(brand_orders, use_container_width=True)
+
+                            st.markdown("---")
+                        usa_col, uk_col = st.columns(2)
+
+                        with usa_col:
+                            show_country_stats(usa_data, "USA 🦅")
+                        with uk_col:
+                            show_country_stats(uk_data, "UK ☕")
 
                     else:
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
@@ -2356,10 +2417,22 @@ def main() -> None:
                             .sort_values(by="Order Cost", ascending=False)
                         )
                         brand_spending["Order Cost"] = brand_spending["Order Cost"].map("${:,.2f}".format)
-
                         brand_spending.index = range(1, len(brand_spending) + 1)
+
+                        brand_orders = (
+                            df.groupby("Brand")["No of Copies"]
+                            .sum()
+                            .reset_index()
+                            .sort_values(by="No of Copies", ascending=False)
+
+                        )
+                        brand_orders.index = range(1, len(brand_orders) + 1)
+
+
                         st.markdown(f"#### 💼 Brand-wise Spending in {country_name}")
                         st.dataframe(brand_spending, use_container_width=True)
+                        st.markdown(f"#### 💼 Brand-wise Orders for {country_name}")
+                        st.dataframe(brand_orders, use_container_width=True)
 
                         st.markdown("---")
                     usa_col, uk_col = st.columns(2)
@@ -2381,7 +2454,29 @@ def main() -> None:
                     if search_df.empty:
                         st.warning("No such orders found!")
                     else:
+                        df = search_df.copy()
+                        total_orders = len(df)
+                        total_copies = df["No of Copies"].sum()
+                        total_cost = df["Order Cost"].sum()
+                        highest_cost = df["Order Cost"].max()
+                        lowest_cost = df["Order Cost"].min()
+                        highest_copies = df["No of Copies"].max()
+                        lowest_copies = df["No of Copies"].min()
+                        avg_cost_per_copy = round(total_cost / total_copies, 2) if total_copies else 0
+
+                        st.markdown(f"### 🌍 Printing Summary")
+                        st.markdown(f"""
+                                                - 🧾 **Total Orders:** {total_orders}
+                                                - 📦 **Total Copies Printed:** `{total_copies}`
+                                                - 💰 **Total Cost:** `${total_cost:,.2f}`
+                                                - 📈 **Highest Order Cost:** `${highest_cost:,.2f}`
+                                                - 📉 **Lowest Order Cost:** `${lowest_cost:,.2f}`
+                                                - 🔢 **Highest Copies in One Order:** `{highest_copies}`
+                                                - 🧮 **Lowest Copies in One Order:** `{lowest_copies}`
+                                                - 💵 **Average Cost per Copy:** `${avg_cost_per_copy:,.2f}`
+                                                """)
                         search_df["Order Cost"] = search_df["Order Cost"].map("${:,.2f}".format)
+                        search_df.index = range(1, len(search_df) +1)
                         st.dataframe(search_df)
 
 
