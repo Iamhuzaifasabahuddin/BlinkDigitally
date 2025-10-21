@@ -2033,7 +2033,7 @@ def main() -> None:
                         pending = review_counts.get("Pending", 0)
                         attained = total_attained
                         negative = negative_pm["Negative Reviews"].sum()
-                        total_reviews = sent + pending + attained
+                        total_reviews = sent + pending + attained + negative
                         percentage = round((attained / total_reviews * 100), 1) if total_reviews > 0 else 0
 
                         unique_clients_count_per_pm = data_rm_dupes.groupby('Project Manager')[
@@ -2658,7 +2658,8 @@ def main() -> None:
 
                             st.subheader("🇺🇸 USA Reviews")
                             st.metric("📊 Total Reviews", usa_total)
-                            st.metric("✅ Total Attained", usa_attained)
+                            st.metric("🟢 Total Attained", usa_attained)
+                            st.metric("🔴 Total Negative", usa_review_data.get("Negative", 0))
                             st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
                             st.metric("👥 Total Unique", total_unique_clients)
                             unique_clients_count_per_pm = combined.groupby('Project Manager')[
@@ -2689,7 +2690,8 @@ def main() -> None:
                                 st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                             st.subheader("🇬🇧 UK Reviews")
                             st.metric("📊 Total Reviews", uk_total)
-                            st.metric("✅ Total Attained", uk_attained)
+                            st.metric("🟢 Total Attained", uk_attained)
+                            st.metric("🔴 Total Negative", uk_review_data.get("Negative", 0))
                             st.metric("🎯Attained Percentage", f"{uk_attained_pct:.1f}%")
 
                             with st.expander("📊 View Clients Per PM Data"):
@@ -2952,7 +2954,8 @@ def main() -> None:
 
                             st.subheader("🇺🇸 USA Reviews")
                             st.metric("📊 Total Reviews", usa_total)
-                            st.metric("✅ Total Attained", usa_attained)
+                            st.metric("🟢 Total Attained", usa_attained)
+                            st.metric("🔴 Total Negative", usa_review_data.get("Negative", 0))
                             st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
                             st.metric("👥 Total Unique", total_unique_clients)
                             unique_clients_count_per_pm = combined.groupby('Project Manager')[
@@ -2991,7 +2994,8 @@ def main() -> None:
                                 st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                             st.subheader("🇬🇧 UK Reviews")
                             st.metric("📊 Total Reviews", uk_total)
-                            st.metric("✅ Total Attained", uk_attained)
+                            st.metric("🟢 Total Attained", uk_attained)
+                            st.metric("🔴 Total Negative", uk_review_data.get("Negative", 0))
                             st.metric("🎯 Attained Percentage", f"{uk_attained_pct:.1f}%")
 
                             with st.expander("📊 View Clients Per PM Data"):
