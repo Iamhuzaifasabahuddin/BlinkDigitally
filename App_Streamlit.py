@@ -2164,6 +2164,7 @@ def main() -> None:
                                 st.warning(f"⚠️ No results found for '{search_term}'")
                             else:
                                 st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
+                                search_df.index = range(1, len(search_df) + 1)
                                 st.dataframe(search_df)
 
                                 buffer = io.BytesIO()
