@@ -208,7 +208,7 @@ def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
                         key=lambda col: col.eq("Attained") if col.name == "Trustpilot Review" else col,
                         ascending=[False, False]
                     )
-                    .drop_duplicates(subset=["Name"], keep="first")
+                    .drop_duplicates(subset=["Name"], keep="last")
                 )
             else:
                 data = data.drop_duplicates(subset=["Name"])
