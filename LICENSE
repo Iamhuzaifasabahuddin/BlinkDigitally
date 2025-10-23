@@ -1,21 +1,74 @@
-MIT License
+Private Software License Agreement
 
-Copyright (c) 2025 Huzaifa Sabah Uddin
+Version 1.0 — [October, 2025]
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+TERMS AND CONDITIONS FOR USE
+1. Definitions
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+“License” means the terms and conditions set forth in this document governing the use of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+“Licensor” means the copyright owner or entity granting this License.
+
+“Licensee” or “You” means the individual or legal entity authorized to use the Software under this License.
+
+“Software” means the work of authorship, in source or object form, made available by the Licensor under this License, including any related documentation or materials.
+
+“Authorized Use” means installation, access, and operation of the Software by the Licensee solely for internal, non-transferable purposes.
+
+2. Grant of License
+
+Subject to the terms of this License, Licensor grants to Licensee a limited, non-exclusive, non-transferable, non-sublicensable, revocable right to use the Software for internal or personal purposes only.
+
+No other rights are granted. The Licensee may not copy, modify, distribute, sell, lease, sublicense, or otherwise make the Software available to any third party, except with prior written consent from the Licensor.
+
+3. Ownership
+
+The Software is and remains the exclusive property of the Licensor.
+Nothing in this License grants any ownership rights to the Licensee.
+
+All intellectual property rights, including but not limited to copyright, trademarks, and trade secrets, are retained by the Licensor.
+
+4. Confidentiality
+
+The Software and related materials are confidential and proprietary to the Licensor.
+The Licensee shall not disclose, distribute, or otherwise make available any portion of the Software to any third party.
+
+5. Restrictions
+
+Licensee shall not:
+
+Modify, translate, reverse-engineer, decompile, or disassemble the Software;
+
+Use the Software to create derivative works or competing products;
+
+Remove or obscure any copyright, trademark, or proprietary notices;
+
+Use the Software in any illegal or unethical manner.
+
+6. Termination
+
+This License is effective until terminated.
+Licensor may terminate this License immediately if Licensee breaches any of its terms.
+Upon termination, Licensee must destroy all copies of the Software and related documentation.
+
+7. Disclaimer of Warranty
+
+The Software is provided “AS IS”, without warranty of any kind, express or implied, including but not limited to warranties of merchantability, non-infringement, or fitness for a particular purpose.
+
+Licensee assumes full responsibility for determining the suitability of the Software for its intended use.
+
+8. Limitation of Liability
+
+In no event shall the Licensor be liable for any indirect, incidental, special, or consequential damages arising from the use or inability to use the Software, even if advised of the possibility of such damages.
+
+9. Governing Law
+
+This License shall be governed by and construed in accordance with the laws of [Your Country/State], without regard to its conflict of law principles.
+
+COPYRIGHT NOTICE
+
+Copyright © [2025] [Huzaifa Sabah Uddin]
+All Rights Reserved.
+
+This software and associated documentation are proprietary and confidential materials of [Huzaifa Sabah Uddin].
+Unauthorized reproduction or distribution is strictly prohibited.
