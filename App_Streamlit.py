@@ -589,7 +589,6 @@ def get_names_in_year(sheet_name: str, year: int) :
     monthly_counts['Active Months'] = (monthly_counts > 0).sum(axis=1)
     multi_month_names = monthly_counts[monthly_counts['Active Months'] > 1].copy()
 
-    multi_month_names['Total Published'] = multi_month_names.sum(axis=1)
     month_cols = multi_month_names.columns[:-2]
     summary={}
     for name in multi_month_names.index:
@@ -599,7 +598,6 @@ def get_names_in_year(sheet_name: str, year: int) :
 
         summary[name] = {
             "Months Active": indexed_months,
-            "Total Published": int(multi_month_names.at[name, "Total Published"]),
             "Month Count": int(multi_month_names.at[name, "Active Months"]),
         }
 
