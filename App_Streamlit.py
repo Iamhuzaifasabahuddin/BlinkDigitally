@@ -1805,8 +1805,10 @@ def main() -> None:
                             merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
 
+
                             col1, col2 = st.columns(2)
                             with col1:
+
                                 st.markdown("---")
                                 st.markdown("### ⭐ Trustpilot Review Summary")
                                 st.markdown(f"""
@@ -1836,6 +1838,19 @@ def main() -> None:
 
                                 with st.expander(f"🤵🏻 Clients List {choice} {selected_month} {number}"):
                                     st.dataframe(data_rm_dupes)
+                                with st.expander(f"📈 Publishing Stats {choice} {selected_month} {number}"):
+                                    data_rm_dupes2 = data.copy()
+                                    data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
+                                    publishing_stats = data_rm_dupes2.groupby('Publishing Date')["Name"].apply(
+                                        list).reset_index(name="Clients")
+                                    publishing_counts = data_rm_dupes2.groupby('Publishing Date')[
+                                        "Name"].count().reset_index(
+                                        name="Counts")
+                                    publishing_merged = publishing_counts.merge(publishing_stats, on='Publishing Date',
+                                                                                how='left'
+                                                                                )
+                                    publishing_merged.index = range(1, len(publishing_merged)+1)
+                                    st.dataframe(publishing_merged)
                             with col2:
                                 st.markdown("---")
                                 st.markdown("#### 🔍 Review & Publishing Status Breakdown")
@@ -2106,6 +2121,19 @@ def main() -> None:
                                         ascending=False)
                                     publishing_per_month.index = range(1, len(publishing_per_month) + 1)
                                     st.dataframe(publishing_per_month)
+                                with st.expander(f"📈 Publishing Stats {choice} {number2}"):
+                                    data_rm_dupes2 = data.copy()
+                                    data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
+                                    publishing_stats = data_rm_dupes2.groupby('Publishing Date')["Name"].apply(
+                                        list).reset_index(name="Clients")
+                                    publishing_counts = data_rm_dupes2.groupby('Publishing Date')[
+                                        "Name"].count().reset_index(
+                                        name="Counts")
+                                    publishing_merged = publishing_counts.merge(publishing_stats, on='Publishing Date',
+                                                                                how='left'
+                                                                                )
+                                    publishing_merged.index = range(1, len(publishing_merged) + 1)
+                                    st.dataframe(publishing_merged)
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
                                 with st.expander("🔴 Negative Reviews Per Month"):
