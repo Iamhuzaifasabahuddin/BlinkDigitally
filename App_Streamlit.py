@@ -3316,9 +3316,9 @@ def main() -> None:
             combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
 
             if not combined_data.empty:
-
-                combined_data["Trustpilot Review Date"] = pd.to_datetime(combined_data["Trustpilot Review Date"],
-                                                                         errors="coerce")
+                combined_data["Trustpilot Review Date"] = pd.to_datetime(
+                    combined_data["Trustpilot Review Date"], format="%d-%B-%Y", errors="coerce"
+                )
 
                 combined_data["Month-Year"] = combined_data["Trustpilot Review Date"].dt.to_period("M").astype(str)
 
@@ -3328,7 +3328,24 @@ def main() -> None:
                     .reset_index(name="Review Count")
                 )
 
-                monthly_pivot = monthly_counts.pivot_table(
+                monthly_clients = (
+                    combined_data.groupby(["Project Manager", "Month-Year"])["Name"]
+                    .apply(list)
+                    .reset_index(name="Clients")
+                )
+
+                monthly_summary = pd.merge(monthly_counts, monthly_clients, on=["Project Manager", "Month-Year"],
+                                           how="left")
+
+                monthly_summary["Month-Year"] = pd.to_datetime(monthly_summary["Month-Year"])
+                monthly_summary = monthly_summary.sort_values(["Project Manager", "Month-Year"])
+                monthly_summary["Month-Year"] = monthly_summary["Month-Year"].dt.strftime("%B %Y")
+
+                st.subheader("📅 Monthly Review Counts per PM")
+                with st.expander("🟢 Monthly Attained Counts per PM (with Clients)"):
+                    st.dataframe(monthly_summary, use_container_width=True)
+
+                monthly_pivot = monthly_summary.pivot_table(
                     index="Project Manager",
                     columns="Month-Year",
                     values="Review Count",
@@ -3343,8 +3360,7 @@ def main() -> None:
                     pd.to_datetime(col).strftime("%B %Y") for col in monthly_pivot.columns
                 ]
 
-                st.subheader("📅 Monthly Review Counts per PM")
-                with st.expander("🟢 Monthly Attained Counts per PM"):
+                with st.expander("📊 Monthly Review Count Pivot Table"):
                     st.dataframe(monthly_pivot, use_container_width=True)
 
             else:
