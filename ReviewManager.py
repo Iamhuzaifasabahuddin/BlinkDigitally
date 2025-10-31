@@ -686,6 +686,10 @@ def main():
                 with st.expander(f"🟢 Attained Reviews {month} {year}"):
                     st.dataframe(df, use_container_width=True)
                 with st.expander(f"❓ Pending Reviews {month} {year}"):
+                    total_reviews = total_reviewsdf[[
+                    "Name", "Brand", "Publishing Date", "Status",
+                    "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
+                ]].rename(columns={"Status": "Publishing Status"})
                     total_reviews.index = range(1, len(total_reviews) + 1)
                     st.dataframe(total_reviews, use_container_width=True)
             else:
