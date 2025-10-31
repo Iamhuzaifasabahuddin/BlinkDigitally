@@ -686,7 +686,7 @@ def main():
                 with st.expander(f"🟢 Attained Reviews {month} {year}"):
                     st.dataframe(df, use_container_width=True)
                 with st.expander(f"❓ Pending Reviews {month} {year}"):
-                    total_reviews = total_reviewsdf[[
+                    total_reviews = total_reviews[[
                     "Name", "Brand", "Publishing Date", "Status",
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                 ]].rename(columns={"Status": "Publishing Status"})
