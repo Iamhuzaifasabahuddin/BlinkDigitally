@@ -271,9 +271,9 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
             data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
 
     try:
-        if "Trustpilot Review Date" in data.columns and month_number:
-            data = data[(data["Trustpilot Review Date"].dt.month == month_number) &
-                        (data["Trustpilot Review Date"].dt.year == year)]
+        if "Publishing Date" in data.columns and month_number:
+            data = data[(data["Publishing Date"].dt.month == month_number) &
+                        (data["Publishing Date"].dt.year == year)]
         else:
             data = data[(data["Publishing Date"].dt.year == year)]
 
@@ -286,7 +286,8 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
                 ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
             (data_original["Status"] == "Published")
             ]
-        return len(data_count)
+
+        return data_count
     except Exception as e:
         logging.error(f"Error calculating total reviews: {e}")
         return 0
@@ -384,7 +385,7 @@ def send_attained_reviews_per_pm(pm_name: str, email: str, sheet_name: str, year
         st.error(f"Could not find user ID for {pm_name}")
         return False
 
-    total_reviews = load_total_reviews(sheet_name, pm_name, year, month)
+    total_reviews = len(load_total_reviews(sheet_name, pm_name, year, month))
     review_data = load_attained_reviews(sheet_name, pm_name, year, month)
 
     review_details_df = review_data.copy()
@@ -668,12 +669,12 @@ def main():
             total_reviews = load_total_reviews(sheet_name, selected_pm, year, month_number)
 
             if not df.empty:
-                total = total_reviews + len(df)
+                total = len(total_reviews) + len(df)
                 percent = len(df) / total if total > 0 else 0
 
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("✅ Attained Reviews", len(df))
-                col2.metric("❓ Pending Reviews", total_reviews)
+                col2.metric("❓ Pending Reviews", len(total_reviews))
                 col3.metric("🤵🏻 Total Reviews", f"{total}")
                 col4.metric("🎯 Retention Rate", f"{percent:.1%}")
 
@@ -682,8 +683,11 @@ def main():
                     "Name", "Brand", "Publishing Date", "Status",
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                 ]].rename(columns={"Status": "Publishing Status"})
-                with st.expander(f"✅ Attained Reviews {month} {year}"):
+                with st.expander(f"🟢 Attained Reviews {month} {year}"):
                     st.dataframe(df, use_container_width=True)
+                with st.expander(f"❓ Pending Reviews {month} {year}"):
+                    total_reviews.index = range(1, len(total_reviews) + 1)
+                    st.dataframe(total_reviews, use_container_width=True)
             else:
                 st.warning(f"No attained reviews found for {selected_pm}")
 
@@ -812,7 +816,7 @@ def main():
 
         email = pm_names[selected_pm]
         df = load_attained_reviews(sheet_name, selected_pm, year)
-        total_reviews = load_total_reviews(sheet_name, selected_pm, year)
+        total_reviews = len(load_total_reviews(sheet_name, selected_pm, year))
 
         if not df.empty:
             total = total_reviews + len(df)

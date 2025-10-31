@@ -550,7 +550,8 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
     else:
         return set(), {}, 0
 
-def get_names_in_year(sheet_name: str, year: int) :
+
+def get_names_in_year(sheet_name: str, year: int):
     """
     Finds names that appear in multiple months within the same year.
 
@@ -590,7 +591,7 @@ def get_names_in_year(sheet_name: str, year: int) :
     multi_month_names = monthly_counts[monthly_counts['Active Months'] > 1].copy()
 
     month_cols = multi_month_names.columns[:-2]
-    summary={}
+    summary = {}
     for name in multi_month_names.index:
         active_months = [month for month in month_cols if multi_month_names.at[name, month] > 0]
 
@@ -602,6 +603,7 @@ def get_names_in_year(sheet_name: str, year: int) :
         }
 
     return multi_month_names, summary, len(multi_month_names)
+
 
 def create_review_pie_chart(review_data: dict[str, int], title: str):
     """Create pie chart for review distribution"""
@@ -894,7 +896,8 @@ def summary(month: int, year: int):
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav, "Kobo": uk_kobo}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
+                    "Kobo": uk_kobo}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1039,7 +1042,6 @@ def generate_year_summary(year: int):
     combined_monthly = combined_monthly.sort_values("Total Published", ascending=False).drop(columns="Month_Num")
 
     combined_monthly.index = range(1, len(combined_monthly) + 1)
-
 
     if not usa_reviews_per_pm.empty:
         usa_attained_pm = (
@@ -1247,7 +1249,8 @@ def generate_year_summary(year: int):
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav, "Kobo": uk_kobo}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
+                    "Kobo": uk_kobo}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1647,7 +1650,7 @@ def main() -> None:
         action = st.selectbox("What would you like to do?",
                               ["View Data", "Sales", "Printing", "Copyright", "Generate Similarity",
                                "Summary",
-                               "Year Summary"],
+                               "Year Summary", "Reviews"],
                               index=None,
                               placeholder="Select Action")
 
@@ -1657,11 +1660,11 @@ def main() -> None:
         status = None
         choice = None
         number = None
-        if action in ["View Data", "Reviews"]:
+        if action in ["View Data"]:
             choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
                                   placeholder="Select Data to View")
 
-        if action in ["View Data", "Reviews", "Copyright", "Sales"]:
+        if action in ["View Data", "Copyright", "Sales"]:
             selected_month = st.selectbox(
                 "Select Month",
                 month_list,
@@ -1670,7 +1673,8 @@ def main() -> None:
             )
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
         if action in ["Year Summary", "Copyright", "View Data", "Reviews", "Sales"]:
-            number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
+            number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                     value=current_year, step=1)
 
         if action == "View Data" and choice and selected_month and number:
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
@@ -1709,7 +1713,8 @@ def main() -> None:
 
                             attained_details = review_details_df[
                                 review_details_df["Trustpilot Review"] == "Attained"
-                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date",
+                                   "Trustpilot Review Links",
                                    "Status"]].copy()
                             attained_details.index = range(1, len(attained_details) + 1)
                         else:
@@ -1732,7 +1737,8 @@ def main() -> None:
 
                             negative_details = review_details_df[
                                 review_details_df["Trustpilot Review"] == "Negative"
-                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date",
+                                   "Trustpilot Review Links",
                                    "Status"]].copy()
                             negative_details.index = range(1, len(negative_details) + 1)
                         else:
@@ -1802,9 +1808,9 @@ def main() -> None:
 
                             clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(
                                 name="Clients")
-                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
+                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
+                                                                          how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
-
 
                             col1, col2 = st.columns(2)
                             with col1:
@@ -1849,7 +1855,7 @@ def main() -> None:
                                     publishing_merged = publishing_counts.merge(publishing_stats, on='Publishing Date',
                                                                                 how='left'
                                                                                 )
-                                    publishing_merged.index = range(1, len(publishing_merged)+1)
+                                    publishing_merged.index = range(1, len(publishing_merged) + 1)
                                     st.dataframe(publishing_merged)
                             with col2:
                                 st.markdown("---")
@@ -1887,7 +1893,8 @@ def main() -> None:
                         st.info(f"No Data found for {choice} {selected_month} {number}")
             with tab2:
                 st.subheader(f"📂 Total Data for {choice}")
-                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1,
+                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1,
                                           key="year_total")
 
                 if number2 and sheet_name:
@@ -1940,7 +1947,8 @@ def main() -> None:
                             ).dt.strftime("%d-%B-%Y")
                             attained_details_total = review_details_total[
                                 review_details_total["Trustpilot Review"] == "Attained"
-                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date",
+                                   "Trustpilot Review Links",
                                    "Status"]].copy()
                             attained_details_total.index = range(1, len(attained_details_total) + 1)
                         else:
@@ -1966,7 +1974,8 @@ def main() -> None:
 
                             negative_details_total = review_details_negative[
                                 review_details_negative["Trustpilot Review"] == "Negative"
-                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links",
+                                ][["Project Manager", "Name", "Brand", "Trustpilot Review Date",
+                                   "Trustpilot Review Links",
                                    "Status"]].copy()
                             negative_details_total.index = range(1, len(negative_details_total) + 1)
                         else:
@@ -1994,7 +2003,8 @@ def main() -> None:
                                 by="Total Attained Reviews", ascending=False
                             )
                             attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
-                            attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date", axis=1)
+                            attained_reviews_per_month = attained_reviews_per_month.drop("Trustpilot Review Date",
+                                                                                         axis=1)
                         else:
                             attained_reviews_per_month = pd.DataFrame(columns=["Month", "Total Attained Reviews"])
 
@@ -2017,7 +2027,8 @@ def main() -> None:
                                 by="Total Negative Reviews", ascending=False
                             )
                             negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
-                            negative_reviews_per_month = negative_reviews_per_month.drop("Trustpilot Review Date", axis=1)
+                            negative_reviews_per_month = negative_reviews_per_month.drop("Trustpilot Review Date",
+                                                                                         axis=1)
                         else:
                             negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
 
@@ -2062,7 +2073,8 @@ def main() -> None:
                             unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
                             clients_list = data_rm_dupes.groupby('Project Manager')["Name"].apply(list).reset_index(
                                 name="Clients")
-                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager', how='left')
+                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
+                                                                          how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
                             total_unique_clients = data['Name'].nunique()
                             col1, col2 = st.columns(2)
@@ -2180,8 +2192,9 @@ def main() -> None:
             with tab3:
                 st.subheader(f"🔍 Search Data for {choice}")
 
-                number3 = st.number_input("Enter Year for Search", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1,
-                                           key="year_search")
+                number3 = st.number_input("Enter Year for Search", min_value=int(get_min_year()),
+                                          max_value=current_year, value=current_year, step=1,
+                                          key="year_search")
 
                 if number3 and sheet_name:
                     data = load_data_year(sheet_name, number3)
@@ -2245,7 +2258,8 @@ def main() -> None:
                     index=current_month - 1,
                     placeholder="Select Month"
                 )
-                number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
+                number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                         value=current_year, step=1)
                 selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
 
                 if selected_month and number:
@@ -2312,6 +2326,7 @@ def main() -> None:
 
                         usa_data = data[data["Brand"].isin(usa_brands)]
                         uk_data = data[data["Brand"].isin(uk_brands)]
+
                         def show_country_stats(df, country_name):
                             if df.empty:
                                 st.warning(f"⚠️ No data found for {country_name} brands.")
@@ -2362,6 +2377,7 @@ def main() -> None:
                             st.dataframe(brand_orders, use_container_width=True)
 
                             st.markdown("---")
+
                         usa_col, uk_col = st.columns(2)
 
                         with usa_col:
@@ -2372,7 +2388,8 @@ def main() -> None:
                     else:
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
             with tab2:
-                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
+                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1)
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
                 uk_brands = ["Authors Solution", "Book Publication"]
                 data, monthly = printing_data_year(number2)
@@ -2464,13 +2481,13 @@ def main() -> None:
                         )
                         brand_orders.index = range(1, len(brand_orders) + 1)
 
-
                         st.markdown(f"#### 💼 Brand-wise Spending in {country_name}")
                         st.dataframe(brand_spending, use_container_width=True)
                         st.markdown(f"#### 💼 Brand-wise Orders for {country_name}")
                         st.dataframe(brand_orders, use_container_width=True)
 
                         st.markdown("---")
+
                     usa_col, uk_col = st.columns(2)
 
                     with usa_col:
@@ -2512,7 +2529,7 @@ def main() -> None:
                                                 - 💵 **Average Cost per Copy:** `${avg_cost_per_copy:,.2f}`
                                                 """)
                         search_df["Order Cost"] = search_df["Order Cost"].map("${:,.2f}".format)
-                        search_df.index = range(1, len(search_df) +1)
+                        search_df.index = range(1, len(search_df) + 1)
                         st.dataframe(search_df)
 
 
@@ -2577,14 +2594,16 @@ def main() -> None:
                     index=current_month - 2,
                     placeholder="Select Month 1"
                 )
-                number1 = st.number_input("Enter Year 1", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
+                number1 = st.number_input("Enter Year 1", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1)
                 selected_month_2 = st.selectbox(
                     "Select Month 2",
                     month_list,
                     index=current_month - 1,
                     placeholder="Select Month 2"
                 )
-                number2 = st.number_input("Enter Year 2", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
+                number2 = st.number_input("Enter Year 2", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1)
                 if sheet_name:
                     if st.button("Generate Similar Clients"):
                         with st.spinner(
@@ -2602,7 +2621,8 @@ def main() -> None:
             with tab2:
                 choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
                                       placeholder="Select Data to View", key="choice_2")
-                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year,
+                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year,
                                           step=1, key="year_3")
 
                 sheet_name = {
@@ -2610,8 +2630,8 @@ def main() -> None:
                     "USA": sheet_usa,
                 }.get(choice)
 
-                if  sheet_name and number3:
-                    df_year,Total_year, year_count = get_names_in_year(sheet_name, number3)
+                if sheet_name and number3:
+                    df_year, Total_year, year_count = get_names_in_year(sheet_name, number3)
                     if not df_year.empty:
                         st.write(df_year)
                         st.write(Total_year)
@@ -2627,7 +2647,8 @@ def main() -> None:
                 index=current_month - 1,
                 placeholder="Select Month"
             )
-            number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year, value=current_year, step=1)
+            number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                     value=current_year, step=1)
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
             uk_clean = clean_data_reviews(sheet_uk)
             usa_clean = clean_data_reviews(sheet_usa)
@@ -3257,6 +3278,77 @@ def main() -> None:
             else:
 
                 st.warning(f"⚠️ No Data Available for Sales in {selected_month} {number}")
+        elif action == "Reviews" and number:
+            uk_clean = clean_data_reviews(sheet_uk)
+            usa_clean = clean_data_reviews(sheet_usa)
+
+            usa_clean = usa_clean[
+                (usa_clean["Publishing Date"].dt.year == number)
+            ]
+            uk_clean = uk_clean[
+                (uk_clean["Publishing Date"].dt.year == number)
+            ]
+
+            usa_clean_platforms = usa_clean[
+                (usa_clean["Publishing Date"].dt.year == number)
+            ]
+            uk_clean_platforms = uk_clean[
+                (uk_clean["Publishing Date"].dt.year == number)
+            ]
+
+            if usa_clean.empty:
+                print("No values found in USA sheet.")
+            if uk_clean.empty:
+                print("No values found in UK sheet.")
+                return
+            if usa_clean.empty and uk_clean.empty:
+                return
+
+            usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="last")
+            uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="last")
+            total_usa = usa_clean["Name"].nunique()
+            total_uk = uk_clean["Name"].nunique()
+            pm_list_usa = usa_clean["Project Manager"].dropna().unique()
+            pm_list_uk = uk_clean["Project Manager"].dropna().unique()
+            usa_reviews_per_pm = safe_concat(
+                [load_reviews_year(sheet_usa, number, pm, "Attained") for pm in pm_list_usa])
+            uk_reviews_per_pm = safe_concat([load_reviews_year(sheet_uk, number, pm, "Attained") for pm in pm_list_uk])
+            combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
+
+            if not combined_data.empty:
+
+                combined_data["Trustpilot Review Date"] = pd.to_datetime(combined_data["Trustpilot Review Date"],
+                                                                         errors="coerce")
+
+                combined_data["Month-Year"] = combined_data["Trustpilot Review Date"].dt.to_period("M").astype(str)
+
+                monthly_counts = (
+                    combined_data.groupby(["Project Manager", "Month-Year"])
+                    .size()
+                    .reset_index(name="Review Count")
+                )
+
+                monthly_pivot = monthly_counts.pivot_table(
+                    index="Project Manager",
+                    columns="Month-Year",
+                    values="Review Count",
+                    fill_value=0
+                )
+
+                monthly_pivot = monthly_pivot.reindex(
+                    sorted(monthly_pivot.columns, key=lambda x: pd.to_datetime(x)),
+                    axis=1
+                )
+                monthly_pivot.columns = [
+                    pd.to_datetime(col).strftime("%B %Y") for col in monthly_pivot.columns
+                ]
+
+                st.subheader("📅 Monthly Review Counts per PM")
+                with st.expander("🟢 Monthly Attained Counts per PM"):
+                    st.dataframe(monthly_pivot, use_container_width=True)
+
+            else:
+                st.warning("No combined review data found.")
 
 
 if __name__ == '__main__':
