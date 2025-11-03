@@ -752,8 +752,11 @@ def summary(month: int, year: int):
     else:
         uk_review_sent = uk_review_pending = uk_review_na = 0
     combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
-    pending_sent_details = combined_pending_sent[(combined_pending_sent["Trustpilot Review"] == "Sent") | (
-            combined_pending_sent["Trustpilot Review"] == "Pending")]
+    pending_sent_details = combined_pending_sent[
+        ((combined_pending_sent["Trustpilot Review"] == "Sent") |
+         (combined_pending_sent["Trustpilot Review"] == "Pending")) &
+        (combined_pending_sent["Brand"].isin(allowed_brands))
+        ]
     pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
@@ -1001,8 +1004,10 @@ def generate_year_summary(year: int):
 
     combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
     pending_sent_details = combined_pending_sent[
-        (combined_pending_sent["Trustpilot Review"] == "Sent") | (
-                combined_pending_sent["Trustpilot Review"] == "Pending")]
+        ((combined_pending_sent["Trustpilot Review"] == "Sent") |
+         (combined_pending_sent["Trustpilot Review"] == "Pending")) &
+        (combined_pending_sent["Brand"].isin(allowed_brands))
+        ]
     pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
 
@@ -3010,6 +3015,7 @@ def main() -> None:
                                 st.plotly_chart(usa_pie, use_container_width=True, key="usa_pie")
 
                             st.subheader("🇺🇸 USA Reviews")
+                            st.metric("🤵🏻 Total Clients", sum(usa_brands.values()))
                             st.metric("📊 Total Reviews", usa_total)
                             st.metric("🟢 Total Attained", usa_attained)
                             st.metric("🔴 Total Negative", usa_review_data.get("Negative", 0))
@@ -3050,6 +3056,7 @@ def main() -> None:
                             if uk_pie:
                                 st.plotly_chart(uk_pie, use_container_width=True, key="uk_pie")
                             st.subheader("🇬🇧 UK Reviews")
+                            st.metric("🤵🏻 Total Clients", sum(uk_brands.values()))
                             st.metric("📊 Total Reviews", uk_total)
                             st.metric("🟢 Total Attained", uk_attained)
                             st.metric("🔴 Total Negative", uk_review_data.get("Negative", 0))
