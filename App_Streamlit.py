@@ -1700,15 +1700,18 @@ def main() -> None:
                             data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
                         review_data = load_reviews(sheet_name, number, selected_month_number)
 
-                        attained_reviews_per_pm = review_data[
-                            review_data["Trustpilot Review"] == "Attained"
-                            ].groupby("Project Manager")["Trustpilot Review"].count().reset_index()
 
-                        review_details_df = review_data.sort_values(by="Project Manager", ascending=True)
-                        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
-                            review_details_df["Trustpilot Review Date"], errors="coerce"
-                        ).dt.strftime("%d-%B-%Y")
+                        if not review_data.empty:
+                            attained_reviews_per_pm = review_data[
+                                review_data["Trustpilot Review"] == "Attained"
+                                ].groupby("Project Manager")["Trustpilot Review"].count().reset_index()
 
+                            review_details_df = review_data.sort_values(by="Project Manager", ascending=True)
+                            review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+                                review_details_df["Trustpilot Review Date"], errors="coerce"
+                            ).dt.strftime("%d-%B-%Y")
+                        else:
+                            attained_reviews_per_pm = pd.DataFrame()
                         if not attained_reviews_per_pm.empty:
                             attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
                             attained_reviews_per_pm = attained_reviews_per_pm.sort_values(
@@ -1729,10 +1732,12 @@ def main() -> None:
                                 "Status"
                             ])
 
-                        negative_reviews_per_pm = review_data[
-                            review_data["Trustpilot Review"] == "Negative"
-                            ].groupby("Project Manager")["Trustpilot Review"].count().reset_index()
-
+                        if not review_data.empty:
+                            negative_reviews_per_pm = review_data[
+                                review_data["Trustpilot Review"] == "Negative"
+                                ].groupby("Project Manager")["Trustpilot Review"].count().reset_index()
+                        else:
+                            negative_reviews_per_pm = pd.DataFrame()
                         if not negative_reviews_per_pm.empty:
                             negative_reviews_per_pm.columns = ["Project Manager", "Negative Reviews"]
                             negative_reviews_per_pm = negative_reviews_per_pm.sort_values(
