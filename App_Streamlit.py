@@ -1822,6 +1822,7 @@ def main() -> None:
                                                                           how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
 
+                            self_publishing =  data_rm_dupes["Issues"].value_counts()
                             col1, col2 = st.columns(2)
                             with col1:
 
@@ -1829,11 +1830,13 @@ def main() -> None:
                                 st.markdown("### ⭐ Trustpilot Review Summary")
                                 st.markdown(f"""
                                             - 🧾 **Total Entries:** `{len(data)}`
+                                            - 👥 **Total Unique Clients:** `{total_unique_clients}`
                                             - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
                                             - 🟢 **'Attained' Reviews:** `{attained}`
                                             - 🔴 **'Negative' Reviews:** `{negative}`
-                                            - 📊 **Attainment Rate:** `{percentage}%`
-                                            - 👥 **Total Unique:** `{total_unique_clients}`
+                                            - 📈 **Attainment Rate:** `{percentage}%`
+                                            - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
+                                            - 💫 **Self Publishing:** `{self_publishing.get("Self Publishing", 0)}`
     
                                             **Brands**
                                             - 📘 **BookMarketeers:** `{bookmarketeers}`
@@ -1854,6 +1857,7 @@ def main() -> None:
 
                                 with st.expander(f"🤵🏻 Clients List {choice} {selected_month} {number}"):
                                     st.dataframe(data_rm_dupes)
+
                                 with st.expander(f"📈 Publishing Stats {choice} {selected_month} {number}"):
                                     data_rm_dupes2 = data.copy()
                                     data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
@@ -1867,6 +1871,10 @@ def main() -> None:
                                                                                 )
                                     publishing_merged.index = range(1, len(publishing_merged) + 1)
                                     st.dataframe(publishing_merged)
+                                with st.expander(f"💫 Self Publishing List {choice} {selected_month} {number}"):
+                                    self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
+                                    self_publishing_df.index = range(1, len(self_publishing_df) +1)
+                                    st.dataframe(self_publishing_df)
                             with col2:
                                 st.markdown("---")
                                 st.markdown("#### 🔍 Review & Publishing Status Breakdown")
@@ -2087,6 +2095,9 @@ def main() -> None:
                                                                           how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
                             total_unique_clients = data['Name'].nunique()
+
+                            self_publishing =  data_rm_dupes["Issues"].value_counts()
+
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown("---")
@@ -2097,7 +2108,11 @@ def main() -> None:
                                 - 🗳️ **Total Trustpilot Reviews:** `{total_reviews}`
                                 - 🟢 **'Attained' Reviews:** `{attained}`
                                 - 🔴 **'Negative' Reviews:** `{negative}`
-                                - 📊 **Attainment Rate:** `{percentage}%`
+                                - 📈 **Attainment Rate:** `{percentage}%`
+                                - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
+                                - 💫 **Self Publishing:** `{self_publishing.get("Self Publishing", 0)}`
+    
+    
     
                                 **Brands**
                                 - 📘 **BookMarketeers:** `{brands.get("BookMarketeers", "N/A")}`
@@ -2156,6 +2171,10 @@ def main() -> None:
                                                                                 )
                                     publishing_merged.index = range(1, len(publishing_merged) + 1)
                                     st.dataframe(publishing_merged)
+                                with st.expander(f"💫 Self Publishing List {choice} {number2}"):
+                                    self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
+                                    self_publishing_df.index = range(1, len(self_publishing_df) +1)
+                                    st.dataframe(self_publishing_df)
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
                                 with st.expander("🔴 Negative Reviews Per Month"):
