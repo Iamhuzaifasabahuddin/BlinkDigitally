@@ -3371,6 +3371,7 @@ def main() -> None:
                 monthly_summary["Month-Year"] = pd.to_datetime(monthly_summary["Month-Year"])
                 monthly_summary = monthly_summary.sort_values(["Project Manager", "Month-Year"])
                 monthly_summary["Month-Year"] = monthly_summary["Month-Year"].dt.strftime("%B %Y")
+                monthly_summary.index = range(1, len(monthly_summary) + 1)
 
                 st.subheader("📅 Monthly Review Counts per PM")
                 with st.expander("🟢 Monthly Attained Counts per PM (with Clients)"):
