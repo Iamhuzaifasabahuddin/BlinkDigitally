@@ -1682,7 +1682,7 @@ def main() -> None:
                                      value=current_year, step=1)
 
         if action == "View Data" and choice and selected_month and number:
-            tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
+            tab1, tab2, tab3, tab4 = st.tabs(["Monthly", "Total", "Search", "By Brand"])
 
             sheet_name = {
                 "UK": sheet_uk,
@@ -2275,6 +2275,53 @@ def main() -> None:
                                             st.markdown(f"  - {platform}: `{count}`")
                         else:
                             st.info("👆 Enter a name above to search")
+
+            with tab4:
+                st.subheader(f"📊 Filter Data by Brand for {choice}")
+
+
+                number4 = st.number_input(
+                    "Select Year",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="year_filter"
+                )
+
+
+                usa_brands = ["BookMarketeers", "Writers Clique", "KDP", "Aurora Writers"]
+                uk_brands = ["Authors Solution", "Book Publication"]
+
+                if number4 and sheet_name:
+                    selected_brand = usa_brands if sheet_name == "USA" else uk_brands
+                    brand_selection = st.selectbox("Select Brand", selected_brand, key="brand_selection")
+
+                    data = load_data_year(sheet_name, number4)
+
+                    if data.empty:
+                        st.warning(f"⚠️ No Data Available for {choice} in {number4}")
+                    else:
+
+                        filtered_df = data[data["Brand"] == brand_selection]
+
+                        if filtered_df.empty:
+                            st.warning(f"⚠️ No records for brand '{brand_selection}' in {number4}")
+                        else:
+                            filtered_df = filtered_df.drop_duplicates(["Name"], keep="first")
+                            filtered_df.index = range(1, len(filtered_df) + 1)
+                            st.dataframe(filtered_df)
+
+                            buffer = io.BytesIO()
+                            filtered_df.to_excel(buffer, index=False)
+                            buffer.seek(0)
+                            st.download_button(
+                                label="📥 Download Filtered Data",
+                                data=buffer,
+                                file_name=f"{choice}_Brand_{brand_selection}_{number4}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                help="Click to download filtered data"
+                            )
         elif action == "Printing":
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
 
