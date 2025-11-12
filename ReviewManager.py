@@ -72,6 +72,7 @@ name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
     "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
     "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
+    "Kamal Muhammad Isa": "kamal.muhammed.issa@topsoftdigitals.pk",
     "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
     "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
     "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
@@ -83,6 +84,7 @@ name_usa = {
 
 names_uk = {
     "Youha": "youha.khan@topsoftdigitals.pk",
+    "Hassan Siddiqui": "hassan.siddiqui@topsoftdigitals.pk",
     "Emaan Zaidi": "emaan.zaidi@topsoftdigitals.pk",
     "Elishba": "elishba@topsoftdigitals.pk",
     "Shahrukh Yousuf": "shahrukh.yousuf@topsoftdigitals.pk"
