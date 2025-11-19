@@ -703,6 +703,8 @@ def summary(month: int, year: int):
         return
     usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="last")
     uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="last")
+    Issues_usa = usa_clean["Issues"].value_counts()
+    Issues_uk = uk_clean["Issues"].value_counts()
     total_usa = usa_clean["Name"].nunique()
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
@@ -922,7 +924,7 @@ def summary(month: int, year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, pending_sent_details, negative_reviews_per_pm, negative_details
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, pending_sent_details, negative_reviews_per_pm, negative_details, Issues_usa, Issues_uk
 
 
 def generate_year_summary(year: int):
@@ -953,6 +955,8 @@ def generate_year_summary(year: int):
 
     usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="last")
     uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="last")
+    Issues_usa = usa_clean["Issues"].value_counts()
+    Issues_uk = uk_clean["Issues"].value_counts()
     total_usa = usa_clean["Name"].nunique()
     total_uk = uk_clean["Name"].nunique()
     total_unique_clients = total_usa + total_uk
@@ -1277,7 +1281,7 @@ def generate_year_summary(year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
 
 
 def logging_function() -> None:
@@ -1822,7 +1826,7 @@ def main() -> None:
                                                                           how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
 
-                            self_publishing =  data_rm_dupes["Issues"].value_counts()
+                            Issues =  data_rm_dupes["Issues"].value_counts()
                             col1, col2 = st.columns(2)
                             with col1:
 
@@ -1836,8 +1840,9 @@ def main() -> None:
                                             - 🔴 **'Negative' Reviews:** `{negative}`
                                             - 📈 **Attainment Rate:** `{percentage}%`
                                             - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
-                                            - 💫 **Self Publishing:** `{self_publishing.get("Self Publishing", 0)}`
-    
+                                            - 💫 **Self Publishing:** `{Issues.get("Self Publishing", 0)}`
+                                            - 🖨 **Printing Only:** `{Issues.get("Printing Only", 0)}`
+                                            
                                             **Brands**
                                             - 📘 **BookMarketeers:** `{bookmarketeers}`
                                             - 📘 **Aurora Writers:** `{aurora_writers}`
@@ -2096,7 +2101,7 @@ def main() -> None:
                             merged_df.index = range(1, len(merged_df) + 1)
                             total_unique_clients = data['Name'].nunique()
 
-                            self_publishing =  data_rm_dupes["Issues"].value_counts()
+                            Issues =  data_rm_dupes["Issues"].value_counts()
 
                             col1, col2 = st.columns(2)
                             with col1:
@@ -2110,9 +2115,8 @@ def main() -> None:
                                 - 🔴 **'Negative' Reviews:** `{negative}`
                                 - 📈 **Attainment Rate:** `{percentage}%`
                                 - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
-                                - 💫 **Self Publishing:** `{self_publishing.get("Self Publishing", 0)}`
-    
-    
+                                - 💫 **Self Publishing:** `{Issues.get("Self Publishing", 0)}`
+                                - 🖨 **Printing Only:** `{Issues.get("Printing Only", 0)}`
     
                                 **Brands**
                                 - 📘 **BookMarketeers:** `{brands.get("BookMarketeers", "N/A")}`
@@ -2752,7 +2756,7 @@ def main() -> None:
             else:
                 if st.button("Generate Summary"):
                     with st.spinner(f"Generating Summary Report for {selected_month} {number}..."):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details, negative_reviews_per_pm, negative_details = summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, pending_sent_details, negative_reviews_per_pm, negative_details, Issues_usa, Issues_uk = summary(
                             selected_month_number, number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -2794,6 +2798,8 @@ def main() -> None:
                             st.metric("🟢 Total Attained", usa_attained)
                             st.metric("🔴 Total Negative", usa_review_data.get("Negative", 0))
                             st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
+                            st.metric("💫 Self Published", Issues_usa.get("Self Publishing", 0))
+                            st.metric("🖨 Printing Only", Issues_usa.get("Printing Only", 0))
                             st.metric("👥 Total Unique", total_unique_clients)
                             unique_clients_count_per_pm = combined.groupby('Project Manager')[
                                 'Name'].nunique().reset_index()
@@ -2826,6 +2832,8 @@ def main() -> None:
                             st.metric("🟢 Total Attained", uk_attained)
                             st.metric("🔴 Total Negative", uk_review_data.get("Negative", 0))
                             st.metric("🎯Attained Percentage", f"{uk_attained_pct:.1f}%")
+                            st.metric("💫 Self Published", Issues_uk.get("Self Publishing", 0))
+                            st.metric("🖨 Printing Only", Issues_uk.get("Printing Only", 0))
 
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
@@ -3051,7 +3059,7 @@ def main() -> None:
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month, Issues_usa, Issues_uk = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -3092,6 +3100,8 @@ def main() -> None:
                             st.metric("🔴 Total Negative", usa_review_data.get("Negative", 0))
                             st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
                             st.metric("👥 Total Unique", total_unique_clients)
+                            st.metric("💫 Self Published", Issues_usa.get("Self Publishing", 0))
+                            st.metric("🖨 Printing Only", Issues_usa.get("Printing Only", 0))
                             unique_clients_count_per_pm = combined.groupby('Project Manager')[
                                 'Name'].nunique().reset_index()
                             unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
@@ -3132,7 +3142,8 @@ def main() -> None:
                             st.metric("🟢 Total Attained", uk_attained)
                             st.metric("🔴 Total Negative", uk_review_data.get("Negative", 0))
                             st.metric("🎯 Attained Percentage", f"{uk_attained_pct:.1f}%")
-
+                            st.metric("💫 Self Published", Issues_uk.get("Self Publishing", 0))
+                            st.metric("🖨 Printing Only", Issues_uk.get("Printing Only", 0))
                             with st.expander("📊 View Clients Per PM Data"):
                                 st.dataframe(merged_df)
                             with st.expander("❓ Pending & Sent Reviews"):
