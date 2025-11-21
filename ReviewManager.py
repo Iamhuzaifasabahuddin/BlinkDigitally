@@ -782,7 +782,11 @@ def main():
                             st.warning(f"⚠️ No results found for '{search_term}'")
                         else:
                             st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
-                            st.dataframe(search_df)
+                            search_df.index = range(1, len(search_df)+1)
+                            st.dataframe(search_df[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
+                           "No of Copies",
+                           "Delivery Method", "Status",
+                           "Type"]])
                     else:
                         st.info("👆 Enter a name above to search")
 
