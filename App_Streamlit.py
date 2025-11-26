@@ -2238,9 +2238,9 @@ def main() -> None:
                         search_term = st.text_input("Search by Name", placeholder="Enter client name to search",
                                                     key="search_term")
 
-                        if search_term:
-                            search_term = search_term.strip()
-                            search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
+                        if search_term and search_term.strip():
+                            search_term_clean = search_term.strip()
+                            search_df = data[data['Name'].str.contains(search_term_clean, case=False, na=False)]
 
                             if search_df.empty:
                                 st.warning(f"⚠️ No results found for '{search_term}'")
@@ -2582,9 +2582,9 @@ def main() -> None:
                 data, _ = printing_data_year(number2)
                 search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")
 
-                if search_term:
-                    search_term = search_term.strip()
-                    search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
+                if search_term and search_term.strip():
+                    search_term_clean = search_term.strip()
+                    search_df = data[data['Name'].str.contains(search_term_clean, case=False, na=False)]
 
                     if search_df.empty:
                         st.warning("No such orders found!")
