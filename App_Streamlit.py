@@ -2239,6 +2239,7 @@ def main() -> None:
                                                     key="search_term")
 
                         if search_term:
+                            search_term = search_term.strip()
                             search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
 
                             if search_df.empty:
@@ -2582,6 +2583,7 @@ def main() -> None:
                 search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")
 
                 if search_term:
+                    search_term = search_term.strip()
                     search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
 
                     if search_df.empty:

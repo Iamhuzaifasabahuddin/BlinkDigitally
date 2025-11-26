@@ -773,7 +773,7 @@ def main():
                     st.warning(f"⚠️ No Data Available for {region} in {number3}")
                 else:
                     search_term = st.text_input("Search by Name", placeholder="Enter client name to search",
-                                                key="search_term")
+                                                key="search_term").strip()
 
                     if search_term:
                         search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
