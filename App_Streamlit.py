@@ -1105,20 +1105,42 @@ def generate_year_summary(year: int):
             attained_details["Trustpilot Review Date"], errors="coerce"
         )
 
-        attained_reviews_per_month = (
-            attained_details.groupby(attained_details["Trustpilot Review Date"].dt.to_period("M"))
-            .size()
-            .reset_index(name="Total Attained Reviews")
+        if not usa_reviews_per_pm.empty:
+            usa_attained_monthly = (
+                usa_reviews_per_pm.groupby(usa_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Attained Reviews")
+            )
+            usa_attained_monthly["Month"] = usa_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_attained_monthly = usa_attained_monthly[["Month", "USA Attained Reviews"]]
+        else:
+            usa_attained_monthly = pd.DataFrame(columns=["Month", "USA Attained Reviews"])
+
+        if not uk_reviews_per_pm.empty:
+            uk_attained_monthly = (
+                uk_reviews_per_pm.groupby(uk_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Attained Reviews")
+            )
+            uk_attained_monthly["Month"] = uk_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_attained_monthly = uk_attained_monthly[["Month", "UK Attained Reviews"]]
+        else:
+            uk_attained_monthly = pd.DataFrame(columns=["Month", "UK Attained Reviews"])
+        attained_reviews_per_month = pd.merge(
+            usa_attained_monthly,
+            uk_attained_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        attained_reviews_per_month["Total Attained Reviews"] = (
+                attained_reviews_per_month["USA Attained Reviews"] + attained_reviews_per_month["UK Attained Reviews"]
         )
 
-        attained_reviews_per_month["Month"] = attained_reviews_per_month[
-            "Trustpilot Review Date"
-        ].dt.strftime("%B %Y")
-
-        attained_reviews_per_month = attained_reviews_per_month[["Month", "Total Attained Reviews"]]
-        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews",
-                                                                            ascending=False)
+        attained_reviews_per_month["Month_Num"] = pd.to_datetime(attained_reviews_per_month["Month"], format="%B %Y")
+        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews", ascending=False)
         attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+        attained_reviews_per_month = attained_reviews_per_month.drop(columns="Month_Num")
 
         attained_details["Trustpilot Review Date"] = pd.to_datetime(
             attained_details["Trustpilot Review Date"], errors="coerce"
@@ -1192,21 +1214,46 @@ def generate_year_summary(year: int):
             negative_details["Trustpilot Review Date"], errors="coerce"
         )
 
-        negative_reviews_per_month = (
-            negative_details.groupby(negative_details["Trustpilot Review Date"].dt.to_period("M"))
-            .size()
-            .reset_index(name="Total Negative Reviews")
+        if not usa_negative_per_pm.empty:
+            usa_negative_monthly = (
+                usa_negative_per_pm.groupby(usa_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Negative Reviews")
+            )
+            usa_negative_monthly["Month"] = usa_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_negative_monthly = usa_negative_monthly[["Month", "USA Negative Reviews"]]
+        else:
+            usa_negative_monthly = pd.DataFrame(columns=["Month", "USA Negative Reviews"])
+
+        # UK monthly negative reviews
+        if not uk_negative_per_pm.empty:
+            uk_negative_monthly = (
+                uk_negative_per_pm.groupby(uk_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Negative Reviews")
+            )
+            uk_negative_monthly["Month"] = uk_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_negative_monthly = uk_negative_monthly[["Month", "UK Negative Reviews"]]
+        else:
+            uk_negative_monthly = pd.DataFrame(columns=["Month", "UK Negative Reviews"])
+
+        # Merge USA and UK negative trends
+        negative_reviews_per_month = pd.merge(
+            usa_negative_monthly,
+            uk_negative_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        negative_reviews_per_month["Total Negative Reviews"] = (
+                negative_reviews_per_month["USA Negative Reviews"] + negative_reviews_per_month["UK Negative Reviews"]
         )
 
-        negative_reviews_per_month["Month"] = negative_reviews_per_month[
-            "Trustpilot Review Date"
-        ].dt.strftime("%B %Y")
-
-        negative_reviews_per_month = negative_reviews_per_month[["Month", "Total Negative Reviews"]]
-        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews",
-                                                                            ascending=False)
+        # Sort by month
+        negative_reviews_per_month["Month_Num"] = pd.to_datetime(negative_reviews_per_month["Month"], format="%B %Y")
+        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews", ascending=False)
         negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
-
+        negative_reviews_per_month = negative_reviews_per_month.drop(columns="Month_Num")
         negative_details["Trustpilot Review Date"] = pd.to_datetime(
             negative_details["Trustpilot Review Date"], errors="coerce"
         ).dt.strftime("%d-%B-%Y")
