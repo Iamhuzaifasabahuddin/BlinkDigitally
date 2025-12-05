@@ -307,12 +307,13 @@ def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
 
     data = data.sort_values(by="Order Date", ascending=True)
     if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].fillna(0)
         data["Order Cost"] = data["Order Cost"].astype(str)
         data["Order Cost"] = pd.to_numeric(
-            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce").fillna(0)
 
     if "No of Copies" in data.columns:
-        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
 
     data = data.sort_values(by="Order Date", ascending=True)
 
@@ -352,10 +353,10 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         data["Order Cost"] = pd.to_numeric(
             data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
             errors="coerce"
-        )
+        ).fillna(0)
 
     if "No of Copies" in data.columns:
-        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
 
     data['Month'] = data['Order Date'].dt.to_period('M')
 
