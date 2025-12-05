@@ -1815,6 +1815,18 @@ def main() -> None:
                         else:
                             st.markdown("### 📄 Detailed Entry Data")
                             st.dataframe(data)
+                            with st.expander("🧮 Clients with multiple platform publishing"):
+                                grouped = data.groupby(["Name", "Platform", "Book Name & Link"]).size().reset_index(
+                                    name="Count")
+                                platform_counts = grouped.groupby(["Name", "Book Name & Link"])[
+                                    "Platform"].nunique().reset_index(name="Platform_Count")
+
+                                platforms_per_client = grouped.groupby(["Name", "Book Name & Link"])["Platform"].apply(
+                                    list).reset_index(name="Platforms")
+                                platform_stats = platform_counts.merge(platforms_per_client, how="left",
+                                                                       on=["Name", "Book Name & Link"])
+                                platform_stats.index = range(1, len(platform_stats) + 1)
+                                st.dataframe(platform_stats)
                             buffer = io.BytesIO()
                             data.to_excel(buffer, index=False)
                             buffer.seek(0)
@@ -2109,6 +2121,18 @@ def main() -> None:
                             st.markdown(f"### 📄 Total Data for {choice} - {number2}")
                             st.dataframe(data)
 
+                            with st.expander("🧮 Clients with multiple platform publishing"):
+                                grouped = data.groupby(["Name", "Platform", "Book Name & Link"]).size().reset_index(
+                                    name="Count")
+                                platform_counts = grouped.groupby(["Name", "Book Name & Link"])[
+                                    "Platform"].nunique().reset_index(name="Platform_Count")
+
+                                platforms_per_client = grouped.groupby(["Name", "Book Name & Link"])["Platform"].apply(
+                                    list).reset_index(name="Platforms")
+                                platform_stats = platform_counts.merge(platforms_per_client, how="left",
+                                                                       on=["Name", "Book Name & Link"])
+                                platform_stats.index = range(1, len(platform_stats) + 1)
+                                st.dataframe(platform_stats)
                             buffer = io.BytesIO()
                             data.to_excel(buffer, index=False)
                             buffer.seek(0)
