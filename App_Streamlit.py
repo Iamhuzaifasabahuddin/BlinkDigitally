@@ -1749,7 +1749,7 @@ def main() -> None:
                     if not data.empty:
                         data_rm_dupes = data.copy()
                         if "Name" in data_rm_dupes.columns:
-                            data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
+                            data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="first")
                         review_data = load_reviews(sheet_name, number, selected_month_number)
 
 
@@ -1974,7 +1974,7 @@ def main() -> None:
                     if not data.empty:
                         data_rm_dupes = data.copy()
                         if "Name" in data_rm_dupes.columns:
-                            data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="last")
+                            data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="first")
 
                         pm_list = data["Project Manager"].dropna().unique()
                         reviews_per_pm = [load_reviews_year(choice, number2, pm, "Attained") for pm in pm_list]
