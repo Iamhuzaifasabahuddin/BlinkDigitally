@@ -289,6 +289,9 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
                 ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
             (data_original["Status"] == "Published")
             ]
+        data_count["Trustpilot Review Date"] = pd.to_datetime(
+            data_count["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
 
         return data_count
     except Exception as e:
