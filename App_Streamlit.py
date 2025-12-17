@@ -1945,6 +1945,10 @@ def main() -> None:
                                     self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
                                     self_publishing_df.index = range(1, len(self_publishing_df) + 1)
                                     st.dataframe(self_publishing_df)
+                                with st.expander(f"🖨 Printing Only List {choice} {selected_month} {number}"):
+                                    printing_only_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Printing Only"]
+                                    printing_only_df.index = range(1, len(printing_only_df) + 1)
+                                    st.dataframe(printing_only_df)
                             with col2:
                                 st.markdown("---")
                                 st.markdown("#### 🔍 Review & Publishing Status Breakdown")
@@ -2260,6 +2264,10 @@ def main() -> None:
                                     self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
                                     self_publishing_df.index = range(1, len(self_publishing_df) + 1)
                                     st.dataframe(self_publishing_df)
+                                with st.expander(f"🖨 Printing Only List {choice} {number2}"):
+                                    printing_only_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Printing Only"]
+                                    printing_only_df.index = range(1, len(printing_only_df) + 1)
+                                    st.dataframe(printing_only_df)
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
                                 with st.expander("🔴 Negative Reviews Per Month"):
