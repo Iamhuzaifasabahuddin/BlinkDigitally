@@ -310,7 +310,8 @@ def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
         data["Order Cost"] = data["Order Cost"].fillna(0)
         data["Order Cost"] = data["Order Cost"].astype(str)
         data["Order Cost"] = pd.to_numeric(
-            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce").fillna(0)
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce").fillna(0)
 
     if "No of Copies" in data.columns:
         data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
@@ -1139,7 +1140,8 @@ def generate_year_summary(year: int):
         )
 
         attained_reviews_per_month["Month_Num"] = pd.to_datetime(attained_reviews_per_month["Month"], format="%B %Y")
-        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews", ascending=False)
+        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews",
+                                                                            ascending=False)
         attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
         attained_reviews_per_month = attained_reviews_per_month.drop(columns="Month_Num")
 
@@ -1252,7 +1254,8 @@ def generate_year_summary(year: int):
 
         # Sort by month
         negative_reviews_per_month["Month_Num"] = pd.to_datetime(negative_reviews_per_month["Month"], format="%B %Y")
-        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews", ascending=False)
+        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews",
+                                                                            ascending=False)
         negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
         negative_reviews_per_month = negative_reviews_per_month.drop(columns="Month_Num")
         negative_details["Trustpilot Review Date"] = pd.to_datetime(
@@ -1752,7 +1755,6 @@ def main() -> None:
                             data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="first")
                         review_data = load_reviews(sheet_name, number, selected_month_number)
 
-
                         if not review_data.empty:
                             attained_reviews_per_pm = review_data[
                                 review_data["Trustpilot Review"] == "Attained"
@@ -1816,12 +1818,15 @@ def main() -> None:
                             st.markdown("### 📄 Detailed Entry Data")
                             st.dataframe(data)
                             with st.expander("🧮 Clients with multiple platform publishing"):
-                                grouped = data.groupby(["Name", "Platform", "Book Name & Link"]).size().reset_index(
-                                    name="Count")
-                                platform_counts = grouped.groupby(["Name", "Book Name & Link"])[
+                                data_multiple_platforms = data.copy()
+
+                                data_multiple_platforms = data_multiple_platforms[
+                                    ~data_multiple_platforms["Issues"].isin(["Printing Only"])]
+                                platform_counts = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
                                     "Platform"].nunique().reset_index(name="Platform_Count")
 
-                                platforms_per_client = grouped.groupby(["Name", "Book Name & Link"])["Platform"].apply(
+                                platforms_per_client = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
+                                    "Platform"].apply(
                                     list).reset_index(name="Platforms")
                                 platform_stats = platform_counts.merge(platforms_per_client, how="left",
                                                                        on=["Name", "Book Name & Link"])
@@ -1886,7 +1891,7 @@ def main() -> None:
                                                                           how='left')
                             merged_df.index = range(1, len(merged_df) + 1)
 
-                            Issues =  data_rm_dupes["Issues"].value_counts()
+                            Issues = data_rm_dupes["Issues"].value_counts()
                             col1, col2 = st.columns(2)
                             with col1:
 
@@ -1938,7 +1943,7 @@ def main() -> None:
                                     st.dataframe(publishing_merged)
                                 with st.expander(f"💫 Self Publishing List {choice} {selected_month} {number}"):
                                     self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
-                                    self_publishing_df.index = range(1, len(self_publishing_df) +1)
+                                    self_publishing_df.index = range(1, len(self_publishing_df) + 1)
                                     st.dataframe(self_publishing_df)
                             with col2:
                                 st.markdown("---")
@@ -2122,12 +2127,16 @@ def main() -> None:
                             st.dataframe(data)
 
                             with st.expander("🧮 Clients with multiple platform publishing"):
-                                grouped = data.groupby(["Name", "Platform", "Book Name & Link"]).size().reset_index(
-                                    name="Count")
-                                platform_counts = grouped.groupby(["Name", "Book Name & Link"])[
+
+                                data_multiple_platforms = data.copy()
+
+                                data_multiple_platforms = data_multiple_platforms[
+                                    ~data_multiple_platforms["Issues"].isin(["Printing Only"])]
+                                platform_counts = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
                                     "Platform"].nunique().reset_index(name="Platform_Count")
 
-                                platforms_per_client = grouped.groupby(["Name", "Book Name & Link"])["Platform"].apply(
+                                platforms_per_client = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
+                                    "Platform"].apply(
                                     list).reset_index(name="Platforms")
                                 platform_stats = platform_counts.merge(platforms_per_client, how="left",
                                                                        on=["Name", "Book Name & Link"])
@@ -2173,7 +2182,7 @@ def main() -> None:
                             merged_df.index = range(1, len(merged_df) + 1)
                             total_unique_clients = data['Name'].nunique()
 
-                            Issues =  data_rm_dupes["Issues"].value_counts()
+                            Issues = data_rm_dupes["Issues"].value_counts()
 
                             col1, col2 = st.columns(2)
                             with col1:
@@ -2249,7 +2258,7 @@ def main() -> None:
                                     st.dataframe(publishing_merged)
                                 with st.expander(f"💫 Self Publishing List {choice} {number2}"):
                                     self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
-                                    self_publishing_df.index = range(1, len(self_publishing_df) +1)
+                                    self_publishing_df.index = range(1, len(self_publishing_df) + 1)
                                     st.dataframe(self_publishing_df)
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
@@ -2356,7 +2365,6 @@ def main() -> None:
             with tab4:
                 st.subheader(f"📊 Filter Data by Brand for {choice}")
 
-
                 number4 = st.number_input(
                     "Select Year",
                     min_value=int(get_min_year()),
@@ -2365,7 +2373,6 @@ def main() -> None:
                     step=1,
                     key="year_filter"
                 )
-
 
                 usa_brands = ["BookMarketeers", "Writers Clique", "KDP", "Aurora Writers"]
                 uk_brands = ["Authors Solution", "Book Publication"]
