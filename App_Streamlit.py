@@ -1708,9 +1708,9 @@ def main() -> None:
             st.cache_data.clear()
             st.success("Fetched new data")
         action = st.selectbox("What would you like to do?",
-                              ["View Data", "Sales", "Printing", "Copyright", "Generate Similarity",
+                              ["View Data", "Printing", "Copyright", "Generate Similarity",
                                "Summary",
-                               "Year Summary", "Reviews"],
+                               "Year Summary", "Reviews", "Sales"],
                               index=None,
                               placeholder="Select Action")
 
