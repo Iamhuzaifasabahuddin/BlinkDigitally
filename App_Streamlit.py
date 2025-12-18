@@ -2222,35 +2222,35 @@ def main() -> None:
 
                                 with st.expander(f"🤵🏻 Clients List {choice} {number2}"):
                                     st.dataframe(data_rm_dupes)
+                                with st.expander("🤵🏻🤵🏻 Publishing Per Month"):
+                                    data_month = data_rm_dupes.copy()
+                                    data_month["Publishing Date"] = pd.to_datetime(data_month["Publishing Date"],
+                                                                                   errors="coerce")
 
-                                data_month = data_rm_dupes.copy()
-                                data_month["Publishing Date"] = pd.to_datetime(data_month["Publishing Date"],
-                                                                               errors="coerce")
+                                    data_month["Month"] = data_month["Publishing Date"].dt.to_period("M").dt.strftime(
+                                        "%B %Y")
+    
+                                    unique_clients_count_per_month = (
+                                        data_month.groupby("Month")["Name"].nunique()
+                                        .reset_index()
+                                    )
+                                    unique_clients_count_per_month.columns = ["Month", "Total Published"]
+                                    clients_list_per_month = (
+                                        data_month.groupby("Month")["Name"]
+                                        .apply(list)
+                                        .reset_index(name="Clients")
+                                    )
 
-                                data_month["Month"] = data_month["Publishing Date"].dt.to_period("M").dt.strftime(
-                                    "%B %Y")
+                                    publishing_per_month = unique_clients_count_per_month.merge(
+                                        clients_list_per_month, on="Month", how="left"
+                                    )
 
-                                unique_clients_count_per_month = (
-                                    data_month.groupby("Month")["Name"].nunique()
-                                    .reset_index()
-                                )
-                                unique_clients_count_per_month.columns = ["Month", "Total Published"]
-                                clients_list_per_month = (
-                                    data_month.groupby("Month")["Name"]
-                                    .apply(list)
-                                    .reset_index(name="Clients")
-                                )
+                                    publishing_per_month = publishing_per_month.sort_values(
+                                        by="Total Published", ascending=False
+                                    )
+                                    publishing_per_month.index = range(1, len(publishing_per_month) + 1)
 
-                                publishing_per_month = unique_clients_count_per_month.merge(
-                                    clients_list_per_month, on="Month", how="left"
-                                )
-
-                                publishing_per_month = publishing_per_month.sort_values(
-                                    by="Total Published", ascending=False
-                                )
-                                publishing_per_month.index = range(1, len(publishing_per_month) + 1)
-
-                                st.dataframe(publishing_per_month)
+                                    st.dataframe(publishing_per_month)
                                 with st.expander(f"📈 Publishing Stats {choice} {number2}"):
                                     data_rm_dupes2 = data.copy()
                                     data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
