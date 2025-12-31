@@ -66,7 +66,10 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 # Constants
 sheet_usa = "USA"
 sheet_uk = "UK"
-current_year = datetime.today().year
+PKST_DATE = pytz.timezone("Asia/Karachi")
+
+now_pk = datetime.now(PKST_DATE)
+current_year = now_pk.year
 
 name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
@@ -653,7 +656,7 @@ def main():
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                 ]].rename(columns={"Status": "Publishing Status"})
                 with st.expander("❓ Pending Reviews"):
-                    st.dataframe(df, use_container_width=True)
+                    st.dataframe(df, width="stretch")
             else:
                 st.warning(f"No pending reviews found for {selected_pm}")
 
@@ -663,7 +666,7 @@ def main():
                     "Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"
                 ]].rename(columns={"Status": "Publishing Status"})
                 with st.expander("📦 Pending Reviews Total"):
-                    st.dataframe(df2, use_container_width=True)
+                    st.dataframe(df2, width="stretch")
             else:
                 st.warning(f"No total pending reviews found for {selected_pm}")
 
@@ -691,14 +694,14 @@ def main():
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                 ]].rename(columns={"Status": "Publishing Status"})
                 with st.expander(f"🟢 Attained Reviews {month} {year}"):
-                    st.dataframe(df, use_container_width=True)
+                    st.dataframe(df, width="stretch")
                 with st.expander(f"❓ Pending Reviews {month} {year}"):
                     total_reviews = total_reviews[[
                     "Name", "Brand", "Publishing Date", "Status",
                     "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                 ]].rename(columns={"Status": "Publishing Status"})
                     total_reviews.index = range(1, len(total_reviews) + 1)
-                    st.dataframe(total_reviews, use_container_width=True)
+                    st.dataframe(total_reviews, width="stretch")
             else:
                 st.warning(f"No attained reviews found for {selected_pm}")
 
@@ -728,7 +731,7 @@ def main():
             if not df.empty:
                 st.subheader(f"🖨️ Printing Data for {month} {year} - {region}")
                 df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "Format", "Ink Type", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, width="stretch")
 
             else:
                 st.warning(f"No printing data found for {month} {year}")
@@ -747,7 +750,7 @@ def main():
                 df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
                          "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
                          "Type", "Accepted"]]
-                st.dataframe(df2, use_container_width=True)
+                st.dataframe(df2, width="stretch")
 
             else:
                 st.warning(f"No printing data found for {year}")
@@ -760,7 +763,7 @@ def main():
                            "No of Copies",
                            "Delivery Method", "Status",
                            "Type"]]
-                st.dataframe(df3, use_container_width=True)
+                st.dataframe(df3, width="stretch")
             else:
                 st.info("No upcoming printings ahead!")
 
@@ -806,7 +809,7 @@ def main():
 
         if not df.empty:
             st.info(f"Found {len(df)} pending reviews for {selected_pm}")
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
             if st.button("📨 Send to Slack", type="primary"):
                 with st.spinner("Sending..."):
                     success = send_pending_reviews_per_pm(selected_pm, sheet_name, email, channel)
@@ -844,7 +847,7 @@ def main():
             df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
             df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
                      "Trustpilot Review Links"]]
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
             if st.button("📨 Send to Slack", type="primary"):
                 with st.spinner("Sending..."):
                     success = send_attained_reviews_per_pm(selected_pm, email, sheet_name, year, channel)

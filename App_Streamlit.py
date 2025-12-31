@@ -8,6 +8,7 @@ import gspread
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import pytz
 import streamlit as st
 from google.oauth2.service_account import Credentials
 from reportlab.lib import colors
@@ -50,10 +51,14 @@ sheet_copyright = "Copyright"
 sheet_a_plus = "A_plus"
 sheet_sales = "Sales"
 
+PKST_DATE = pytz.timezone("Asia/Karachi")
+
+now_pk = datetime.now(PKST_DATE)
+
 month_list = list(calendar.month_name)[1:]
-current_month = datetime.today().month
+current_month = now_pk.month
 current_month_name = calendar.month_name[current_month]
-current_year = datetime.today().year
+current_year = now_pk.year
 
 st.markdown("""
  <style>
@@ -1999,7 +2004,7 @@ def main() -> None:
 
                         pm_list = data["Project Manager"].dropna().unique()
                         reviews_per_pm = [load_reviews_year(choice, number2, pm, "Attained") for pm in pm_list]
-                        reviews_per_pm = pd.concat([df for df in reviews_per_pm if not df.empty], ignore_index=True)
+                        reviews_per_pm = safe_concat([df for df in reviews_per_pm if not df.empty])
 
                         reviews_n_pm = [load_reviews_year(choice, number2, pm, "Negative") for pm in pm_list]
                         reviews_n_pm = safe_concat([df for df in reviews_n_pm if not df.empty])
@@ -2021,7 +2026,7 @@ def main() -> None:
                                 .reset_index()
                             )
                         else:
-                            reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+                            attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
 
                         if not attained_pm.empty:
                             attained_pm.columns = ["Project Manager", "Attained Reviews"]
