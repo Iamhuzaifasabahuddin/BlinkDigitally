@@ -8,6 +8,7 @@ import gspread
 import pandas as pd
 import pytz
 import streamlit as st
+import streamlit_authenticator as stauth
 from google.oauth2.service_account import Credentials
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -559,347 +560,363 @@ def fetch(region: str):
 
 
 def main():
-    if "authenticated_normal" not in st.session_state:
-        st.session_state.authenticated_normal = False
-    if "authenticated_admin" not in st.session_state:
+    config = {
+        'credentials': {
+            'usernames': {}
+        },
+        'cookie': {
+            'name': st.secrets.get("cookie_name", "Review_manager_cookie"),
+            'key': st.secrets.get("cookie_key", "some_signature_key"),
+            'expiry_days': st.secrets.get("cookie_expiry_days", 30)
+        }
+    }
+
+    for key in st.secrets:
+        if key.startswith("auth_username_"):
+            username = st.secrets[key]
+            suffix = key.replace("auth_username_", "")
+            config['credentials']['usernames'][username] = {
+                'name': st.secrets.get(f"auth_name_{suffix}", username),
+                'email': st.secrets.get(f"auth_email_{suffix}", f"{username}@example.com"),
+                'password': st.secrets.get(f"auth_password_{suffix}", "")
+            }
+
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days']
+    )
+    if st.session_state.get('authentication_status') is None:
+        st.title("🔑 Review Manager Login")
+
+    authenticator.login()
+
+    if st.session_state.get('authentication_status') is True:
+
         st.session_state.authenticated_admin = False
+        st.session_state.authenticated_normal = False
 
-    authenticated = st.session_state.authenticated_normal or st.session_state.authenticated_admin
+        if st.session_state.get('name') == "Admin":
+            st.session_state.authenticated_admin = True
+        elif st.session_state.get('name') == "PM":
+            st.session_state.authenticated_normal = True
 
-    if not authenticated:
-        st.title("🔑 Printing Data & Trustpilot Review Manager")
-        password = st.text_input("Enter Password", type="password")
+        st.title("⭐ Printing Data & Trustpilot Review Manager")
+        st.markdown("---")
 
-        if st.button("Login"):
-            if password == APP_PASSWORD_NORMAL:
-                st.session_state.authenticated_normal = True
-                st.success("Login successful (Normal User)! 🎉")
-                time.sleep(1)
-                st.rerun()
-            elif password == APP_PASSWORD_ADMIN:
-                st.session_state.authenticated_admin = True
-                st.success("Login successful (Admin)! 🎉")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("Incorrect password.")
-        st.stop()
+        with st.sidebar:
+            st.header("📋 Settings")
+            region = st.selectbox("Select Region", ["USA", "UK"])
 
-    st.title("⭐ Printing Data & Trustpilot Review Manager")
-    st.markdown("---")
-
-    with st.sidebar:
-        st.header("📋 Settings")
-        region = st.selectbox("Select Region", ["USA", "UK"])
-
-        if "fetched" not in st.session_state:
-            st.session_state.fetched = False
-        if "last_fetch_time" not in st.session_state:
-            st.session_state.last_fetch_time = None
-        if st.session_state.authenticated_admin:
-            action = st.radio("Select Action",
-                              ["View Reviews", "Send Pending Reviews", "Send Attained Reviews", "Bulk Send", "Printing Data"])
-
-            if st.button("🔃 Fetch Latest"):
-               fetch(region)
-            if st.session_state.fetched:
-                st.success(f"✅ Latest reviews fetched for {region} at {st.session_state.last_fetch_time} PKST")
+            if "fetched" not in st.session_state:
                 st.session_state.fetched = False
+            if "last_fetch_time" not in st.session_state:
+                st.session_state.last_fetch_time = None
 
-        else:
-            action = st.radio("Select Action", ["View Reviews", "Printing Data"])
+            if st.session_state.authenticated_admin:
+                action = st.radio(
+                    "Select Action",
+                    ["View Reviews", "Send Pending Reviews", "Send Attained Reviews", "Bulk Send", "Printing Data"]
+                )
+            elif st.session_state.authenticated_normal:
+                action = st.radio(
+                    "Select Action",
+                    ["View Reviews", "Printing Data"]
+                )
+
             if st.button("🔃 Fetch Latest"):
                 fetch(region)
 
             if st.session_state.fetched:
-                st.success(f"✅ Latest reviews fetched for {region} at {st.session_state.last_fetch_time} PKST")
+                st.success(
+                    f"✅ Latest reviews fetched for {region} at {st.session_state.last_fetch_time} PKST"
+                )
                 st.session_state.fetched = False
 
+            st.markdown("---")
+            st.info("💡 Use this app to manage and send Trustpilot reviews to project managers.")
+            authenticator.logout()
 
-        st.markdown("---")
-        st.info("💡 Use this app to manage and send Trustpilot reviews to project managers.")
-        if st.button("🚪 Logout"):
-            st.session_state.authenticated_normal = False
-            st.session_state.authenticated_admin = False
-            st.success("Logged out successfully!")
-            time.sleep(1)
-            st.rerun()
+        sheet_name = sheet_usa if region == "USA" else sheet_uk
+        pm_names = name_usa if region == "USA" else names_uk
+        channel = channel_usa if region == "USA" else channel_uk
 
-    sheet_name = sheet_usa if region == "USA" else sheet_uk
-    pm_names = name_usa if region == "USA" else names_uk
-    channel = channel_usa if region == "USA" else channel_uk
+        if action == "View Reviews":
+            st.header(f"📊 View Reviews - {region}")
+            col1, col2 = st.columns(2)
 
-    if action == "View Reviews":
-        st.header(f"📊 View Reviews - {region}")
-        col1, col2 = st.columns(2)
+            with col1:
+                selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
 
-        with col1:
+            with col2:
+                pass
+
+            review_type_P, review_type_A = st.tabs(["Pending", "Attained"])
+
+            with review_type_P:
+                df, min_date, max_date = load_pending_reviews(sheet_name, selected_pm)
+                df2, _, _ = load_sent_reviews(sheet_name, selected_pm)
+
+                if not df.empty:
+                    st.success(f"Found {len(df)} pending reviews for {selected_pm}")
+                    if pd.notna(min_date) and pd.notna(max_date):
+                        st.info(f"Date Range: {min_date.strftime('%B %Y')} - {max_date.strftime('%B %Y')}")
+
+                    df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                    df = df[[
+                        "Name", "Brand", "Publishing Date", "Status",
+                        "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
+                    ]].rename(columns={"Status": "Publishing Status"})
+                    with st.expander("❓ Pending Reviews"):
+                        st.dataframe(df, width="stretch")
+                else:
+                    st.warning(f"No pending reviews found for {selected_pm}")
+
+                if not df2.empty:
+                    df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                    df2 = df2[[
+                        "Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"
+                    ]].rename(columns={"Status": "Publishing Status"})
+                    with st.expander("📦 Pending Reviews Total"):
+                        st.dataframe(df2, width="stretch")
+                else:
+                    st.warning(f"No total pending reviews found for {selected_pm}")
+
+            with review_type_A:
+                year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
+                month = st.selectbox("Select Month (Optional)", ["All"] + list(calendar.month_name)[1:])
+                month_number = None if month == "All" else list(calendar.month_name).index(month)
+
+                df = load_attained_reviews(sheet_name, selected_pm, year, month_number)
+                total_reviews = load_total_reviews(sheet_name, selected_pm, year, month_number)
+
+                if not df.empty:
+                    total = len(total_reviews) + len(df)
+                    percent = len(df) / total if total > 0 else 0
+
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("✅ Attained Reviews", len(df))
+                    col2.metric("❓ Pending Reviews", len(total_reviews))
+                    col3.metric("🤵🏻 Total Reviews", f"{total}")
+                    col4.metric("🎯 Retention Rate", f"{percent:.1%}")
+
+                    df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                    df = df[[
+                        "Name", "Brand", "Publishing Date", "Status",
+                        "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
+                    ]].rename(columns={"Status": "Publishing Status"})
+                    with st.expander(f"🟢 Attained Reviews {month} {year}"):
+                        st.dataframe(df, width="stretch")
+                    with st.expander(f"❓ Pending Reviews {month} {year}"):
+                        total_reviews = total_reviews[[
+                        "Name", "Brand", "Publishing Date", "Status",
+                        "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
+                    ]].rename(columns={"Status": "Publishing Status"})
+                        total_reviews.index = range(1, len(total_reviews) + 1)
+                        st.dataframe(total_reviews, width="stretch")
+                else:
+                    st.warning(f"No attained reviews found for {selected_pm}")
+
+        elif action == "Printing Data":
+            month_list = list(calendar.month_name)[1:]
+            current_month = datetime.today().strftime("%B")
+
+            tab_m, tab_y, tab_u, tab_s = st.tabs(["Monthly", "Yearly", "Upcoming", "Search"])
+
+            with tab_m:
+
+                month = st.selectbox(
+                    "Select Month:",
+                    month_list,
+                    index=month_list.index(current_month)
+                )
+                month_number = month_list.index(month) + 1
+                year = st.number_input(
+                    "Select Year:",
+                    min_value=2025,
+                    max_value=current_year,
+                    value=current_year,
+                    key="year1"
+                )
+                df = printing_data_month(month_number, year, region)
+
+                if not df.empty:
+                    st.subheader(f"🖨️ Printing Data for {month} {year} - {region}")
+                    df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "Format", "Ink Type", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
+                    st.dataframe(df, width="stretch")
+
+                else:
+                    st.warning(f"No printing data found for {month} {year}")
+            with tab_y:
+                year2 = st.number_input(
+                    "Select Year:",
+                    min_value=2025,
+                    max_value=current_year,
+                    value=current_year,
+                    key="year2"
+                )
+                df2 = printing_data_year(year2, region)
+
+                if not df.empty:
+                    st.subheader(f"🖨️ Printing Data for {year} - {region}")
+                    df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
+                             "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
+                             "Type", "Accepted"]]
+                    st.dataframe(df2, width="stretch")
+
+                else:
+                    st.warning(f"No printing data found for {year}")
+
+            with tab_u:
+                df3 = get_printing_upcoming(region)
+
+                if not df3.empty:
+                    df3 = df3[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
+                               "No of Copies",
+                               "Delivery Method", "Status",
+                               "Type"]]
+                    st.dataframe(df3, width="stretch")
+                else:
+                    st.info("No upcoming printings ahead!")
+
+            with tab_s:
+                st.subheader(f"🔍 Search Data for {region}")
+
+                number3 = st.number_input("Enter Year for Search", min_value=2025, step=1,
+                                          value=current_year, key="year_search")
+
+                if number3 and sheet_name:
+                    data = printing_data_year(number3, region)
+
+                    if data.empty:
+                        st.warning(f"⚠️ No Data Available for {region} in {number3}")
+                    else:
+                        search_term = st.text_input("Search by Name", placeholder="Enter client name to search",
+                                                    key="search_term").strip()
+
+                        if search_term:
+                            search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
+
+                            if search_df.empty:
+                                st.warning(f"⚠️ No results found for '{search_term}'")
+                            else:
+                                st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
+                                search_df.index = range(1, len(search_df)+1)
+                                st.dataframe(search_df[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
+                               "No of Copies",
+                               "Delivery Method", "Status",
+                               "Type"]])
+                        else:
+                            st.info("👆 Enter a name above to search")
+
+        elif action == "Send Pending Reviews":
+            if not st.session_state.authenticated_admin:
+                st.error("🚫 You do not have permission to access this section.")
+                st.stop()
+
+            st.header(f"📤 Send Pending Reviews - {region}")
             selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
-
-        with col2:
-            pass
-
-        review_type_P, review_type_A = st.tabs(["Pending", "Attained"])
-
-        with review_type_P:
-            df, min_date, max_date = load_pending_reviews(sheet_name, selected_pm)
-            df2, _, _ = load_sent_reviews(sheet_name, selected_pm)
+            email = pm_names[selected_pm]
+            df, _, _ = load_pending_reviews(sheet_name, selected_pm)
 
             if not df.empty:
-                st.success(f"Found {len(df)} pending reviews for {selected_pm}")
-                if pd.notna(min_date) and pd.notna(max_date):
-                    st.info(f"Date Range: {min_date.strftime('%B %Y')} - {max_date.strftime('%B %Y')}")
-
-                df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-                df = df[[
-                    "Name", "Brand", "Publishing Date", "Status",
-                    "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
-                ]].rename(columns={"Status": "Publishing Status"})
-                with st.expander("❓ Pending Reviews"):
-                    st.dataframe(df, width="stretch")
+                st.info(f"Found {len(df)} pending reviews for {selected_pm}")
+                st.dataframe(df, width="stretch")
+                if st.button("📨 Send to Slack", type="primary"):
+                    with st.spinner("Sending..."):
+                        success = send_pending_reviews_per_pm(selected_pm, sheet_name, email, channel)
+                        if success:
+                            st.success(f"✅ Successfully sent pending reviews to {selected_pm}")
+                        else:
+                            st.error("❌ Failed to send reviews")
             else:
                 st.warning(f"No pending reviews found for {selected_pm}")
 
-            if not df2.empty:
-                df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-                df2 = df2[[
-                    "Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"
-                ]].rename(columns={"Status": "Publishing Status"})
-                with st.expander("📦 Pending Reviews Total"):
-                    st.dataframe(df2, width="stretch")
-            else:
-                st.warning(f"No total pending reviews found for {selected_pm}")
+        elif action == "Send Attained Reviews":
+            if not st.session_state.authenticated_admin:
+                st.error("🚫 You do not have permission to access this section.")
+                st.stop()
 
-        with review_type_A:
-            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
-            month = st.selectbox("Select Month (Optional)", ["All"] + list(calendar.month_name)[1:])
-            month_number = None if month == "All" else list(calendar.month_name).index(month)
+            st.header(f"📊 Send Attained Reviews - {region}")
+            col1, col2 = st.columns(2)
+            with col1:
+                selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
+            with col2:
+                year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
 
-            df = load_attained_reviews(sheet_name, selected_pm, year, month_number)
-            total_reviews = load_total_reviews(sheet_name, selected_pm, year, month_number)
+            email = pm_names[selected_pm]
+            df = load_attained_reviews(sheet_name, selected_pm, year)
+            total_reviews = len(load_total_reviews(sheet_name, selected_pm, year))
 
             if not df.empty:
-                total = len(total_reviews) + len(df)
+                total = total_reviews + len(df)
                 percent = len(df) / total if total > 0 else 0
-
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("✅ Attained Reviews", len(df))
-                col2.metric("❓ Pending Reviews", len(total_reviews))
-                col3.metric("🤵🏻 Total Reviews", f"{total}")
-                col4.metric("🎯 Retention Rate", f"{percent:.1%}")
-
+                col1.metric("✅ Attained", len(df))
+                col2.metric("❓ Pending", total_reviews)
+                col3.metric("🤵🏻 Total", total)
+                col4.metric("🎯 Retention", f"{percent:.1%}")
                 df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-                df = df[[
-                    "Name", "Brand", "Publishing Date", "Status",
-                    "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
-                ]].rename(columns={"Status": "Publishing Status"})
-                with st.expander(f"🟢 Attained Reviews {month} {year}"):
-                    st.dataframe(df, width="stretch")
-                with st.expander(f"❓ Pending Reviews {month} {year}"):
-                    total_reviews = total_reviews[[
-                    "Name", "Brand", "Publishing Date", "Status",
-                    "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
-                ]].rename(columns={"Status": "Publishing Status"})
-                    total_reviews.index = range(1, len(total_reviews) + 1)
-                    st.dataframe(total_reviews, width="stretch")
+                df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
+                         "Trustpilot Review Links"]]
+                st.dataframe(df, width="stretch")
+                if st.button("📨 Send to Slack", type="primary"):
+                    with st.spinner("Sending..."):
+                        success = send_attained_reviews_per_pm(selected_pm, email, sheet_name, year, channel)
+                        if success:
+                            st.success(f"✅ Successfully sent attained reviews to {selected_pm}")
+                        else:
+                            st.error("❌ Failed to send reviews")
             else:
                 st.warning(f"No attained reviews found for {selected_pm}")
 
-    elif action == "Printing Data":
-        month_list = list(calendar.month_name)[1:]
-        current_month = datetime.today().strftime("%B")
 
-        tab_m, tab_y, tab_u, tab_s = st.tabs(["Monthly", "Yearly", "Upcoming", "Search"])
+        elif action == "Bulk Send":
+            if not st.session_state.authenticated_admin:
+                st.error("🚫 You do not have permission to access this section.")
+                st.stop()
 
-        with tab_m:
+            st.header(f"🚀 Bulk Send - {region}")
+            send_type = st.radio("Select Type", ["Pending Reviews", "Attained Reviews"])
 
-            month = st.selectbox(
-                "Select Month:",
-                month_list,
-                index=month_list.index(current_month)
-            )
-            month_number = month_list.index(month) + 1
-            year = st.number_input(
-                "Select Year:",
-                min_value=2025,
-                max_value=current_year,
-                value=current_year,
-                key="year1"
-            )
-            df = printing_data_month(month_number, year, region)
-
-            if not df.empty:
-                st.subheader(f"🖨️ Printing Data for {month} {year} - {region}")
-                df = df[["Name", "Brand", "Project Manager", "Address", "Phone #", "Book", "Format", "Ink Type", "No of Copies", "Order Date", "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled", "Type", "Accepted"]]
-                st.dataframe(df, width="stretch")
+            if send_type == "Pending Reviews":
+                if st.button("📤 Send to All PMs", type="primary"):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    total_pms = len(pm_names)
+                    success_count = 0
+                    for idx, (name, email) in enumerate(pm_names.items()):
+                        status_text.text(f"Processing {name}...")
+                        success = send_pending_reviews_per_pm(name, sheet_name, email, channel)
+                        if success:
+                            success_count += 1
+                        progress_bar.progress((idx + 1) / total_pms)
+                    status_text.empty()
+                    progress_bar.empty()
+                    st.success(f"✅ Sent to {success_count}/{total_pms} project managers")
 
             else:
-                st.warning(f"No printing data found for {month} {year}")
-        with tab_y:
-            year2 = st.number_input(
-                "Select Year:",
-                min_value=2025,
-                max_value=current_year,
-                value=current_year,
-                key="year2"
-            )
-            df2 = printing_data_year(year2, region)
-
-            if not df.empty:
-                st.subheader(f"🖨️ Printing Data for {year} - {region}")
-                df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
-                         "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
-                         "Type", "Accepted"]]
-                st.dataframe(df2, width="stretch")
-
-            else:
-                st.warning(f"No printing data found for {year}")
-
-        with tab_u:
-            df3 = get_printing_upcoming(region)
-
-            if not df3.empty:
-                df3 = df3[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
-                           "No of Copies",
-                           "Delivery Method", "Status",
-                           "Type"]]
-                st.dataframe(df3, width="stretch")
-            else:
-                st.info("No upcoming printings ahead!")
-
-        with tab_s:
-            st.subheader(f"🔍 Search Data for {region}")
-
-            number3 = st.number_input("Enter Year for Search", min_value=2025, step=1,
-                                      value=current_year, key="year_search")
-
-            if number3 and sheet_name:
-                data = printing_data_year(number3, region)
-
-                if data.empty:
-                    st.warning(f"⚠️ No Data Available for {region} in {number3}")
-                else:
-                    search_term = st.text_input("Search by Name", placeholder="Enter client name to search",
-                                                key="search_term").strip()
-
-                    if search_term:
-                        search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
-
-                        if search_df.empty:
-                            st.warning(f"⚠️ No results found for '{search_term}'")
-                        else:
-                            st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
-                            search_df.index = range(1, len(search_df)+1)
-                            st.dataframe(search_df[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
-                           "No of Copies",
-                           "Delivery Method", "Status",
-                           "Type"]])
-                    else:
-                        st.info("👆 Enter a name above to search")
-
-    elif action == "Send Pending Reviews":
-        if not st.session_state.authenticated_admin:
-            st.error("🚫 You do not have permission to access this section.")
-            st.stop()
-
-        st.header(f"📤 Send Pending Reviews - {region}")
-        selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
-        email = pm_names[selected_pm]
-        df, _, _ = load_pending_reviews(sheet_name, selected_pm)
-
-        if not df.empty:
-            st.info(f"Found {len(df)} pending reviews for {selected_pm}")
-            st.dataframe(df, width="stretch")
-            if st.button("📨 Send to Slack", type="primary"):
-                with st.spinner("Sending..."):
-                    success = send_pending_reviews_per_pm(selected_pm, sheet_name, email, channel)
-                    if success:
-                        st.success(f"✅ Successfully sent pending reviews to {selected_pm}")
-                    else:
-                        st.error("❌ Failed to send reviews")
-        else:
-            st.warning(f"No pending reviews found for {selected_pm}")
-
-    elif action == "Send Attained Reviews":
-        if not st.session_state.authenticated_admin:
-            st.error("🚫 You do not have permission to access this section.")
-            st.stop()
-
-        st.header(f"📊 Send Attained Reviews - {region}")
-        col1, col2 = st.columns(2)
-        with col1:
-            selected_pm = st.selectbox("Select Project Manager", list(pm_names.keys()))
-        with col2:
-            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
-
-        email = pm_names[selected_pm]
-        df = load_attained_reviews(sheet_name, selected_pm, year)
-        total_reviews = len(load_total_reviews(sheet_name, selected_pm, year))
-
-        if not df.empty:
-            total = total_reviews + len(df)
-            percent = len(df) / total if total > 0 else 0
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("✅ Attained", len(df))
-            col2.metric("❓ Pending", total_reviews)
-            col3.metric("🤵🏻 Total", total)
-            col4.metric("🎯 Retention", f"{percent:.1%}")
-            df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
-            df = df[["Name", "Brand", "Publishing Date", "Status", "Trustpilot Review", "Trustpilot Review Date",
-                     "Trustpilot Review Links"]]
-            st.dataframe(df, width="stretch")
-            if st.button("📨 Send to Slack", type="primary"):
-                with st.spinner("Sending..."):
-                    success = send_attained_reviews_per_pm(selected_pm, email, sheet_name, year, channel)
-                    if success:
-                        st.success(f"✅ Successfully sent attained reviews to {selected_pm}")
-                    else:
-                        st.error("❌ Failed to send reviews")
-        else:
-            st.warning(f"No attained reviews found for {selected_pm}")
-
-
-    elif action == "Bulk Send":
-        if not st.session_state.authenticated_admin:
-            st.error("🚫 You do not have permission to access this section.")
-            st.stop()
-
-        st.header(f"🚀 Bulk Send - {region}")
-        send_type = st.radio("Select Type", ["Pending Reviews", "Attained Reviews"])
-
-        if send_type == "Pending Reviews":
-            if st.button("📤 Send to All PMs", type="primary"):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                total_pms = len(pm_names)
-                success_count = 0
-                for idx, (name, email) in enumerate(pm_names.items()):
-                    status_text.text(f"Processing {name}...")
-                    success = send_pending_reviews_per_pm(name, sheet_name, email, channel)
-                    if success:
-                        success_count += 1
-                    progress_bar.progress((idx + 1) / total_pms)
-                status_text.empty()
-                progress_bar.empty()
-                st.success(f"✅ Sent to {success_count}/{total_pms} project managers")
-
-        else:
-            year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
-            if st.button("📤 Send to All PMs", type="primary"):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                total_pms = len(pm_names)
-                success_count = 0
-                for idx, (name, email) in enumerate(pm_names.items()):
-                    status_text.text(f"Processing {name}...")
-                    success = send_attained_reviews_per_pm(name, email, sheet_name, year, channel)
-                    if success:
-                        success_count += 1
-                    progress_bar.progress((idx + 1) / total_pms)
-                status_text.empty()
-                progress_bar.empty()
-                st.success(f"✅ Sent to {success_count}/{total_pms} project managers")
-
-
+                year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
+                if st.button("📤 Send to All PMs", type="primary"):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    total_pms = len(pm_names)
+                    success_count = 0
+                    for idx, (name, email) in enumerate(pm_names.items()):
+                        status_text.text(f"Processing {name}...")
+                        success = send_attained_reviews_per_pm(name, email, sheet_name, year, channel)
+                        if success:
+                            success_count += 1
+                        progress_bar.progress((idx + 1) / total_pms)
+                    status_text.empty()
+                    progress_bar.empty()
+                    st.success(f"✅ Sent to {success_count}/{total_pms} project managers")
+    elif st.session_state.get('authentication_status') is False:
+        st.error('Username/password is incorrect')
+        st.stop()
+    elif st.session_state.get('authentication_status') is None:
+        st.warning('Please enter your username and password')
+        st.stop()
 if __name__ == "__main__":
     main()
