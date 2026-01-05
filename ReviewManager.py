@@ -758,7 +758,7 @@ def main():
                 )
                 df2 = printing_data_year(year2, region)
 
-                if not df.empty:
+                if not df2.empty:
                     st.subheader(f"🖨️ Printing Data for {year2} - {region}")
                     df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
                              "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
