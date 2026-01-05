@@ -759,14 +759,14 @@ def main():
                 df2 = printing_data_year(year2, region)
 
                 if not df.empty:
-                    st.subheader(f"🖨️ Printing Data for {year} - {region}")
+                    st.subheader(f"🖨️ Printing Data for {year2} - {region}")
                     df2 = df2[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
                              "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
                              "Type", "Accepted"]]
                     st.dataframe(df2, width="stretch")
 
                 else:
-                    st.warning(f"No printing data found for {year}")
+                    st.warning(f"No printing data found for {year2}")
 
             with tab_u:
                 df3 = get_printing_upcoming(region)
