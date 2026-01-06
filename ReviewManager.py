@@ -772,10 +772,9 @@ def main():
                 df3 = get_printing_upcoming(region)
 
                 if not df3.empty:
-                    df3 = df3[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
-                               "No of Copies",
-                               "Delivery Method", "Status",
-                               "Type"]]
+                    df3 = df3[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
+                             "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
+                             "Type", "Accepted"]]
                     st.dataframe(df3, width="stretch")
                 else:
                     st.info("No upcoming printings ahead!")
@@ -803,10 +802,9 @@ def main():
                             else:
                                 st.success(f"✅ Found {len(search_df)} result(s) for '{search_term}'")
                                 search_df.index = range(1, len(search_df)+1)
-                                st.dataframe(search_df[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type",
-                               "No of Copies",
-                               "Delivery Method", "Status",
-                               "Type"]])
+                                st.dataframe(search_df[["Name", "Brand", "Project Manager", "Address", "Book", "Format", "Ink Type", "No of Copies", "Order Date",
+                             "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
+                             "Type", "Accepted"]])
                         else:
                             st.info("👆 Enter a name above to search")
 
