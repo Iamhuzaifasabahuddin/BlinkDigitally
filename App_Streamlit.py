@@ -1700,7 +1700,34 @@ def sales(month: int, year: int) -> pd.DataFrame:
         data["Payment"] = data["Payment"].astype(str)
         data["Payment"] = pd.to_numeric(
             data["Payment"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+    data["Payment Date"] = data["Payment Date"].dt.strftime("%d-%B-%Y")
 
+    data.index = range(1, len(data) + 1)
+
+    return data
+
+
+def sales_year(year: int) -> pd.DataFrame:
+    data = get_sheet_data(sheet_sales)
+
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Payment" in columns:
+        end_col_index = columns.index("Payment")
+        data = data.iloc[:, :end_col_index + 1]
+        data["Payment Date"] = pd.to_datetime(data["Payment Date"], errors="coerce")
+
+    if "Payment Date" in data.columns:
+        data = data[data["Payment Date"].dt.year == year]
+
+    if "Payment" in data.columns:
+        data["Payment"] = data["Payment"].astype(str)
+        data["Payment"] = pd.to_numeric(
+            data["Payment"].str.replace("$", "", regex=False).str.replace(",", "", regex=False), errors="coerce")
+
+    data["Payment Date"] = data["Payment Date"].dt.strftime("%d-%B-%Y")
     data.index = range(1, len(data) + 1)
 
     return data
@@ -1729,7 +1756,7 @@ def main() -> None:
             choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
                                   placeholder="Select Data to View")
 
-        if action in ["View Data", "Copyright", "Sales"]:
+        if action in ["View Data"]:
             selected_month = st.selectbox(
                 "Select Month",
                 month_list,
@@ -1737,7 +1764,7 @@ def main() -> None:
                 placeholder="Select Month"
             )
             selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
-        if action in ["Year Summary", "Copyright", "View Data", "Reviews", "Sales"]:
+        if action in ["Year Summary", "View Data", "Reviews"]:
             number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                      value=current_year, step=1)
 
@@ -2234,7 +2261,7 @@ def main() -> None:
 
                                     data_month["Month"] = data_month["Publishing Date"].dt.to_period("M").dt.strftime(
                                         "%B %Y")
-    
+
                                     unique_clients_count_per_month = (
                                         data_month.groupby("Month")["Name"].nunique()
                                         .reset_index()
@@ -2333,12 +2360,21 @@ def main() -> None:
                     if data.empty:
                         st.warning(f"⚠️ No Data Available for {choice} in {number3}")
                     else:
-                        search_term = st.text_input("Search by Name", placeholder="Enter client name to search",
+                        search_term = st.text_input("Search by Name / Book",
+                                                    placeholder="Enter client name or book to search",
                                                     key="search_term")
 
                         if search_term and search_term.strip():
                             search_term_clean = search_term.strip()
-                            search_df = data[data['Name'].str.contains(search_term_clean, case=False, na=False)]
+                            search_df = data[
+
+                                data["Book Name & Link"].str.contains(search_term, case=False, na=False)
+
+                                | data["Name"].str.contains(search_term, case=False, na=False)
+
+                                | data["Email"].str.contains(search_term, case=False, na=False)
+
+                                ]
 
                             if search_df.empty:
                                 st.warning(f"⚠️ No results found for '{search_term}'")
@@ -2676,11 +2712,17 @@ def main() -> None:
                     st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
                 data, _ = printing_data_year(number2)
-                search_term = st.text_input("Search by Name", placeholder="Enter Search Term", key="search_term")
+                search_term = st.text_input("Search by Name / Book", placeholder="Enter Search Term", key="search_term")
 
                 if search_term and search_term.strip():
                     search_term_clean = search_term.strip()
-                    search_df = data[data['Name'].str.contains(search_term_clean, case=False, na=False)]
+                    search_df = data[
+
+                        data["Book Name & Link"].str.contains(search_term, case=False, na=False)
+
+                        | data["Name"].str.contains(search_term, case=False, na=False)
+
+                        ]
 
                     if search_df.empty:
                         st.warning("No such orders found!")
@@ -2710,50 +2752,251 @@ def main() -> None:
                         search_df.index = range(1, len(search_df) + 1)
                         st.dataframe(search_df)
 
+        elif action == "Copyright":
 
+            tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
 
-        elif action == "Copyright" and selected_month and number:
-            st.subheader(f"© Copyright Summary for {selected_month}")
+            with tab1:
 
-            data, result, result_no = get_copyright_month(selected_month_number, number)
+                selected_month = st.selectbox(
 
-            if not data.empty:
-                st.dataframe(data)
-                st.dataframe(data)
-                buffer = io.BytesIO()
-                data.to_excel(buffer, index=False)
-                buffer.seek(0)
+                    "Select Month",
 
-                st.download_button(
-                    label="📥 Download Excel",
-                    data=buffer,
-                    file_name=f"Copyright_{selected_month}_{number}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    help="Click to download the Excel report"
+                    month_list,
+
+                    index=current_month - 1,
+
+                    placeholder="Select Month"
+
                 )
-                total_copyrights = len(data)
-                total_cost_copyright = total_copyrights * 65
-                country = data["Country"].value_counts()
-                usa = country.get("USA", "N/A")
-                canada = country.get("Canada", "N/A")
-                uk = country.get("UK", "N/A")
-                st.markdown("---")
-                st.markdown(f"""
-                ### 📊 Summary Stats
 
-                - 🧾 **Total Copyrighted Titles:** `{total_copyrights}`
-                - 💵 **Copyright Total Cost:** `${total_cost_copyright}`
-                - ✅ **Total Approved:** `{result} / {total_copyrights}`
-                - 📈 **Total Approved rate:** `{result / total_copyrights:.1%}`
-                - ❌ **Total Rejected:** `{result_no} / {total_copyrights}`
-                - 📈 **Total Rejected rate:** `{result_no / total_copyrights:.1%}`
-                - 🦅 **USA:** `{usa}`
-                - 🍁 **Canada:** `{canada}`
-                - ☕ **UK:** `{uk}`
-                """)
-                st.markdown("---")
-            else:
-                st.warning(f"⚠️ No Data Available for Copyright in {selected_month} {number}")
+                number = st.number_input(
+
+                    "Enter Year",
+
+                    min_value=int(get_min_year()),
+
+                    max_value=current_year,
+
+                    value=current_year,
+
+                    step=1,
+                    key="number_copyright"
+
+                )
+
+                selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
+
+                if selected_month and number:
+
+                    st.subheader(f"© Copyright Summary for {selected_month} {number}")
+
+                    data, approved, rejected = get_copyright_month(selected_month_number, number)
+
+                    if not data.empty:
+
+                        st.dataframe(data)
+
+                        buffer = io.BytesIO()
+
+                        data.to_excel(buffer, index=False)
+
+                        buffer.seek(0)
+
+                        st.download_button(
+
+                            label="📥 Download Excel",
+
+                            data=buffer,
+
+                            file_name=f"Copyright_{selected_month}_{number}.xlsx",
+
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+                        )
+
+                        total_titles = len(data)
+
+                        total_cost = total_titles * 65
+
+                        country_counts = data["Country"].value_counts()
+
+                        st.markdown("---")
+
+                        st.markdown("### 📊 Summary Statistics")
+
+                        st.markdown(f"""
+
+                        - 🧾 **Total Copyrighted Titles:** `{total_titles}`
+
+                        - 💵 **Total Cost:** `${total_cost}`
+
+                        - ✅ **Approved:** `{approved}` ({approved / total_titles:.1%})
+
+                        - ❌ **Rejected:** `{rejected}` ({rejected / total_titles:.1%})
+
+                        - 🦅 **USA:** `{country_counts.get("USA", 0)}`
+
+                        - 🍁 **Canada:** `{country_counts.get("Canada", 0)}`
+
+                        - ☕ **UK:** `{country_counts.get("UK", 0)}`
+
+                        """)
+
+
+                    else:
+
+                        st.warning(f"⚠️ No Data Available for {selected_month} {number}")
+
+            # -------------------- TOTAL --------------------
+
+            with tab2:
+
+                number2 = st.number_input(
+
+                    "Enter Year",
+
+                    min_value=int(get_min_year()),
+
+                    max_value=current_year,
+
+                    value=current_year,
+
+                    step=1,
+
+                    key="copyright_year_total"
+
+                )
+
+                data, approved, rejected = copyright_year(number2)
+
+                if not data.empty:
+
+                    st.subheader(f"© Total Copyright Data for {number2}")
+
+                    st.dataframe(data)
+
+                    buffer = io.BytesIO()
+
+                    data.to_excel(buffer, index=False)
+
+                    buffer.seek(0)
+
+                    st.download_button(
+
+                        label="📥 Download Excel",
+
+                        data=buffer,
+
+                        file_name=f"Copyright_{number2}.xlsx",
+
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+                    )
+
+                    total_titles = len(data)
+
+                    total_cost = total_titles * 65
+
+                    country_counts = data["Country"].value_counts()
+
+                    st.markdown("---")
+
+                    st.markdown("### 📊 Summary Statistics (All Data)")
+
+                    st.markdown(f"""
+
+                    - 🧾 **Total Titles:** `{total_titles}`
+
+                    - 💵 **Total Cost:** `${total_cost}`
+
+                    - ✅ **Approved:** `{approved}` ({approved / total_titles:.1%})
+
+                    - ❌ **Rejected:** `{rejected}` ({rejected / total_titles:.1%})
+
+                    - 🦅 **USA:** `{country_counts.get("USA", 0)}`
+
+                    - 🍁 **Canada:** `{country_counts.get("Canada", 0)}`
+
+                    - ☕ **UK:** `{country_counts.get("UK", 0)}`
+
+                    """)
+
+
+                else:
+
+                    st.warning(f"⚠️ No Data Available for {number2}")
+
+            with tab3:
+
+                number3 = st.number_input(
+
+                    "Enter Year",
+
+                    min_value=int(get_min_year()),
+
+                    max_value=current_year,
+
+                    value=current_year,
+
+                    step=1,
+
+                    key="copyright_search"
+
+                )
+
+                data, _, _ = copyright_year(number3)
+
+                search_term = st.text_input(
+
+                    "Search by Title / Name",
+
+                    placeholder="Enter Search Term"
+
+                )
+
+                if search_term and not data.empty:
+
+                    search_df = data[
+
+                        data["Book Name & Link"].str.contains(search_term, case=False, na=False)
+
+                        | data["Name"].str.contains(search_term, case=False, na=False)
+
+                        ]
+
+                    if search_df.empty:
+
+                        st.warning("No matching records found.")
+
+                    else:
+
+                        total_titles = len(search_df)
+
+                        total_cost = total_titles * 65
+
+                        country_counts = search_df["Country"].value_counts()
+
+                        st.markdown("### 🔍 Search Summary")
+
+                        st.markdown(f"""
+
+                        - 🧾 **Total Titles:** `{total_titles}`
+
+                        - 💵 **Total Cost:** `${total_cost}`
+
+                        - 🦅 **USA:** `{country_counts.get("USA", 0)}`
+
+                        - 🍁 **Canada:** `{country_counts.get("Canada", 0)}`
+
+                        - ☕ **UK:** `{country_counts.get("UK", 0)}`
+
+                        """)
+
+                        search_df.index = range(1, len(search_df) + 1)
+
+                        st.dataframe(search_df)
+
         elif action == "Generate Similarity":
 
             tab1, tab2 = st.tabs(["Queries", "Yearly Queries"])
@@ -3441,30 +3684,82 @@ def main() -> None:
                         help="Click to download the PDF report"
                     )
 
-        elif action == "Sales" and selected_month and number:
-            data = sales(selected_month_number, number)
-            if not data.empty:
-                Total_sales = data["Payment"].sum()
+        elif action == "Sales":
+            tab1, tab2 = st.tabs(["Monthly", "Yearly"])
 
-                st.markdown("### 📄 Detailed Sales Data")
+            with tab1:
+                selected_month = st.selectbox(
+                    "Select Month",
+                    month_list,
+                    index=current_month - 1,
+                    placeholder="Select Month"
+                )
 
-                st.dataframe(data)
-                st.markdown("---")
+                number = st.number_input(
+                    "Enter Year",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1
+                )
 
-                st.markdown("### 📊 Summary Statistics")
+                selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
 
-                st.markdown(f"""
+                if selected_month and number:
+                    data = sales(selected_month_number, number)
 
-                              - 🧾 **Total Clients:** {len(data)}
+                    if not data.empty:
+                        total_sales = data["Payment"].sum()
 
-                              - 💰 **Total Sales:** `{Total_sales}`
+                        show_data = data.copy()
+                        show_data["Payment"] = show_data["Payment"].map("${:,.2f}".format)
 
-                              """)
-                st.markdown("---")
+                        st.markdown("### 📄 Detailed Monthly Sales Data")
+                        st.dataframe(show_data)
 
-            else:
+                        st.markdown("---")
+                        st.markdown("### 📊 Monthly Summary")
 
-                st.warning(f"⚠️ No Data Available for Sales in {selected_month} {number}")
+                        st.markdown(f"""
+                        - 🧾 **Total Clients:** `{len(data)}`
+                        - 💰 **Total Sales:** `${total_sales:,.2f}`
+                        """)
+
+                    else:
+                        st.warning(f"⚠️ No Data Available for Sales in {selected_month} {number}")
+
+            with tab2:
+                year = st.number_input(
+                    "Enter Year",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="sales_year"
+                )
+
+                data = sales_year(year)
+
+                if not data.empty:
+                    total_sales = data["Payment"].sum()
+
+                    show_data = data.copy()
+                    show_data["Payment"] = show_data["Payment"].map("${:,.2f}".format)
+
+                    st.markdown(f"### 📄 Total Sales Data for {year}")
+                    st.dataframe(show_data)
+
+                    st.markdown("---")
+                    st.markdown("### 📊 Yearly Summary")
+
+                    st.markdown(f"""
+                    - 🧾 **Total Clients:** `{len(data)}`
+                    - 💰 **Total Sales:** `${total_sales:,.2f}`
+                    """)
+
+                else:
+                    st.warning(f"⚠️ No Data Available for Sales in {year}")
+
         elif action == "Reviews" and number:
             uk_clean = clean_data_reviews(sheet_uk)
             usa_clean = clean_data_reviews(sheet_usa)
