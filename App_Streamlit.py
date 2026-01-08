@@ -894,12 +894,12 @@ def summary(month: int, year: int):
 
     copyright_data, result_count, result_count_no = get_copyright_month(month, year)
     Total_copyrights = len(copyright_data)
-    Total_cost_copyright = Total_copyrights * 65
+
     country = copyright_data["Country"].value_counts()
     usa = country.get("USA", 0)
     canada = country.get("Canada", 0)
     uk = country.get("UK", 0)
-
+    Total_cost_copyright = (usa * 65) + (canada * 63) + (uk * 35)
     a_plus, a_plus_count = get_A_plus_month(month, year)
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
@@ -1301,11 +1301,11 @@ def generate_year_summary(year: int):
 
     copyright_data, result_count, result_count_no = copyright_year(year)
     Total_copyrights = len(copyright_data)
-    Total_cost_copyright = Total_copyrights * 65
     country = copyright_data["Country"].value_counts()
     usa = country.get("USA", "N/A")
     canada = country.get("Canada", "N/A")
     uk = country.get("UK", "N/A")
+    Total_cost_copyright = (usa * 65) + (canada * 63) + (uk * 35)
 
     a_plus, a_plus_count = get_A_plus_year(year)
 
@@ -2814,20 +2814,24 @@ def main() -> None:
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
                         )
+                        total_titles = len(data)
+                        country_counts = data["Country"].value_counts()
 
+                        country_usa = country_counts.get("USA", 0)
+                        country_uk = country_counts.get("UK", 0)
+                        country_canada = country_counts.get("Canada", 0)
                         total_titles = len(data)
 
-                        total_cost = total_titles * 65
+                        total_cost = (country_usa * 65) + (country_canada * 63) + (country_uk * 35)
 
-                        country_counts = data["Country"].value_counts()
 
                         st.markdown("---")
 
-                        st.markdown("### 📊 Summary Statistics")
+                        st.markdown("### 📊 Summary Statistics (All Data)")
 
                         st.markdown(f"""
 
-                        - 🧾 **Total Copyrighted Titles:** `{total_titles}`
+                        - 🧾 **Total Titles:** `{total_titles}`
 
                         - 💵 **Total Cost:** `${total_cost}`
 
@@ -2835,11 +2839,11 @@ def main() -> None:
 
                         - ❌ **Rejected:** `{rejected}` ({rejected / total_titles:.1%})
 
-                        - 🦅 **USA:** `{country_counts.get("USA", 0)}`
+                        - 🦅 **USA:** `{country_usa}`
 
-                        - 🍁 **Canada:** `{country_counts.get("Canada", 0)}`
+                        - 🍁 **Canada:** `{country_canada}`
 
-                        - ☕ **UK:** `{country_counts.get("UK", 0)}`
+                        - ☕ **UK:** `{country_uk}`
 
                         """)
 
@@ -2896,9 +2900,15 @@ def main() -> None:
 
                     total_titles = len(data)
 
-                    total_cost = total_titles * 65
-
                     country_counts = data["Country"].value_counts()
+
+                    country_usa = country_counts.get("USA", 0)
+                    country_uk = country_counts.get("UK", 0)
+                    country_canada = country_counts.get("Canada", 0)
+                    total_titles = len(data)
+
+                    total_cost = (country_usa * 65) + (country_canada * 63) + (country_uk * 35)
+
 
                     st.markdown("---")
 
@@ -2914,11 +2924,11 @@ def main() -> None:
 
                     - ❌ **Rejected:** `{rejected}` ({rejected / total_titles:.1%})
 
-                    - 🦅 **USA:** `{country_counts.get("USA", 0)}`
+                    - 🦅 **USA:** `{country_usa}`
 
-                    - 🍁 **Canada:** `{country_counts.get("Canada", 0)}`
+                    - 🍁 **Canada:** `{country_canada}`
 
-                    - ☕ **UK:** `{country_counts.get("UK", 0)}`
+                    - ☕ **UK:** `{country_uk}`
 
                     """)
 
@@ -2973,11 +2983,18 @@ def main() -> None:
 
                         total_titles = len(search_df)
 
-                        total_cost = total_titles * 65
-
                         country_counts = search_df["Country"].value_counts()
 
-                        st.markdown("### 🔍 Search Summary")
+
+                        country_usa = country_counts.get("USA", 0)
+                        country_uk = country_counts.get("UK", 0)
+                        country_canada = country_counts.get("Canada", 0)
+
+                        total_cost = (country_usa * 65) + (country_canada * 63) + (country_uk * 35)
+
+                        st.markdown("---")
+
+                        st.markdown("### 📊 Summary Statistics (All Data)")
 
                         st.markdown(f"""
 
@@ -2985,11 +3002,15 @@ def main() -> None:
 
                         - 💵 **Total Cost:** `${total_cost}`
 
-                        - 🦅 **USA:** `{country_counts.get("USA", 0)}`
+                        - ✅ **Approved:** `{approved}` ({approved / total_titles:.1%})
 
-                        - 🍁 **Canada:** `{country_counts.get("Canada", 0)}`
+                        - ❌ **Rejected:** `{rejected}` ({rejected / total_titles:.1%})
 
-                        - ☕ **UK:** `{country_counts.get("UK", 0)}`
+                        - 🦅 **USA:** `{country_usa}`
+
+                        - 🍁 **Canada:** `{country_canada}`
+
+                        - ☕ **UK:** `{country_uk}`
 
                         """)
 
