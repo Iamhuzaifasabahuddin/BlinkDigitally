@@ -2413,7 +2413,7 @@ def main() -> None:
                                         for platform, count in platforms.items():
                                             st.markdown(f"  - {platform}: `{count}`")
                         else:
-                            st.info("👆 Enter a name above to search")
+                            st.info("👆 Enter name/book/email above to search")
 
             with tab4:
                 st.subheader(f"📊 Filter Data by Brand for {choice}")
@@ -2751,7 +2751,8 @@ def main() -> None:
                         search_df["Order Cost"] = search_df["Order Cost"].map("${:,.2f}".format)
                         search_df.index = range(1, len(search_df) + 1)
                         st.dataframe(search_df)
-
+                else:
+                    st.info("👆 Enter name/book above to search")
         elif action == "Copyright":
 
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
@@ -2852,7 +2853,6 @@ def main() -> None:
 
                         st.warning(f"⚠️ No Data Available for {selected_month} {number}")
 
-            # -------------------- TOTAL --------------------
 
             with tab2:
 
@@ -3017,7 +3017,8 @@ def main() -> None:
                         search_df.index = range(1, len(search_df) + 1)
 
                         st.dataframe(search_df)
-
+                else:
+                    st.info("👆 Enter name/book above to search")
         elif action == "Generate Similarity":
 
             tab1, tab2 = st.tabs(["Queries", "Yearly Queries"])
