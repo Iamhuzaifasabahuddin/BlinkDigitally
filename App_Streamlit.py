@@ -1777,7 +1777,7 @@ def main() -> None:
             }.get(choice)
 
             with tab1:
-                st.subheader(f"📂 Viewing Data for {choice} - {selected_month}")
+                st.subheader(f"📂 Viewing Data for {choice} - {selected_month} {number}")
 
                 if sheet_name:
                     data = load_data(sheet_name, selected_month_number, number)
@@ -2476,7 +2476,7 @@ def main() -> None:
                 selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
 
                 if selected_month and number:
-                    st.subheader(f"🖨️ Printing Summary for {selected_month}")
+                    st.subheader(f"🖨️ Printing Summary for {selected_month} {number}")
 
                     data = get_printing_data_month(selected_month_number, number)
 
@@ -2718,7 +2718,7 @@ def main() -> None:
                     search_term_clean = search_term.strip()
                     search_df = data[
 
-                        data["Book Name & Link"].str.contains(search_term, case=False, na=False)
+                        data["Book"].str.contains(search_term, case=False, na=False)
 
                         | data["Name"].str.contains(search_term, case=False, na=False)
 
