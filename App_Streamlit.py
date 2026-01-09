@@ -3023,61 +3023,102 @@ def main() -> None:
 
             tab1, tab2 = st.tabs(["Queries", "Yearly Queries"])
 
+            def safe_month_index(month_offset: int, month_list_len: int) -> int:
+                """Ensure selectbox index is within valid range."""
+                return max(0, min(month_offset, month_list_len - 1))
+
             with tab1:
                 st.header("Compare clients with months")
-                choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
-                                      placeholder="Select Data to View")
-                sheet_name = {
-                    "UK": sheet_uk,
-                    "USA": sheet_usa,
-                }.get(choice)
+                choice = st.selectbox(
+                    "Select Data To View",
+                    ["USA", "UK"],
+                    index=None,
+                    key="choice_tab1"
+                )
+                sheet_name = {"UK": sheet_uk, "USA": sheet_usa}.get(choice)
+
+
+                index_month1 = safe_month_index(current_month - 2, len(month_list))
+                index_month2 = safe_month_index(current_month - 1, len(month_list))
+
                 selected_month_1 = st.selectbox(
                     "Select Month 1",
                     month_list,
-                    index=current_month - 2,
-                    placeholder="Select Month 1"
+                    index=index_month1,
+                    key="month1_tab1"
                 )
-                number1 = st.number_input("Enter Year 1", min_value=int(get_min_year()), max_value=current_year,
-                                          value=current_year, step=1)
+
+                number1 = st.number_input(
+                    "Enter Year 1",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="year1_tab1"
+                )
+
                 selected_month_2 = st.selectbox(
                     "Select Month 2",
                     month_list,
-                    index=current_month - 1,
-                    placeholder="Select Month 2"
+                    index=index_month2,
+                    key="month2_tab1"
                 )
-                number2 = st.number_input("Enter Year 2", min_value=int(get_min_year()), max_value=current_year,
-                                          value=current_year, step=1)
-                if sheet_name:
-                    if st.button("Generate Similar Clients"):
-                        with st.spinner(
-                                f"Generating Similarity Report for {selected_month_1} N {selected_month_2} for {choice}..."):
 
-                            data1, data2, data3 = get_names_in_both_months(sheet_name, selected_month_1, number1,
-                                                                           selected_month_2, number2)
+                number2 = st.number_input(
+                    "Enter Year 2",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="year2_tab1"
+                )
+
+                if sheet_name:
+                    if st.button("Generate Similar Clients", key="btn_generate_tab1"):
+                        with st.spinner(
+                                f"Generating Similarity Report for {selected_month_1} & {selected_month_2} for {choice}..."):
+                            data1, data2, data3 = get_names_in_both_months(
+                                sheet_name, selected_month_1, number1,
+                                selected_month_2, number2
+                            )
 
                             if not data1:
                                 st.info("No similarities found")
-                            st.write(data1)
-                            st.write(data2)
-                            st.write(data3)
+                            else:
+                                st.write("Data 1:")
+                                st.write(data1)
+                                st.write("Data 2:")
+                                st.write(data2)
+                                st.write("Data 3:")
+                                st.write(data3)
 
             with tab2:
-                choice = st.selectbox("Select Data To View", ["USA", "UK"], index=None,
-                                      placeholder="Select Data to View", key="choice_2")
-                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
-                                          value=current_year,
-                                          step=1, key="year_3")
+                choice = st.selectbox(
+                    "Select Data To View",
+                    ["USA", "UK"],
+                    index=None,
+                    key="choice_tab2"
+                )
 
-                sheet_name = {
-                    "UK": sheet_uk,
-                    "USA": sheet_usa,
-                }.get(choice)
+                sheet_name = {"UK": sheet_uk, "USA": sheet_usa}.get(choice)
+
+                number3 = st.number_input(
+                    "Enter Year",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="year_tab2"
+                )
 
                 if sheet_name and number3:
                     df_year, Total_year, year_count = get_names_in_year(sheet_name, number3)
                     if not df_year.empty:
+                        st.write("Yearly Data:")
                         st.write(df_year)
+                        st.write("Total Year:")
                         st.write(Total_year)
+                        st.write("Year Count:")
                         st.write(year_count)
                     else:
                         st.warning(f"No Similarities found for {number3}-{choice}")
