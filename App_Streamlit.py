@@ -2360,8 +2360,8 @@ def main() -> None:
                     if data.empty:
                         st.warning(f"⚠️ No Data Available for {choice} in {number3}")
                     else:
-                        search_term = st.text_input("Search by Name / Book",
-                                                    placeholder="Enter client name or book to search",
+                        search_term = st.text_input("Search by Name / Book / Email",
+                                                    placeholder="Enter client name, email or book to search",
                                                     key="search_term")
 
                         if search_term and search_term.strip():
@@ -2711,7 +2711,9 @@ def main() -> None:
                 else:
                     st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
-                data, _ = printing_data_year(number2)
+                number3 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1)
+                data, _ = printing_data_year(number3)
                 search_term = st.text_input("Search by Name / Book", placeholder="Enter Search Term", key="search_term")
 
                 if search_term and search_term.strip():
