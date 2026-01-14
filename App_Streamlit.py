@@ -735,6 +735,7 @@ def summary(month: int, year: int):
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
     usa_fav = usa_platforms.get("FAV", 0)
+    usa_acx = usa_platforms.get("ACX", 0)
 
     uk_platforms = uk_clean_platforms["Platform"].value_counts()
     uk_amazon = uk_platforms.get("Amazon", 0)
@@ -742,6 +743,7 @@ def summary(month: int, year: int):
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
     uk_fav = uk_platforms.get("FAV", 0)
     uk_kobo = uk_platforms.get("Kobo", 0)
+    uk_acx = uk_platforms.get("ACX", 0)
 
     allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
@@ -907,9 +909,9 @@ def summary(month: int, year: int):
 
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav, "ACX":usa_acx}
     uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
-                    "Kobo": uk_kobo}
+                    "Kobo": uk_kobo, "ACX":uk_acx}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -987,6 +989,7 @@ def generate_year_summary(year: int):
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
     usa_fav = usa_platforms.get("FAV", 0)
+    usa_acx = usa_platforms.get("ACX", 0)
 
     uk_platforms = uk_clean_platforms["Platform"].value_counts()
     uk_amazon = uk_platforms.get("Amazon", 0)
@@ -994,6 +997,7 @@ def generate_year_summary(year: int):
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
     uk_fav = uk_platforms.get("FAV", 0)
     uk_kobo = uk_platforms.get("Kobo", 0)
+    uk_acx = uk_platforms.get("ACX", 0)
 
     allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
 
@@ -1302,9 +1306,9 @@ def generate_year_summary(year: int):
     copyright_data, result_count, result_count_no = copyright_year(year)
     Total_copyrights = len(copyright_data)
     country = copyright_data["Country"].value_counts()
-    usa = country.get("USA", "N/A")
-    canada = country.get("Canada", "N/A")
-    uk = country.get("UK", "N/A")
+    usa = country.get("USA", 0)
+    canada = country.get("Canada", 0)
+    uk = country.get("UK", 0)
     Total_cost_copyright = (usa * 65) + (canada * 63) + (uk * 35)
 
     a_plus, a_plus_count = get_A_plus_year(year)
@@ -1313,9 +1317,9 @@ def generate_year_summary(year: int):
                   'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav, "ACX": usa_acx}
     uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
-                    "Kobo": uk_kobo}
+                    "Kobo": uk_kobo, "ACX": uk_acx}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1889,6 +1893,7 @@ def main() -> None:
                             bn = platforms.get("Barnes & Noble", "N/A")
                             ingram = platforms.get("Ingram Spark", "N/A")
                             fav = platforms.get("FAV", "N/A")
+                            acx = platforms.get("ACX", "N/A")
                             kobo = platforms.get("Kobo", "N/A")
 
                             filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
@@ -1954,6 +1959,7 @@ def main() -> None:
                                             - ⚡ **Ingram Spark:** `{ingram}`
                                             - 📚 **Kobo:** `{kobo}`
                                             - 🔉 **Findaway Voices:** `{fav}`
+                                            - 🔉 **ACX:** `{acx}`
                                             """)
                                 data_rm_dupes.index = range(1, len(data_rm_dupes) + 1)
 
@@ -2249,6 +2255,7 @@ def main() -> None:
                                 - ⚡ **Ingram Spark:** `{platforms.get("Ingram Spark", "N/A")}`
                                 - 📚 **Kobo:** `{platforms.get("Kobo", "N/A")}`
                                 - 🔉 **Findaway Voices:** `{platforms.get("FAV", "N/A")}`
+                                - 🔉 **ACX:** `{platforms.get("ACX", "N/A")}`
                                 """)
                                 data_rm_dupes.index = range(1, len(data_rm_dupes) + 1)
 
