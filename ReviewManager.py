@@ -797,7 +797,8 @@ def main():
                                                     key="search_term").strip()
 
                         if search_term:
-                            search_df = data[data['Name'].str.contains(search_term, case=False, na=False)]
+                            search_df = data[data['Book'].str.contains(search_term, case=False, na=False) |
+                                             data['Name'].str.contains(search_term, case=False, na=False) ]
 
                             if search_df.empty:
                                 st.warning(f"⚠️ No results found for '{search_term}'")
@@ -808,7 +809,7 @@ def main():
                              "Delivery Method", "Status", "Courier", "Tracking Number", "Shipping Date", "Fulfilled",
                              "Type", "Accepted"]])
                         else:
-                            st.info("👆 Enter a name above to search")
+                            st.info("👆 Enter a name / book above to search")
 
         elif action == "Send Pending Reviews":
             if not st.session_state.authenticated_admin:
