@@ -665,25 +665,42 @@ def main():
                     if pd.notna(min_date) and pd.notna(max_date):
                         st.info(f"Date Range: {min_date.strftime('%B %Y')} - {max_date.strftime('%B %Y')}")
 
-                    df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                    df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime(
+                        "%d-%B-%Y")
                     df = df[[
                         "Name", "Brand", "Publishing Date", "Status",
                         "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                     ]].rename(columns={"Status": "Publishing Status"})
+
+                    search_query = st.text_input("🔍 Search Pending Reviews", "")
+                    if search_query:
+                        df = df[
+                            df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)]
+
                     with st.expander("❓ Pending Reviews"):
                         st.dataframe(df, width="stretch")
                 else:
                     st.warning(f"No pending reviews found for {selected_pm}")
 
                 if not df2.empty:
-                    df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                    df2["Publishing Date"] = pd.to_datetime(df2["Publishing Date"], errors='coerce').dt.strftime(
+                        "%d-%B-%Y")
                     df2 = df2[[
                         "Name", "Brand", "Publishing Date", "Status", "Trustpilot Review"
                     ]].rename(columns={"Status": "Publishing Status"})
+
+
+                    search_query_total = st.text_input("🔍 Search Total Pending Reviews", "")
+                    if search_query_total:
+                        df2 = df2[
+                            df2.apply(lambda row: row.astype(str).str.contains(search_query_total, case=False).any(),
+                                      axis=1)]
+
                     with st.expander("📦 Pending Reviews Total"):
                         st.dataframe(df2, width="stretch")
                 else:
                     st.warning(f"No total pending reviews found for {selected_pm}")
+
 
             with review_type_A:
                 year = st.number_input("Select Year", min_value=2025, max_value=current_year, value=current_year)
@@ -703,19 +720,33 @@ def main():
                     col3.metric("🤵🏻 Total Reviews", f"{total}")
                     col4.metric("🎯 Retention Rate", f"{percent:.1%}")
 
-                    df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime("%d-%B-%Y")
+                    df["Publishing Date"] = pd.to_datetime(df["Publishing Date"], errors='coerce').dt.strftime(
+                        "%d-%B-%Y")
                     df = df[[
                         "Name", "Brand", "Publishing Date", "Status",
                         "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                     ]].rename(columns={"Status": "Publishing Status"})
+
+                    # --- Search/filter for attained reviews ---
+                    search_attained = st.text_input(f"🔍 Search Attained Reviews ({month} {year})", "")
+                    if search_attained:
+                        df = df[df.apply(lambda row: row.astype(str).str.contains(search_attained, case=False).any(),
+                                         axis=1)]
+
                     with st.expander(f"🟢 Attained Reviews {month} {year}"):
                         st.dataframe(df, width="stretch")
-                    with st.expander(f"❓ Pending Reviews {month} {year}"):
-                        total_reviews = total_reviews[[
+
+                    # --- Search/filter for pending reviews ---
+                    search_pending = st.text_input(f"🔍 Search Pending Reviews ({month} {year})", "")
+                    total_reviews = total_reviews[[
                         "Name", "Brand", "Publishing Date", "Status",
                         "Trustpilot Review", "Trustpilot Review Date", "Trustpilot Review Links"
                     ]].rename(columns={"Status": "Publishing Status"})
-                        total_reviews.index = range(1, len(total_reviews) + 1)
+                    if search_pending:
+                        total_reviews = total_reviews[total_reviews.apply(
+                            lambda row: row.astype(str).str.contains(search_pending, case=False).any(), axis=1)]
+                    total_reviews.index = range(1, len(total_reviews) + 1)
+                    with st.expander(f"❓ Pending Reviews {month} {year}"):
                         st.dataframe(total_reviews, width="stretch")
                 else:
                     st.warning(f"No attained reviews found for {selected_pm}")
