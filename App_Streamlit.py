@@ -268,6 +268,53 @@ def load_reviews_year(sheet_name: str, year: int, name: str, type_: str = "Attai
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
+def load_reviews_year_multiple(sheet_name: str, start_year: int, end_year: int, name: str, type_: str = "Attained") -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns:
+            data = data[
+                (data["Trustpilot Review Date"].dt.year >= start_year) &
+                (data["Trustpilot Review Date"].dt.year <= end_year)
+
+            ]
+
+        else:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        data_original = data.copy()
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            (data_original["Trustpilot Review"] == type_) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
 
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
     """Clean the data from Google Sheets"""
@@ -384,6 +431,60 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     return data, month_totals
 
+def printing_data_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[
+        (data["Order Date"].dt.year >= start_year) &
+        (data["Order Date"].dt.year <= end_year)
+    ]
+
+    data = data.sort_values(by="Order Date", ascending=True)
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
+
+    data['Month'] = data['Order Date'].dt.to_period('M')
+
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
+    month_totals = month_totals.sort_values(by="Total Cost ($)", ascending=False)
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals["Total Cost ($)"] = month_totals["Total Cost ($)"].map("${:,.2f}".format)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, month_totals
 
 def get_copyright_month(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
     """Get copyright data for the current month"""
@@ -445,6 +546,37 @@ def copyright_year(year: int) -> tuple[pd.DataFrame, int, int]:
 
     return data, result_count, result_count_no
 
+def copyright_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, int, int]:
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return pd.DataFrame(), 0, 0
+
+    columns = list(data.columns)
+    if "Country" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year >= start_year) &
+            (data["Submission Date"].dt.year <= end_year)
+
+        ]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count, result_count_no
 
 def get_A_plus_month(month: int, year: int) -> tuple[pd.DataFrame, int]:
     data = get_sheet_data(sheet_a_plus)
@@ -503,6 +635,35 @@ def get_A_plus_year(year: int) -> tuple[pd.DataFrame, int]:
 
     return data, result_count
 
+def get_A_plus_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, int]:
+    data = get_sheet_data(sheet_a_plus)
+    if data.empty:
+        return pd.DataFrame(), 0
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"] ,errors='coerce')
+        data = data[
+            (data["A+ Content Date"].dt.year >= start_year) &
+            (data["A+ Content Date"].dt.year <= end_year)
+        ]
+    data = data.sort_values(by=["A+ Content Date"], ascending=True)
+
+    result_count = len(data[data["Status"] == "Published"]) if "Status" in data.columns else 0
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = data["A+ Content Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
 
 def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2: str, year2: int) -> tuple:
     """
@@ -1344,6 +1505,419 @@ def generate_year_summary(year: int):
     return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
 
 
+def generate_year_summary_multiple(start_year: int, end_year: int):
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.year >= start_year) &
+        (usa_clean["Publishing Date"].dt.year <= end_year)
+
+    ]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.year >= start_year) &
+        (uk_clean["Publishing Date"].dt.year <= end_year)
+    ]
+
+    usa_clean_platforms = usa_clean[
+        (usa_clean["Publishing Date"].dt.year >= start_year) &
+        (usa_clean["Publishing Date"].dt.year <= end_year)
+        ]
+    uk_clean_platforms = uk_clean[
+        (uk_clean["Publishing Date"].dt.year >= start_year) &
+        (uk_clean["Publishing Date"].dt.year <= end_year)
+    ]
+
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+        return
+    if usa_clean.empty and uk_clean.empty:
+        return
+
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="first")
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="first")
+    Issues_usa = usa_clean["Issues"].value_counts()
+    Issues_uk = uk_clean["Issues"].value_counts()
+    total_usa = usa_clean["Name"].nunique()
+    total_uk = uk_clean["Name"].nunique()
+    total_unique_clients = total_usa + total_uk
+
+    combined = pd.concat([usa_clean[["Name", "Brand", "Project Manager", "Email"]],
+                          uk_clean[["Name", "Brand", "Project Manager", "Email"]]])
+    combined.index = range(1, len(combined) + 1)
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    aurora_writers = brands.get("Aurora Writers", 0)
+    kdp = brands.get("KDP", 0)
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", 0)
+    book_publication = uk_brand.get("Book Publication", 0)
+
+    usa_platforms = usa_clean_platforms["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_fav = usa_platforms.get("FAV", 0)
+    usa_acx = usa_platforms.get("ACX", 0)
+
+    uk_platforms = uk_clean_platforms["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_fav = uk_platforms.get("FAV", 0)
+    uk_kobo = uk_platforms.get("Kobo", 0)
+    uk_acx = uk_platforms.get("ACX", 0)
+
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
+
+    if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
+        usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
+        usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        usa_review_sent = usa_review_pending = usa_review_na = 0
+
+    if "Trustpilot Review" in uk_clean.columns and "Brand" in uk_clean.columns:
+        uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
+        uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        uk_review_sent = uk_review_pending = uk_review_na = 0
+
+    combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    pending_sent_details = combined_pending_sent[
+        ((combined_pending_sent["Trustpilot Review"] == "Sent") |
+         (combined_pending_sent["Trustpilot Review"] == "Pending")) &
+        (combined_pending_sent["Brand"].isin(allowed_brands))
+        ]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
+    pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+
+    pm_list_usa = usa_clean["Project Manager"].dropna().unique()
+    pm_list_uk = uk_clean["Project Manager"].dropna().unique()
+
+    usa_reviews_per_pm = safe_concat([load_reviews_year_multiple(sheet_usa, start_year, end_year, pm, "Attained") for pm in pm_list_usa])
+    uk_reviews_per_pm = safe_concat([load_reviews_year_multiple(sheet_uk, start_year, end_year, pm, "Attained") for pm in pm_list_uk])
+    combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
+
+    usa_monthly = (
+        usa_clean.groupby(usa_clean["Publishing Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="USA Published")
+    )
+    usa_monthly["Month"] = usa_monthly["Publishing Date"].dt.strftime("%B %Y")
+    usa_monthly = usa_monthly[["Month", "USA Published"]]
+
+    uk_monthly = (
+        uk_clean.groupby(uk_clean["Publishing Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="UK Published")
+    )
+    uk_monthly["Month"] = uk_monthly["Publishing Date"].dt.strftime("%B %Y")
+    uk_monthly = uk_monthly[["Month", "UK Published"]]
+
+    combined_monthly = pd.merge(
+        usa_monthly,
+        uk_monthly,
+        on="Month",
+        how="outer"
+    ).fillna(0)
+
+    combined_monthly["Total Published"] = combined_monthly["USA Published"] + combined_monthly["UK Published"]
+
+    combined_monthly["Month_Num"] = pd.to_datetime(combined_monthly["Month"], format="%B %Y")
+    combined_monthly = combined_monthly.sort_values("Total Published", ascending=False).drop(columns="Month_Num")
+
+    combined_monthly.index = range(1, len(combined_monthly) + 1)
+
+    if not usa_reviews_per_pm.empty:
+        usa_attained_pm = (
+            usa_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+        usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    else:
+        usa_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        usa_total_attained = 0
+
+    if not uk_reviews_per_pm.empty:
+        uk_attained_pm = (
+            uk_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+        uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+    else:
+        uk_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        uk_total_attained = 0
+
+    if not combined_data.empty:
+        attained_reviews_per_pm = (
+            combined_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
+        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+        review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            review_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        attained_details = review_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        attained_details.index = range(1, len(attained_details) + 1)
+
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        )
+
+        if not usa_reviews_per_pm.empty:
+            usa_attained_monthly = (
+                usa_reviews_per_pm.groupby(usa_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Attained Reviews")
+            )
+            usa_attained_monthly["Month"] = usa_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_attained_monthly = usa_attained_monthly[["Month", "USA Attained Reviews"]]
+        else:
+            usa_attained_monthly = pd.DataFrame(columns=["Month", "USA Attained Reviews"])
+
+        if not uk_reviews_per_pm.empty:
+            uk_attained_monthly = (
+                uk_reviews_per_pm.groupby(uk_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Attained Reviews")
+            )
+            uk_attained_monthly["Month"] = uk_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_attained_monthly = uk_attained_monthly[["Month", "UK Attained Reviews"]]
+        else:
+            uk_attained_monthly = pd.DataFrame(columns=["Month", "UK Attained Reviews"])
+        attained_reviews_per_month = pd.merge(
+            usa_attained_monthly,
+            uk_attained_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        attained_reviews_per_month["Total Attained Reviews"] = (
+                attained_reviews_per_month["USA Attained Reviews"] + attained_reviews_per_month["UK Attained Reviews"]
+        )
+
+        attained_reviews_per_month["Month_Num"] = pd.to_datetime(attained_reviews_per_month["Month"], format="%B %Y")
+        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews",
+                                                                            ascending=False)
+        attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+        attained_reviews_per_month = attained_reviews_per_month.drop(columns="Month_Num")
+
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        attained_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        attained_reviews_per_month = pd.DataFrame(columns=["Month", "Total Attained Reviews"])
+
+    usa_negative_per_pm = [load_reviews_year_multiple(sheet_usa, start_year, end_year,  pm, "Negative") for pm in pm_list_usa]
+    usa_negative_per_pm = safe_concat([df for df in usa_negative_per_pm if not df.empty])
+
+    uk_negative_per_pm = [load_reviews_year_multiple(sheet_uk, start_year, end_year, pm, "Negative") for pm in pm_list_uk]
+    uk_negative_per_pm = safe_concat([df for df in uk_negative_per_pm if not df.empty])
+
+    combined_negative_data = safe_concat([usa_negative_per_pm, uk_negative_per_pm])
+
+    if not usa_negative_per_pm.empty:
+        usa_negative_pm = (
+            usa_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        usa_negative_pm.index = range(1, len(usa_negative_pm) + 1)
+        usa_total_negative = usa_negative_pm["Negative Reviews"].sum()
+    else:
+        usa_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        usa_total_negative = 0
+
+    if not uk_negative_per_pm.empty:
+        uk_negative_pm = (
+            uk_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        uk_negative_pm.index = range(1, len(uk_negative_pm) + 1)
+        uk_total_negative = uk_negative_pm["Negative Reviews"].sum()
+    else:
+        uk_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        uk_total_negative = 0
+
+    if not combined_negative_data.empty:
+
+        negative_reviews_per_pm = (
+            combined_negative_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        negative_reviews_per_pm.columns = ["Project Manager", "Negative Reviews"]
+        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(by="Negative Reviews", ascending=False)
+        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
+
+        negative_details_df = combined_negative_data.sort_values(by="Project Manager", ascending=True)
+        negative_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        negative_details = negative_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        negative_details.index = range(1, len(negative_details) + 1)
+
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        )
+
+        if not usa_negative_per_pm.empty:
+            usa_negative_monthly = (
+                usa_negative_per_pm.groupby(usa_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Negative Reviews")
+            )
+            usa_negative_monthly["Month"] = usa_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_negative_monthly = usa_negative_monthly[["Month", "USA Negative Reviews"]]
+        else:
+            usa_negative_monthly = pd.DataFrame(columns=["Month", "USA Negative Reviews"])
+
+        # UK monthly negative reviews
+        if not uk_negative_per_pm.empty:
+            uk_negative_monthly = (
+                uk_negative_per_pm.groupby(uk_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Negative Reviews")
+            )
+            uk_negative_monthly["Month"] = uk_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_negative_monthly = uk_negative_monthly[["Month", "UK Negative Reviews"]]
+        else:
+            uk_negative_monthly = pd.DataFrame(columns=["Month", "UK Negative Reviews"])
+
+        # Merge USA and UK negative trends
+        negative_reviews_per_month = pd.merge(
+            usa_negative_monthly,
+            uk_negative_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        negative_reviews_per_month["Total Negative Reviews"] = (
+                negative_reviews_per_month["USA Negative Reviews"] + negative_reviews_per_month["UK Negative Reviews"]
+        )
+
+        # Sort by month
+        negative_reviews_per_month["Month_Num"] = pd.to_datetime(negative_reviews_per_month["Month"], format="%B %Y")
+        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews",
+                                                                            ascending=False)
+        negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
+        negative_reviews_per_month = negative_reviews_per_month.drop(columns="Month_Num")
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        negative_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
+
+    usa_review = {
+        "Attained": usa_total_attained,
+        "Sent": usa_review_sent,
+        "Pending": usa_review_pending,
+        "Negative": usa_total_negative
+    }
+
+    uk_review = {
+        "Attained": uk_total_attained,
+        "Sent": uk_review_sent,
+        "Pending": uk_review_pending,
+        "Negative": uk_total_negative
+    }
+
+    printing_data, monthly_printing = printing_data_year_multiple(start_year, end_year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
+
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count, result_count_no = copyright_year_multiple(start_year, end_year)
+    Total_copyrights = len(copyright_data)
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", 0)
+    canada = country.get("Canada", 0)
+    uk = country.get("UK", 0)
+    Total_cost_copyright = (usa * 65) + (canada * 63) + (uk * 35)
+
+    a_plus, a_plus_count = get_A_plus_year_multiple(start_year, end_year)
+
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
+                  'Aurora Writers': aurora_writers}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
+                    "Kobo": uk_kobo, "ACX": uk_acx}
+
+    printing_stats = {
+        'Total_copies': Total_copies,
+        'Total_cost': Total_cost,
+        'Highest_cost': Highest_cost,
+        'Lowest_cost': Lowest_cost,
+        'Highest_copies': Highest_copies,
+        'Lowest_copies': Lowest_copies,
+        'Average': Average
+    }
+
+    copyright_stats = {
+        'Total_copyrights': Total_copyrights,
+        'Total_cost_copyright': Total_cost_copyright,
+        'result_count': result_count,
+        'result_count_no': result_count_no,
+        'usa_copyrights': usa,
+        'canada_copyrights': canada,
+        'uk': uk
+    }
+
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
+
+
 def logging_function() -> None:
     """Creates a console and file logging handler that logs messages
         Returns:
@@ -1362,32 +1936,61 @@ def logging_function() -> None:
     logger.addHandler(file_handler)
 
 
-def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_brands,
-                                usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus,
-                                selected_month, number, filename="summary_report.pdf"):
+def generate_summary_report_pdf(
+    usa_review_data,
+    uk_review_data,
+    usa_brands,
+    uk_brands,
+    usa_platforms,
+    uk_platforms,
+    printing_stats,
+    copyright_stats,
+    a_plus,
+    selected_month=None,
+    start_year=None,
+    end_year=None,
+    filename=None
+):
     """
-    Generate a PDF version of the Streamlit summary report
+    Generate a PDF summary report with proper year / range handling
     """
 
-    # Create PDF document in memory
-    if selected_month:
-        filename = f"{selected_month}-{number} Summary Report.pdf"
+    if selected_month and start_year and end_year:
+        title_text = f"{selected_month} ({start_year}–{end_year}) Summary Report"
+        filename = f"{selected_month}_{start_year}_{end_year}_Summary_Report.pdf"
+
+    elif selected_month and start_year:
+        title_text = f"{selected_month} {start_year} Summary Report"
+        filename = f"{selected_month}_{start_year}_Summary_Report.pdf"
+
+    elif start_year and end_year:
+        title_text = f"{start_year}–{end_year} Summary Report"
+        filename = f"{start_year}_{end_year}_Summary_Report.pdf"
+
+    elif start_year:
+        title_text = f"{start_year} Summary Report"
+        filename = f"{start_year}_Summary_Report.pdf"
+
     else:
-        filename = f"{number} Summary Report.pdf"
+        title_text = "Summary Report"
+        filename = "Summary_Report.pdf"
 
-    # Create BytesIO object to store PDF in memory
+    filename = filename.replace(" ", "_")
+
     buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=18
+    )
 
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            rightMargin=72, leftMargin=72,
-                            topMargin=72, bottomMargin=18)
-
-    # Get styles
     styles = getSampleStyleSheet()
 
-    # Custom styles
     title_style = ParagraphStyle(
-        'CustomTitle',
+        'Title',
         parent=styles['Heading1'],
         fontSize=24,
         spaceAfter=30,
@@ -1396,275 +1999,151 @@ def generate_summary_report_pdf(usa_review_data, uk_review_data, usa_brands, uk_
     )
 
     section_style = ParagraphStyle(
-        'SectionHeader',
+        'Section',
         parent=styles['Heading2'],
         fontSize=16,
-        spaceAfter=12,
         spaceBefore=20,
+        spaceAfter=12,
         textColor=colors.darkgreen
     )
 
     subsection_style = ParagraphStyle(
-        'SubsectionHeader',
+        'SubSection',
         parent=styles['Heading3'],
         fontSize=12,
-        spaceAfter=8,
         spaceBefore=12,
+        spaceAfter=8,
         textColor=colors.darkblue
     )
 
     story = []
-
-    if selected_month:
-        story.append(Paragraph(f"{selected_month} {number} Summary Report", title_style))
-    else:
-        story.append(Paragraph(f"{number} Summary Report", title_style))
-
+    story.append(Paragraph(title_text, title_style))
     story.append(Spacer(1, 20))
 
-    usa_total = usa_review_data.sum() if hasattr(usa_review_data, "sum") else sum(usa_review_data.values())
-    if isinstance(usa_review_data, dict):
-        usa_attained = usa_review_data.get("Attained", 0)
-    else:
-        usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
-    usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
+    usa_total = sum(usa_review_data.values())
+    uk_total = sum(uk_review_data.values())
 
-    uk_total = uk_review_data.sum() if hasattr(uk_review_data, "sum") else sum(uk_review_data.values())
-    if isinstance(uk_review_data, dict):
-        uk_attained = uk_review_data.get("Attained", 0)
-    else:
-        uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
-    uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
+    usa_attained = usa_review_data.get("Attained", 0)
+    uk_attained = uk_review_data.get("Attained", 0)
 
     combined_total = usa_total + uk_total
     combined_attained = usa_attained + uk_attained
-    combined_attained_pct = (combined_attained / combined_total * 100) if combined_total > 0 else 0
 
-    # Review Analytics Section
+    usa_pct = (usa_attained / usa_total * 100) if usa_total else 0
+    uk_pct = (uk_attained / uk_total * 100) if uk_total else 0
+    combined_pct = (combined_attained / combined_total * 100) if combined_total else 0
+
     story.append(Paragraph("📝 Review Analytics", section_style))
-    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
     story.append(Spacer(1, 12))
 
-    # Review summary table
-    review_data = [
-        ['Region', 'Total Reviews', 'Attained', 'Success Rate'],
-        ['🇺🇸 USA', f"{usa_total:,}", f"{usa_attained:,}", f"{usa_attained_pct:.1f}%"],
-        ['🇬🇧 UK', f"{uk_total:,}", f"{uk_attained:,}", f"{uk_attained_pct:.1f}%"],
-        ['Combined', f"{combined_total:,}", f"{combined_attained:,}", f"{combined_attained_pct:.1f}%"]
-    ]
+    review_table = Table([
+        ["Region", "Total Reviews", "Attained", "Success Rate"],
+        ["USA", f"{usa_total:,}", f"{usa_attained:,}", f"{usa_pct:.1f}%"],
+        ["UK", f"{uk_total:,}", f"{uk_attained:,}", f"{uk_pct:.1f}%"],
+        ["Combined", f"{combined_total:,}", f"{combined_attained:,}", f"{combined_pct:.1f}%"],
+    ])
 
-    review_table = Table(review_data)
     review_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
     ]))
 
     story.append(review_table)
-    story.append(Spacer(1, 20))
 
-    # Platform Distribution
+    story.append(Spacer(1, 20))
     story.append(Paragraph("📱 Platform Distribution", subsection_style))
 
-    total_client_usa = 0
-    total_client_uk = 0
-    # USA Platforms
-    if usa_platforms:
-        story.append(Paragraph("USA Platform Breakdown:", styles['Normal']))
-        usa_platform_data = [['Platform', 'Count']]
-        for platform, count in usa_platforms.items():
-            usa_platform_data.append([platform, str(count)])
-
-        usa_platform_table = Table(usa_platform_data)
-        usa_platform_table.setStyle(TableStyle([
+    for label, platforms in [("USA", usa_platforms), ("UK", uk_platforms)]:
+        story.append(Paragraph(f"{label} Platforms", styles['Normal']))
+        table = Table([["Platform", "Count"]] + [[k, v] for k, v in platforms.items()])
+        table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
         ]))
-        story.append(usa_platform_table)
-        story.append(Spacer(1, 10))
+        story.append(table)
+        story.append(Spacer(1, 12))
 
-    # UK Platforms
-    if uk_platforms:
-        story.append(Paragraph("UK Platform Breakdown:", styles['Normal']))
-        uk_platform_data = [['Platform', 'Count']]
-        for platform, count in uk_platforms.items():
-            uk_platform_data.append([platform, str(count)])
-
-        uk_platform_table = Table(uk_platform_data)
-        uk_platform_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(uk_platform_table)
-        story.append(Spacer(1, 20))
-
-    # Brand Performance
     story.append(Paragraph("🏷️ Brand Performance", subsection_style))
 
-    # Brand tables side by side
-    if usa_brands and uk_brands:
-        brand_data = [['USA Brands', 'Count', 'UK Brands', 'Count']]
-        usa_items = list(usa_brands.items())
-        uk_items = list(uk_brands.items())
-        max_len = max(len(usa_items), len(uk_items))
+    brand_table = Table(
+        [["USA Brand", "Count", "UK Brand", "Count"]] +
+        list(zip(
+            list(usa_brands.keys()) + ["Total"],
+            list(usa_brands.values()) + [sum(usa_brands.values())],
+            list(uk_brands.keys()) + ["Total"],
+            list(uk_brands.values()) + [sum(uk_brands.values())]
+        ))
+    )
 
-        for i in range(max_len):
-            usa_brand = usa_items[i] if i < len(usa_items) else ('', '')
-            uk_brand = uk_items[i] if i < len(uk_items) else ('', '')
-            brand_data.append([usa_brand[0], str(usa_brand[1]), uk_brand[0], str(uk_brand[1])])
+    brand_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
+    ]))
 
-        # Add totals row
-        total_usa = sum(usa_brands.values())
-        total_uk = sum(uk_brands.values())
-        brand_data.append(['Total', str(total_usa), 'Total', str(total_uk)])
-
-        brand_table = Table(brand_data)
-        brand_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey)
-        ]))
-        story.append(brand_table)
-        story.append(Spacer(1, 20))
+    story.append(brand_table)
 
     story.append(PageBreak())
     story.append(Paragraph("🖨️ Printing Analytics", section_style))
-    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
-    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
 
-    printing_data = [
-        ['Metric', 'Value'],
-        ['Total Copies', f"{printing_stats['Total_copies']:,}"],
-        ['Highest Copies', str(printing_stats['Highest_copies'])],
-        ['Lowest Copies', str(printing_stats['Lowest_copies'])],
-        ['Total Cost', f"${printing_stats['Total_cost']:,.2f}"],
-        ['Highest Cost', f"${printing_stats['Highest_cost']:.2f}"],
-        ['Lowest Cost', f"${printing_stats['Lowest_cost']:.2f}"],
-        ['Average Cost per Copy', f"${printing_stats['Average']:.2f}"]
-    ]
+    printing_table = Table([
+        ["Metric", "Value"],
+        ["Total Copies", f"{printing_stats['Total_copies']:,}"],
+        ["Total Cost", f"${printing_stats['Total_cost']:,.2f}"],
+        ["Avg Cost/Copy", f"${printing_stats['Average']:.2f}"]
+    ])
 
-    printing_table = Table(printing_data)
     printing_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.lightyellow)
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
 
     story.append(printing_table)
     story.append(Spacer(1, 20))
-
-    # Copyright Analytics Section
     story.append(Paragraph("©️ Copyright Analytics", section_style))
-    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
-    story.append(Spacer(1, 12))
-    success = copyright_stats['result_count']
-    success_rate = (copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if copyright_stats[
-                                                                                                        'Total_copyrights'] > 0 else 0
-    rejection_rate = (copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if \
-        copyright_stats[
-            'Total_copyrights'] > 0 else 0
-    copyright_data = [
-        ['Metric', 'Value'],
-        ['Total Copyrights', str(copyright_stats['Total_copyrights'])],
-        ['Total Cost', f"${copyright_stats['Total_cost_copyright']:,}"],
-        ['Success Count', f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}"],
-        ['Success Percentage', f"{success_rate:.1f}%"],
-        ['Rejected', f"{copyright_stats["result_count_no"]}"],
-        ['Rejection Percentage', f"{rejection_rate:.1f}%"],
-        ['USA Copyrights', str(copyright_stats['usa_copyrights'])],
-        ['Canada Copyrights', str(copyright_stats['canada_copyrights'])]
-    ]
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
 
-    copyright_table = Table(copyright_data)
+    success_rate = (
+        copyright_stats['result_count'] /
+        copyright_stats['Total_copyrights'] * 100
+        if copyright_stats['Total_copyrights'] else 0
+    )
+
+    copyright_table = Table([
+        ["Metric", "Value"],
+        ["Total Copyrights", copyright_stats['Total_copyrights']],
+        ["Success Rate", f"{success_rate:.1f}%"],
+        ["Total Cost", f"${copyright_stats['Total_cost_copyright']:,}"]
+    ])
+
     copyright_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.purple),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.lavender)
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
 
     story.append(copyright_table)
     story.append(Spacer(1, 20))
-
     story.append(Paragraph("A+ Content", section_style))
-    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
-    story.append(Spacer(1, 12))
-    a_plus_data = [
-        ['Metric', 'Count'],
-        ['Total A+', str(a_plus)]
-    ]
+    story.append(Table([["Total A+", a_plus]]))
 
-    a_plus_table = Table(a_plus_data)
-    a_plus_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.blue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
-    ]))
+    story.append(Spacer(1, 30))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+    story.append(
+        Paragraph(
+            f"Generated on {datetime.now().strftime('%B %d, %Y %I:%M %p')}",
+            styles['Normal']
+        )
+    )
 
-    story.append(a_plus_table)
-    story.append(Spacer(1, 20))
-
-    # Executive Summary Section
-    story.append(Paragraph("📈 Executive Summary", section_style))
-    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
-    story.append(Spacer(1, 12))
-
-    exec_summary = f"""
-    <b>Reviews:</b><br/>
-    • Combined Reviews: {combined_total:,}<br/>
-    • Success Rate: {combined_attained_pct:.1f}%<br/>
-    • USA Attained: {usa_attained:,}<br/>
-    • UK Attained: {uk_attained:,}<br/><br/>
-
-    <b>Printing:</b><br/>
-    • Total Copies: {printing_stats['Total_copies']:,}<br/>
-    • Total Cost: ${printing_stats['Total_cost']:,.2f}<br/>
-    • Cost Efficiency: ${printing_stats['Average']:.2f}/copy<br/><br/>
-
-    <b>Copyright:</b><br/>
-    • Applications: {copyright_stats['Total_copyrights']}<br/>
-    • Success Rate: {success_rate:.1f}%<br/>
-    • Rejection Rate: {rejection_rate:.1f}%<br/>
-    • Total Cost: ${copyright_stats['Total_cost_copyright']:,}<br/>
-
-    <b>A+ Content:</b><br/>
-    • Total A+: {a_plus}<br/>
-
-    """
-
-    story.append(Paragraph(exec_summary, styles['Normal']))
-    story.append(Spacer(1, 20))
-
-    # Footer
-    story.append(HRFlowable(width="100%", thickness=1, lineCap='round', color=colors.lightgrey))
-    story.append(Spacer(1, 10))
-    footer_text = f"Report generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
-    story.append(Paragraph(footer_text, styles['Normal']))
-
-    # Build the PDF
     doc.build(story)
 
-    # Get PDF data from buffer
     pdf_data = buffer.getvalue()
     buffer.close()
 
@@ -1746,7 +2225,7 @@ def main() -> None:
         action = st.selectbox("What would you like to do?",
                               ["View Data", "Printing", "Copyright", "Generate Similarity",
                                "Summary",
-                               "Year Summary", "Reviews", "Sales"],
+                               "Year Summary", "Custom Summary", "Reviews", "Sales"],
                               index=None,
                               placeholder="Select Action")
 
@@ -3176,7 +3655,7 @@ def main() -> None:
                                                                              usa_platforms, uk_platforms,
                                                                              printing_stats, copyright_stats,
                                                                              a_plus,
-                                                                             selected_month, number)
+                                                                             selected_month=selected_month, start_year=number)
 
                         usa_total = sum(usa_review_data.values())
                         usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
@@ -3478,7 +3957,7 @@ def main() -> None:
                                                                              usa_brands, uk_brands,
                                                                              usa_platforms, uk_platforms,
                                                                              printing_stats, copyright_stats, a_plus,
-                                                                             selected_month, number)
+                                                                             start_year=number)
 
                         usa_total = sum(usa_review_data.values())
                         usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
@@ -3920,6 +4399,325 @@ def main() -> None:
 
             else:
                 st.warning("No combined review data found.")
+
+        elif action == "Custom Summary":
+
+            start_year = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                     value=current_year-1, step=1, key="start_year")
+            end_year = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                     value=current_year, step=1, key="end_year")
+            st.header("📄 Generate Multi Year Summary Report")
+
+            uk_clean = clean_data_reviews(sheet_uk)
+            usa_clean = clean_data_reviews(sheet_usa)
+
+            usa_clean = usa_clean[
+                (usa_clean["Publishing Date"].dt.year >= start_year) &
+                 (usa_clean["Publishing Date"].dt.year<=  end_year)
+            ]
+            uk_clean = uk_clean[
+                (uk_clean["Publishing Date"].dt.year >= start_year) &
+                (uk_clean["Publishing Date"].dt.year <= end_year)
+            ]
+            no_data = False
+
+            if usa_clean.empty:
+                no_data = True
+
+            if uk_clean.empty:
+                no_data = True
+
+            if usa_clean.empty and uk_clean.empty:
+                no_data = True
+
+            if no_data:
+                st.error(f"Cannot generate summary — no data available for the Years {start_year}-{end_year}.")
+            else:
+                if st.button("Generate Year Summary Report"):
+                    with st.spinner("Generating Year Summary Report"):
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month, Issues_usa, Issues_uk = generate_year_summary_multiple(
+                            start_year, end_year)
+                        pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
+                                                                             usa_brands, uk_brands,
+                                                                             usa_platforms, uk_platforms,
+                                                                             printing_stats, copyright_stats, a_plus,
+                                                                             selected_month, start_year=start_year, end_year=end_year)
+
+                        usa_total = sum(usa_review_data.values())
+                        usa_attained = usa_review_data["Attained"] if "Attained" in usa_review_data else 0
+
+                        usa_attained_pct = (usa_attained / usa_total * 100) if usa_total > 0 else 0
+
+                        uk_total = sum(uk_review_data.values())
+                        uk_attained = uk_review_data["Attained"] if "Attained" in uk_review_data else 0
+
+                        uk_attained_pct = (uk_attained / uk_total * 100) if uk_total > 0 else 0
+
+                        combined_total = usa_total + uk_total
+                        combined_attained = usa_attained + uk_attained
+                        combined_attained_pct = (combined_attained / combined_total * 100) if combined_total > 0 else 0
+
+                        st.header(f"{start_year}-{end_year} Summary Report")
+                        st.divider()
+
+                        st.markdown('<h2 class="section-header">📝 Review Analytics</h2>', unsafe_allow_html=True)
+
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            usa_pie = create_review_pie_chart(usa_review_data, "USA Trustpilot Reviews")
+                            if usa_pie:
+                                st.plotly_chart(usa_pie, width="stretch", key="usa_pie")
+
+                            st.subheader("🇺🇸 USA Reviews")
+                            st.metric("🤵🏻 Total Clients", sum(usa_brands.values()))
+                            st.metric("📊 Total Reviews", usa_total)
+                            st.metric("🟢 Total Attained", usa_attained)
+                            st.metric("🔴 Total Negative", usa_review_data.get("Negative", 0))
+                            st.metric("🎯 Attained Percentage", f"{usa_attained_pct:.1f}%")
+                            st.metric("👥 Total Unique", total_unique_clients)
+                            st.metric("💫 Self Published", Issues_usa.get("Self Publishing", 0))
+                            st.metric("🖨 Printing Only", Issues_usa.get("Printing Only", 0))
+                            unique_clients_count_per_pm = combined.groupby('Project Manager')[
+                                'Name'].nunique().reset_index()
+                            unique_clients_count_per_pm.columns = ['Project Manager', 'Unique Clients']
+                            unique_clients_count_per_pm.index = range(1, len(unique_clients_count_per_pm) + 1)
+                            clients_list = combined.groupby('Project Manager')["Name"].apply(list).reset_index(
+                                name="Clients")
+                            merged_df = unique_clients_count_per_pm.merge(clients_list, on='Project Manager',
+                                                                          how='left')
+                            merged_df.index = range(1, len(merged_df) + 1)
+
+                            with st.expander("🤵🏻 Total Clients"):
+                                st.dataframe(combined)
+                            with st.expander("🤵🏻🤵🏻 Publishing Per Month"):
+                                st.dataframe(publishing_per_month)
+                            buffer = io.BytesIO()
+                            combined.to_excel(buffer, index=False)
+                            buffer.seek(0)
+
+                            st.download_button(
+                                label="📥 Download Excel",
+                                data=buffer,
+                                file_name=f"USA+UK_{number}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                help="Click to download the Excel report"
+                            )
+                            with st.expander("🟢 Attained Reviews Per Month"):
+                                st.dataframe(attained_reviews_per_month)
+
+                            with st.expander("🔴 Negative Reviews Per Month"):
+                                st.dataframe(negative_per_month)
+                        with col2:
+                            uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
+                            if uk_pie:
+                                st.plotly_chart(uk_pie, width="stretch", key="uk_pie")
+                            st.subheader("🇬🇧 UK Reviews")
+                            st.metric("🤵🏻 Total Clients", sum(uk_brands.values()))
+                            st.metric("📊 Total Reviews", uk_total)
+                            st.metric("🟢 Total Attained", uk_attained)
+                            st.metric("🔴 Total Negative", uk_review_data.get("Negative", 0))
+                            st.metric("🎯 Attained Percentage", f"{uk_attained_pct:.1f}%")
+                            st.metric("💫 Self Published", Issues_uk.get("Self Publishing", 0))
+                            st.metric("🖨 Printing Only", Issues_uk.get("Printing Only", 0))
+                            with st.expander("📊 View Clients Per PM Data"):
+                                st.dataframe(merged_df)
+                            with st.expander("❓ Pending & Sent Reviews"):
+                                st.dataframe(pending_sent_details)
+                                breakdown_pending_sent = pending_sent_details["Trustpilot Review"].value_counts()
+                                st.dataframe(breakdown_pending_sent)
+                            with st.expander("👏 Reviews Per PM"):
+                                st.dataframe(attained_reviews_per_pm)
+                                st.dataframe(attained_df)
+                                st.dataframe(attained_df["Status"].value_counts())
+                            with st.expander("🏷️ Reviews Per Brand"):
+                                attained_brands = attained_df["Brand"].value_counts()
+                                st.dataframe(attained_brands)
+                            with st.expander("❌ Negative Reviews Per PM"):
+                                st.dataframe(negative_reviews_per_pm)
+                                st.dataframe(negative_details)
+                                st.dataframe(negative_details["Status"].value_counts())
+
+                        st.subheader("📱 Platform Distribution")
+                        platform_chart = create_platform_comparison_chart(usa_platforms, uk_platforms)
+                        st.plotly_chart(platform_chart, width="stretch")
+
+                        st.subheader("🏷️ Brand Performance")
+                        brand_chart = create_brand_chart(usa_brands, uk_brands)
+                        st.plotly_chart(brand_chart, width="stretch", key="brand_chart")
+
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.subheader("USA Brand Breakdown")
+                            usa_df = pd.DataFrame(list(usa_brands.items()), columns=['Brand', 'Count'])
+                            st.dataframe(usa_df, hide_index=True)
+                            total_count_usa = usa_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Brands:** `{total_count_usa}`
+                                                        """)
+
+                            st.subheader("USA Platform Breakdown")
+                            usa_platform_df = pd.DataFrame(list(usa_platforms.items()),
+                                                           columns=['Platform', 'Count'])
+                            st.dataframe(usa_platform_df, hide_index=True)
+                            total_count_usa_platforms = usa_platform_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Platforms:** `{total_count_usa_platforms}`
+                                                        """)
+                        with col2:
+                            st.subheader("UK Brand Breakdown")
+                            uk_df = pd.DataFrame(list(uk_brands.items()), columns=['Brand', 'Count'])
+                            st.dataframe(uk_df, hide_index=True)
+                            total_count_uk = uk_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Brands:** `{total_count_uk}`
+                                                        """)
+                            st.subheader("UK Platform Breakdown")
+                            uk_platform_df = pd.DataFrame(list(uk_platforms.items()), columns=['Platform', 'Count'])
+                            st.dataframe(uk_platform_df, hide_index=True)
+                            total_count_uk_platforms = uk_platform_df["Count"].sum()
+                            st.markdown(f"""
+                                                        - 📊 **Total Count Across Platforms:** `{total_count_uk_platforms}`
+                                                        """)
+                        st.divider()
+
+                        st.markdown('<h2 class="section-header">🖨️ Printing Analytics</h2>', unsafe_allow_html=True)
+
+                        col1, col2, col3 = st.columns(3)
+
+                        with col1:
+                            st.subheader("📊 Volume Metrics")
+                            st.metric("Total Copies", f"{printing_stats['Total_copies']:,}")
+                            st.metric("Highest Copies", printing_stats['Highest_copies'])
+                            st.metric("Lowest Copies", printing_stats['Lowest_copies'])
+
+                        with col2:
+                            st.subheader("💰 Cost Metrics")
+                            st.metric("Total Cost", f"${printing_stats['Total_cost']:,.2f}")
+                            st.metric("Highest Cost", f"${printing_stats['Highest_cost']:.2f}")
+                            st.metric("Lowest Cost", f"${printing_stats['Lowest_cost']:.2f}")
+
+                        with col3:
+                            st.subheader("📈 Efficiency")
+                            st.metric("Average Cost per Copy", f"${printing_stats['Average']:.2f}")
+
+                            fig_gauge = go.Figure(go.Indicator(
+                                mode="gauge+number",
+                                value=printing_stats['Average'],
+                                domain={'x': [0, 1], 'y': [0, 1]},
+                                title={'text': "Avg Cost/Copy"},
+                                gauge={
+                                    'axis': {'range': [None, 15]},
+                                    'bar': {'color': "darkblue"},
+                                    'steps': [
+                                        {'range': [0, 5], 'color': "lightgray"},
+                                        {'range': [5, 10], 'color': "gray"}],
+                                    'threshold': {
+                                        'line': {'color': "red", 'width': 4},
+                                        'thickness': 0.75,
+                                        'value': 10}}))
+
+                            fig_gauge.update_layout(height=200)
+                            st.plotly_chart(fig_gauge, width="stretch")
+                        with st.expander("🖨 Monthly Printing Data"):
+                            st.dataframe(monthly_printing)
+                        st.divider()
+
+                        st.markdown('<h2 class="section-header">©️ Copyright Analytics</h2>', unsafe_allow_html=True)
+
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.subheader("📋 Copyright Summary")
+                            st.metric("Total Copyrights", copyright_stats['Total_copyrights'])
+                            st.metric("Total Cost", f"${copyright_stats['Total_cost_copyright']:,}")
+                            st.metric("Success Rate",
+                                      f"{copyright_stats['result_count']}/{copyright_stats['Total_copyrights']}")
+
+                            success_rate = (
+                                    copyright_stats['result_count'] / copyright_stats['Total_copyrights'] * 100) if \
+                                copyright_stats['Total_copyrights'] > 0 else 0
+                            st.metric("Success Percentage", f"{success_rate:.1f}%")
+                            st.metric("Rejection Rate",
+                                      f"{copyright_stats['result_count_no']}/{copyright_stats['Total_copyrights']}")
+
+                            rejection_rate = (
+                                    copyright_stats['result_count_no'] / copyright_stats['Total_copyrights'] * 100) if \
+                                copyright_stats['Total_copyrights'] > 0 else 0
+                            st.metric("Rejection Percentage", f"{rejection_rate:.1f}%")
+
+                        with col2:
+                            st.subheader("🌍 Country Distribution")
+
+                            copyright_countries = {
+                                'USA': copyright_stats['usa_copyrights'],
+                                'Canada': copyright_stats['canada_copyrights'],
+                                'UK': copyright_stats['uk']
+                            }
+
+                            fig_copyright = px.pie(
+                                values=list(copyright_countries.values()),
+                                names=list(copyright_countries.keys()),
+                                title="Copyright Applications by Country",
+                                color_discrete_sequence=["#23A0F8", "#d62728", "#F7E319"]
+                            )
+                            st.plotly_chart(fig_copyright, width="stretch", key="copyright_chart")
+
+                            cp1, cp2, cp3 = st.columns(3)
+
+                            with cp1:
+                                st.metric('Usa', copyright_stats['usa_copyrights'])
+
+                            with cp2:
+                                st.metric('Canada', copyright_stats['canada_copyrights'])
+
+                            with cp2:
+                                st.metric('UK', copyright_stats['uk'])
+
+                        st.divider()
+
+                        cola = st.columns(1)
+
+                        with cola[0]:
+                            st.subheader("🅰➕ Content")
+                            st.metric("A+ Count", f"{a_plus} Published")
+
+                        st.divider()
+
+                        st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
+
+                        summary_col1, summary_col2, summary_col3 = st.columns(3)
+
+                        with summary_col1:
+                            st.markdown("### 📝 Reviews")
+                            st.write(f"• **Combined Reviews**: {combined_total}")
+                            st.write(f"• **Success Rate**: {combined_attained_pct:.1f}%")
+                            st.write(f"• **USA Attained**: {usa_attained}")
+                            st.write(f"• **UK Attained**: {uk_attained}")
+
+                        with summary_col2:
+                            st.markdown("### 🖨️ Printing")
+                            st.write(f"• **Total Copies**: {printing_stats['Total_copies']:,}")
+                            st.write(f"• **Total Cost**: ${printing_stats['Total_cost']:,.2f}")
+                            st.write(f"• **Cost Efficiency**: ${printing_stats['Average']:.2f}/copy")
+
+                        with summary_col3:
+                            st.markdown("### ©️ Copyright")
+                            st.write(f"• **Applications**: {copyright_stats['Total_copyrights']}")
+                            st.write(f"• **Success Rate**: {success_rate:.1f}%")
+                            st.write(f"• **Rejection Rate**: {rejection_rate:.1f}%")
+                            st.write(f"• **Total Cost**: ${copyright_stats['Total_cost_copyright']:,}")
+
+                    st.success(f"Summary report for {number} generated!")
+
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=pdf_data,
+                        file_name=pdf_filename,
+                        mime="application/pdf",
+                        help="Click to download the PDF report"
+                    )
 
 
 if __name__ == '__main__':
