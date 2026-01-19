@@ -3001,7 +3001,7 @@ def main() -> None:
                                 help="Click to download filtered data"
                             )
         elif action == "Printing":
-            tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
+            tab1, tab2, tab3, tab4 = st.tabs(["Monthly", "Total", "Search", "Stats"])
 
             with tab1:
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
@@ -3296,6 +3296,127 @@ def main() -> None:
                         st.dataframe(search_df)
                 else:
                     st.info("👆 Enter name/book above to search")
+            with tab4:
+                st.subheader("📊 Year-over-Year Printing Stats")
+
+                year1 = st.number_input(
+                    "Enter Previous Year",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year - 1,
+                    step=1
+                )
+
+                year2 = st.number_input(
+                    "Enter Current Year",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1
+                )
+
+                data1, _ = printing_data_year(year1)
+                data2, _ = printing_data_year(year2)
+
+                def pct_change(new, old):
+                    return round(((new - old) / old) * 100, 2) if old else 0
+
+                if not data1.empty and not data2.empty:
+
+                    # ---------------- OVERALL TOTALS ----------------
+                    total_orders1 = len(data1)
+                    total_orders2 = len(data2)
+
+                    total_copies1 = data1["No of Copies"].sum()
+                    total_copies2 = data2["No of Copies"].sum()
+
+                    total_cost1 = data1["Order Cost"].sum()
+                    total_cost2 = data2["Order Cost"].sum()
+
+                    st.subheader("🌍 Overall Printing Comparison")
+
+                    # Forward (Year1 → Year2)
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric(
+                        f"🧾 Orders ({year1} → {year2})",
+                        total_orders2,
+                        f"{pct_change(total_orders2, total_orders1)}%"
+                    )
+                    col2.metric(
+                        f"📦 Copies ({year1} → {year2})",
+                        total_copies2,
+                        f"{pct_change(total_copies2, total_copies1)}%"
+                    )
+                    col3.metric(
+                        f"💰 Cost ({year1} → {year2})",
+                        f"${total_cost2:,.2f}",
+                        f"{pct_change(total_cost2, total_cost1)}%"
+                    )
+
+
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric(
+                        f"🧾 Orders ({year2} <- {year1})",
+                        total_orders1,
+                        f"{pct_change(total_orders1, total_orders2)}%"
+                    )
+                    col2.metric(
+                        f"📦 Copies ({year2} <- {year1})",
+                        total_copies1,
+                        f"{pct_change(total_copies1, total_copies2)}%"
+                    )
+                    col3.metric(
+                        f"💰 Cost ({year2} <- {year1})",
+                        f"${total_cost1:,.2f}",
+                        f"{pct_change(total_cost1, total_cost2)}%"
+                    )
+
+                    st.markdown("---")
+
+                    usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+                    uk_brands = ["Authors Solution", "Book Publication"]
+
+                    def country_stats(df, brands):
+                        df = df[df["Brand"].isin(brands)]
+                        return len(df), df["No of Copies"].sum(), df["Order Cost"].sum()
+
+                    usa_orders1, usa_copies1, usa_cost1 = country_stats(data1, usa_brands)
+                    usa_orders2, usa_copies2, usa_cost2 = country_stats(data2, usa_brands)
+
+                    st.subheader("🇺🇸 USA Printing Comparison")
+
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("🧾 Orders", usa_orders2, f"{pct_change(usa_orders2, usa_orders1)}%")
+                    col2.metric("📦 Copies", usa_copies2, f"{pct_change(usa_copies2, usa_copies1)}%")
+                    col3.metric("💰 Cost", f"${usa_cost2:,.2f}", f"{pct_change(usa_cost2, usa_cost1)}%")
+
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("🧾 Orders (Reverse)", usa_orders1, f"{pct_change(usa_orders1, usa_orders2)}%")
+                    col2.metric("📦 Copies (Reverse)", usa_copies1, f"{pct_change(usa_copies1, usa_copies2)}%")
+                    col3.metric("💰 Cost (Reverse)", f"${usa_cost1:,.2f}", f"{pct_change(usa_cost1, usa_cost2)}%")
+
+                    st.markdown("---")
+
+
+                    uk_orders1, uk_copies1, uk_cost1 = country_stats(data1, uk_brands)
+                    uk_orders2, uk_copies2, uk_cost2 = country_stats(data2, uk_brands)
+
+                    st.subheader("🇬🇧 UK Printing Comparison")
+
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("🧾 Orders", uk_orders2, f"{pct_change(uk_orders2, uk_orders1)}%")
+                    col2.metric("📦 Copies", uk_copies2, f"{pct_change(uk_copies2, uk_copies1)}%")
+                    col3.metric("💰 Cost", f"${uk_cost2:,.2f}", f"{pct_change(uk_cost2, uk_cost1)}%")
+
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("🧾 Orders (Reverse)", uk_orders1, f"{pct_change(uk_orders1, uk_orders2)}%")
+                    col2.metric("📦 Copies (Reverse)", uk_copies1, f"{pct_change(uk_copies1, uk_copies2)}%")
+                    col3.metric("💰 Cost (Reverse)", f"${uk_cost1:,.2f}", f"{pct_change(uk_cost1, uk_cost2)}%")
+
+                else:
+                    st.warning("⚠️ No data available for one or both years.")
+
+
         elif action == "Copyright":
 
             tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
