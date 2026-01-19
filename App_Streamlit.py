@@ -75,7 +75,7 @@ def normalize_name(name):
     return str(name).strip().title()
 
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=300)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """Get data from Google Sheets using gspread"""
     try:
@@ -146,6 +146,7 @@ def load_data(sheet_name: str, month_number: int, year: int) -> pd.DataFrame:
 
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
 
@@ -171,6 +172,7 @@ def load_data_year(sheet_name: str, year: int) -> pd.DataFrame:
 
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
 
@@ -221,6 +223,7 @@ def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
 
@@ -266,6 +269,7 @@ def load_reviews_year(sheet_name: str, year: int, name: str, type_: str = "Attai
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
 def load_reviews_year_multiple(sheet_name: str, start_year: int, end_year: int, name: str, type_: str = "Attained") -> pd.DataFrame:
@@ -314,6 +318,7 @@ def load_reviews_year_multiple(sheet_name: str, start_year: int, end_year: int, 
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
 def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
