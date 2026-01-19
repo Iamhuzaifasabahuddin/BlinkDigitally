@@ -67,6 +67,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def get_min_year() -> int:
+    """Gets Minimum year from the data"""
+    # uk_clean = clean_data_reviews(sheet_uk)
+    # audio = clean_data_reviews(sheet_audio)
+    # usa_clean = clean_data_reviews(sheet_usa)
+    # combined = pd.concat([uk_clean, usa_clean, audio])
+    #
+    # combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
+    #
+    # min_year = combined["Publishing Date"].dt.year.min()
+
+    return 2025
 
 def normalize_name(name):
     """Normalize a name to consistent format (Title Case, stripped whitespace)"""
@@ -175,6 +187,33 @@ def load_data_year(sheet_name: str, year: int) -> pd.DataFrame:
         logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
+def load_data_search(sheet_name: str, year: int) -> pd.DataFrame:
+    """Load data from Google Sheets with optional month filtering"""
+    try:
+        data = get_sheet_data(sheet_name)
+        data = clean_data(data)
+
+        if "Publishing Date" in data.columns:
+            data = data[
+                (data["Publishing Date"].dt.year >= get_min_year()) &
+                (data["Publishing Date"].dt.year <= year)
+            ]
+
+        if data.empty:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Publishing Date", ascending=True)
+
+        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        data.index = range(1, len(data) + 1)
+        return data
+
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
 
 def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
     data = get_sheet_data(sheet_name)
@@ -436,6 +475,62 @@ def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     return data, month_totals
 
+def printing_data_search(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[
+        (data["Order Date"].dt.year >= get_min_year()) &
+        (data["Order Date"].dt.year <= year)
+
+    ]
+
+    data = data.sort_values(by="Order Date", ascending=True)
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
+
+    data['Month'] = data['Order Date'].dt.to_period('M')
+
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
+    month_totals = month_totals.sort_values(by="Total Cost ($)", ascending=False)
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals["Total Cost ($)"] = month_totals["Total Cost ($)"].map("${:,.2f}".format)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, month_totals
+
 def printing_data_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     data = get_sheet_data(sheet_printing)
 
@@ -538,6 +633,38 @@ def copyright_year(year: int) -> tuple[pd.DataFrame, int, int]:
         data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
         data = data[
             (data["Submission Date"].dt.year == year)]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count, result_count_no
+
+def copyright_search(year: int) -> tuple[pd.DataFrame, int, int]:
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return pd.DataFrame(), 0, 0
+
+    columns = list(data.columns)
+    if "Country" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year >= get_min_year()) &
+            (data["Submission Date"].dt.year <= year)
+
+        ]
     data = data.sort_values(by=["Submission Date"], ascending=True)
 
     result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
@@ -2205,18 +2332,7 @@ def generate_summary_report_pdf(
     return pdf_data, filename
 
 
-def get_min_year() -> int:
-    """Gets Minimum year from the data"""
-    # uk_clean = clean_data_reviews(sheet_uk)
-    # audio = clean_data_reviews(sheet_audio)
-    # usa_clean = clean_data_reviews(sheet_usa)
-    # combined = pd.concat([uk_clean, usa_clean, audio])
-    #
-    # combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
-    #
-    # min_year = combined["Publishing Date"].dt.year.min()
 
-    return 2025
 
 
 def sales(month: int, year: int) -> pd.DataFrame:
@@ -2896,7 +3012,7 @@ def main() -> None:
                                           key="year_search")
 
                 if number3 and sheet_name:
-                    data = load_data_year(sheet_name, number3)
+                    data = load_data_search(sheet_name, number3)
 
                     if data.empty:
                         st.warning(f"⚠️ No Data Available for {choice} in {number3}")
@@ -3254,7 +3370,7 @@ def main() -> None:
             with tab3:
                 number3 = st.number_input("Enter Year3", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1)
-                data, _ = printing_data_year(number3)
+                data, _ = printing_data_search(number3)
                 search_term = st.text_input("Search by Name / Book", placeholder="Enter Search Term", key="search_term")
 
                 if search_term and search_term.strip():
@@ -3619,7 +3735,7 @@ def main() -> None:
 
                 )
 
-                data, _, _ = copyright_year(number3)
+                data, _, _ = copyright_search(number3)
 
                 search_term = st.text_input(
 

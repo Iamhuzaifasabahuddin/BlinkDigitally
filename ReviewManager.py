@@ -524,6 +524,53 @@ def printing_data_year(year: int, choice: str) -> pd.DataFrame:
 
     return data
 
+def printing_data_search(year: int, choice: str) -> pd.DataFrame:
+    data = get_sheet_data("Printing")
+    usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+    uk_brands = ["Authors Solution", "Book Publication"]
+
+    if choice == "USA":
+        selected_brands = usa_brands
+    else:
+        selected_brands = uk_brands
+    data = get_sheet_data("Printing")
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[((data["Order Date"].dt.year >= 2025) & (data["Order Date"].dt.year <= year)) &
+                (data["Brand"].isin(selected_brands))]
+
+    if data.empty:
+        return pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        )
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce')
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data
+
 def get_printing_upcoming(choice: str):
     data = get_sheet_data("Printing")
     usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
@@ -736,7 +783,7 @@ def main():
                     with st.expander(f"🟢 Attained Reviews {month} {year}"):
                         st.dataframe(df, width="stretch")
 
-                    # --- Search/filter for pending reviews ---
+
                     search_pending = st.text_input(f"🔍 Search Pending Reviews ({month} {year})", "")
                     total_reviews = total_reviews[[
                         "Name", "Brand", "Publishing Date", "Status",
@@ -819,7 +866,7 @@ def main():
                                           value=current_year, key="year_search")
 
                 if number3 and sheet_name:
-                    data = printing_data_year(number3, region)
+                    data = printing_data_search(number3, region)
 
                     if data.empty:
                         st.warning(f"⚠️ No Data Available for {region} in {number3}")
