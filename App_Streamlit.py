@@ -723,6 +723,56 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
     else:
         return set(), {}, 0
 
+def get_names_in_both_years(sheet_name: str, year1: int, year2: int) -> tuple:
+    """
+    Identifies names that appear in both June and July from a Google Sheet.
+    Returns:
+        - A set of matching names
+        - A dictionary with individual counts for June and July
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Date' columns or data is empty.")
+        return set(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], format="%d-%B-%Y", errors='coerce')
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Year'] = df['Publishing Date'].dt.year
+
+    year_1_names = set(
+        df[(df['Year'] == year1)]['Name'].str.strip()
+    )
+
+    year_2_names = set(
+        df[(df['Year'] == year2)]['Name'].str.strip()
+    )
+
+    if year_1_names & year_2_names:
+        names_in_both = year_1_names.intersection(year_2_names)
+
+        counts = {}
+        for name in names_in_both:
+            year_1_count = df[
+                (df['Year'] == year1) &
+                (df['Name'].str.strip() == name)
+                ].shape[0]
+
+            year_2_count = df[
+                (df['Year'] == year2) &
+                (df['Name'].str.strip() == name)
+                ].shape[0]
+
+            counts[name] = {
+                f"{year1}": year_1_count,
+                f"{year2}": year_2_count,
+            }
+
+        return names_in_both, counts, len(names_in_both)
+    else:
+        return set(), {}, 0
 
 def get_names_in_year(sheet_name: str, year: int):
     """
@@ -3514,7 +3564,7 @@ def main() -> None:
                     st.info("👆 Enter name/book above to search")
         elif action == "Generate Similarity":
 
-            tab1, tab2 = st.tabs(["Queries", "Yearly Queries"])
+            tab1, tab2, tab3 = st.tabs(["Queries", "Yearly Queries", "Compare Years"])
 
             def safe_month_index(month_offset: int, month_list_len: int) -> int:
                 """Ensure selectbox index is within valid range."""
@@ -3578,12 +3628,11 @@ def main() -> None:
                             if not data1:
                                 st.info("No similarities found")
                             else:
-                                st.write("Data 1:")
-                                st.write(data1)
-                                st.write("Data 2:")
-                                st.write(data2)
-                                st.write("Data 3:")
-                                st.write(data3)
+                                st.metric(label="Total Number of Same Clients", value=data3)
+                                st.write("Names:")
+                                st.json(data1, expanded=True)
+                                st.write("Detailed Names:")
+                                st.json(data2, expanded=False)
 
             with tab2:
                 choice = st.selectbox(
@@ -3607,14 +3656,58 @@ def main() -> None:
                 if sheet_name and number3:
                     df_year, Total_year, year_count = get_names_in_year(sheet_name, number3)
                     if not df_year.empty:
+                        st.metric(label="Total Number of Same Clients", value=year_count)
                         st.write("Yearly Data:")
                         st.write(df_year)
                         st.write("Total Year:")
-                        st.write(Total_year)
-                        st.write("Year Count:")
-                        st.write(year_count)
+                        st.json(Total_year, expanded=False)
                     else:
                         st.warning(f"No Similarities found for {number3}-{choice}")
+            with tab3:
+                st.header("Compare clients with Years")
+                choice = st.selectbox(
+                    "Select Data To View",
+                    ["USA", "UK"],
+                    index=None,
+                    key="choice_tab3"
+                )
+                sheet_name = {"UK": sheet_uk, "USA": sheet_usa}.get(choice)
+
+                number1 = st.number_input(
+                    "Enter Year 1",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year-1,
+                    step=1,
+                    key="year1_tab3"
+                )
+
+                number2 = st.number_input(
+                    "Enter Year 2",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="year2_tab3"
+                )
+
+                if sheet_name:
+                    if st.button("Generate Similar Clients", key="btn_generate_tab3"):
+                        with st.spinner(
+                                f"Generating Similarity Report for {number1} & {number2} for {choice}..."):
+                            data1, data2, data3 = get_names_in_both_years(
+                                sheet_name, number1,
+                                number2
+                            )
+
+                            if not data1:
+                                st.info("No similarities found")
+                            else:
+                                st.metric(label="Total Number of Same Clients", value=data3)
+                                st.write("Names:")
+                                st.json(data1, expanded=True)
+                                st.write("Detailed Names:")
+                                st.json(data2, expanded=False)
 
         elif action == "Summary":
             st.header("📄 Generate Summary Report")
