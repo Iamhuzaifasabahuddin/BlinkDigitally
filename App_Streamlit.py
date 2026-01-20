@@ -2479,7 +2479,7 @@ def main() -> None:
                                      value=current_year, step=1)
 
         if action == "View Data" and choice and selected_month and number:
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Monthly", "Total","Year to Date", "Search", "By Brand"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Monthly", "Yearly","Start to Year", "Search", "By Brand"])
 
             sheet_name = {
                 "UK": sheet_uk,
@@ -2728,7 +2728,7 @@ def main() -> None:
                     else:
                         st.info(f"No Data found for {choice} {selected_month} {number}")
             with tab2:
-                st.subheader(f"📂 Total Data for {choice}")
+                st.subheader(f"📂 Yearly Data for {choice}")
                 number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1,
                                           key="year_total")
@@ -3061,7 +3061,7 @@ def main() -> None:
                     else:
                         st.info(f"No Data Found for {choice} {number2}")
             with tab3:
-                st.subheader(f"📂 Total Data for {choice}")
+                st.subheader(f"📂 Start to Year Data for {choice}")
                 number4 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1,
                                           key="year_total_to_date")
@@ -3204,7 +3204,7 @@ def main() -> None:
                         if data.empty:
                             st.warning(f"⚠️ No Data Available for {choice} in {get_min_year()} to {number4}")
                         else:
-                            st.markdown(f"### 📄 Total Data for {choice} - {get_min_year()} to {number4}")
+                            st.markdown(f"### 📄 Year to Year Data for {choice} - {get_min_year()} to {number4}")
                             st.dataframe(data)
 
                             with st.expander("🧮 Clients with multiple platform publishing"):
@@ -3269,7 +3269,7 @@ def main() -> None:
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown("---")
-                                st.markdown("### ⭐ Year to Date Summary")
+                                st.markdown("### ⭐ Start to Year Summary")
                                 st.markdown(f"""
                                                 - 🧾 **Total Entries:** `{len(data)}`
                                                 - 👥 **Total Unique Clients:** `{total_unique_clients}`
@@ -3506,7 +3506,7 @@ def main() -> None:
                                 help="Click to download filtered data"
                             )
         elif action == "Printing":
-            tab1, tab2, tab3, tab4 = st.tabs(["Monthly", "Total", "Search", "Stats"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Monthly", "Yearly", "Start to Year", "Search", "Stats"])
 
             with tab1:
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
@@ -3654,7 +3654,7 @@ def main() -> None:
                 data, monthly = printing_data_year(number2)
 
                 if not data.empty:
-                    st.markdown(f"### 📄 Total Printing Data for {number2}")
+                    st.markdown(f"### 📄 Yearly Printing Data for {number2}")
                     show_data = data.copy()
                     show_data["Order Cost"] = show_data["Order Cost"].map("${:,.2f}".format)
                     st.dataframe(show_data)
@@ -3757,6 +3757,116 @@ def main() -> None:
                 else:
                     st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
+                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1, key="printing_year_to_year")
+                usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
+                uk_brands = ["Authors Solution", "Book Publication"]
+                data, monthly = printing_data_search(number2)
+
+                if not data.empty:
+                    st.markdown(f"### 📄 Start to Year Printing Data for 2025 to {number2}")
+                    show_data = data.copy()
+                    show_data["Order Cost"] = show_data["Order Cost"].map("${:,.2f}".format)
+                    st.dataframe(show_data)
+
+                    Total_copies = data["No of Copies"].sum()
+                    Total_cost = data["Order Cost"].sum()
+                    Highest_cost = data["Order Cost"].max()
+                    Highest_copies = data["No of Copies"].max()
+                    Lowest_cost = data["Order Cost"].min()
+                    Lowest_copies = data["No of Copies"].min()
+                    Average = round(Total_cost / Total_copies, 2) if Total_copies else 0
+
+                    buffer = io.BytesIO()
+                    data.to_excel(buffer, index=False)
+                    buffer.seek(0)
+
+                    st.download_button(
+                        label="📥 Download Excel",
+                        data=buffer,
+                        file_name=f"Printing_{number2}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        help="Click to download the Excel report"
+                    )
+
+                    st.markdown("---")
+
+                    st.markdown("### 📊 Summary Statistics (Start to Year)")
+                    st.markdown(f"""
+                    - 🧾 **Total Orders:** {len(data)}
+                    - 📦 **Total Copies Printed:** `{Total_copies}`
+                    - 💰 **Total Cost:** `${Total_cost:,.2f}`
+                    - 📈 **Highest Order Cost:** `${Highest_cost:,.2f}`
+                    - 📉 **Lowest Order Cost:** `${Lowest_cost:,.2f}`
+                    - 🔢 **Highest Copies in One Order:** `{Highest_copies}`
+                    - 🧮 **Lowest Copies in One Order:** `{Lowest_copies}`
+                    - 💵 **Average Cost per Copy:** `${Average:,.2f}`
+                    """)
+
+                    usa_data = data[data["Brand"].isin(usa_brands)]
+                    uk_data = data[data["Brand"].isin(uk_brands)]
+
+                    def show_country_stats(df, country_name):
+                        if df.empty:
+                            st.warning(f"⚠️ No data found for {country_name} brands.")
+                            return
+
+                        total_orders = len(df)
+                        total_copies = df["No of Copies"].sum()
+                        total_cost = df["Order Cost"].sum()
+                        highest_cost = df["Order Cost"].max()
+                        lowest_cost = df["Order Cost"].min()
+                        highest_copies = df["No of Copies"].max()
+                        lowest_copies = df["No of Copies"].min()
+                        avg_cost_per_copy = round(total_cost / total_copies, 2) if total_copies else 0
+
+                        st.markdown(f"### 🌍 {country_name} Printing Summary")
+                        st.markdown(f"""
+                        - 🧾 **Total Orders:** {total_orders}
+                        - 📦 **Total Copies Printed:** `{total_copies}`
+                        - 💰 **Total Cost:** `${total_cost:,.2f}`
+                        - 📈 **Highest Order Cost:** `${highest_cost:,.2f}`
+                        - 📉 **Lowest Order Cost:** `${lowest_cost:,.2f}`
+                        - 🔢 **Highest Copies in One Order:** `{highest_copies}`
+                        - 🧮 **Lowest Copies in One Order:** `{lowest_copies}`
+                        - 💵 **Average Cost per Copy:** `${avg_cost_per_copy:,.2f}`
+                        """)
+
+                        brand_spending = (
+                            df.groupby("Brand")["Order Cost"]
+                            .sum()
+                            .reset_index()
+                            .sort_values(by="Order Cost", ascending=False)
+                        )
+                        brand_spending["Order Cost"] = brand_spending["Order Cost"].map("${:,.2f}".format)
+                        brand_spending.index = range(1, len(brand_spending) + 1)
+
+                        brand_orders = (
+                            df.groupby("Brand")["No of Copies"]
+                            .sum()
+                            .reset_index()
+                            .sort_values(by="No of Copies", ascending=False)
+
+                        )
+                        brand_orders.index = range(1, len(brand_orders) + 1)
+
+                        st.markdown(f"#### 💼 Brand-wise Spending in {country_name}")
+                        st.dataframe(brand_spending, width="stretch")
+                        st.markdown(f"#### 💼 Brand-wise Orders for {country_name}")
+                        st.dataframe(brand_orders, width="stretch")
+
+                        st.markdown("---")
+
+                    usa_col, uk_col = st.columns(2)
+
+                    with usa_col:
+                        show_country_stats(usa_data, "USA 🦅")
+                    with uk_col:
+                        show_country_stats(uk_data, "UK ☕")
+
+                else:
+                    st.warning(f"⚠️ No Data Available for Printing in Start to Year {number2}")
+            with tab4:
                 number3 = st.number_input("Enter Year3", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1)
                 data, _ = printing_data_search(number3)
@@ -3801,7 +3911,7 @@ def main() -> None:
                         st.dataframe(search_df)
                 else:
                     st.info("👆 Enter name/book above to search")
-            with tab4:
+            with tab5:
                 st.subheader("📊 Year-over-Year Printing Stats")
 
                 year1 = st.number_input(
@@ -3924,7 +4034,7 @@ def main() -> None:
 
         elif action == "Copyright":
 
-            tab1, tab2, tab3 = st.tabs(["Monthly", "Total", "Search"])
+            tab1, tab2, tab3 = st.tabs(["Monthly", "Yearly", "Search"])
 
             with tab1:
 
@@ -4045,7 +4155,7 @@ def main() -> None:
 
                 if not data.empty:
 
-                    st.subheader(f"© Total Copyright Data for {number2}")
+                    st.subheader(f"© Yearly Copyright Data for {number2}")
 
                     st.dataframe(data)
 
