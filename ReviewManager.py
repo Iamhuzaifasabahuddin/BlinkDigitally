@@ -107,24 +107,24 @@ BP: https://bookpublication.co.uk/
 """
 
 
-def get_gspread_client():
-    try:
-        credentials = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-        gc = gspread.authorize(credentials)
-        return gc
-    except Exception as e:
-        logging.error(f"Failed to initialize gspread client: {e}")
-        st.error(f"Failed to connect to Google Sheets: {e}")
-        return None
+@st.cache_resource
+def get_gsheets_client(creds_dict: dict, spreadsheet_id: str):
+    """Create and cache Google Sheets client + spreadsheet"""
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=SCOPES
+    )
+    client = gspread.authorize(creds)
+    spreadsheet = client.open_by_key(spreadsheet_id)
+    return spreadsheet
+
+
 
 
 @st.cache_data(ttl=300)
 def get_sheet_data(sheet_name):
     try:
-        gc = get_gspread_client()
-        if not gc:
-            return pd.DataFrame()
-        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        spreadsheet = get_gsheets_client(creds_dict, SPREADSHEET_ID)
         worksheet = spreadsheet.worksheet(sheet_name)
         records = worksheet.get_all_values()
         headers = records[0]

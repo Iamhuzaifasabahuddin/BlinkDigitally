@@ -35,12 +35,20 @@ creds_dict = {
 # Google Sheets setup
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 # creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
-creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-gs_client = gspread.authorize(creds)
-
-# Spreadsheet configuration
 SPREADSHEET_ID = st.secrets["connections"]["gsheets"]["SPREADSHEET_ID"]
-spreadsheet = gs_client.open_by_key(SPREADSHEET_ID)
+
+@st.cache_resource
+def get_gsheets_client(creds_dict: dict, spreadsheet_id: str):
+    """Create and cache Google Sheets client + spreadsheet"""
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=SCOPES
+    )
+    client = gspread.authorize(creds)
+    spreadsheet = client.open_by_key(spreadsheet_id)
+    return spreadsheet
+
+spreadsheet = get_gsheets_client(creds_dict, SPREADSHEET_ID)
 
 # Sheet names
 sheet_usa = "USA"
