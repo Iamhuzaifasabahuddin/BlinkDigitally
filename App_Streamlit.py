@@ -3075,10 +3075,10 @@ def main() -> None:
                             data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="first")
 
                         pm_list = list(set((data["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
-                        reviews_per_pm = [load_reviews_year_to_date(choice, number2, pm, "Attained") for pm in pm_list]
+                        reviews_per_pm = [load_reviews_year_to_date(choice, number4, pm, "Attained") for pm in pm_list]
                         reviews_per_pm = safe_concat([df for df in reviews_per_pm if not df.empty])
 
-                        reviews_n_pm = [load_reviews_year_to_date(choice, number2, pm, "Negative") for pm in pm_list]
+                        reviews_n_pm = [load_reviews_year_to_date(choice, number4, pm, "Negative") for pm in pm_list]
                         reviews_n_pm = safe_concat([df for df in reviews_n_pm if not df.empty])
 
                         if not reviews_n_pm.empty:
