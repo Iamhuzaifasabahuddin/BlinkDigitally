@@ -3784,9 +3784,10 @@ def main() -> None:
                     st.download_button(
                         label="📥 Download Excel",
                         data=buffer,
-                        file_name=f"Printing_{number2}.xlsx",
+                        file_name=f"Printing_Start to Year_{number2}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        help="Click to download the Excel report"
+                        help="Click to download the Excel report",
+                        key="Start_to_Year"
                     )
 
                     st.markdown("---")
