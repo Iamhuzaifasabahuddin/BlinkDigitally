@@ -1,4 +1,4 @@
-# Blink Digitally Publishing Dashboard v1.0.5
+# Blink Digitally Publishing Dashboard v1.2.0
 
 **Short description:**  
 Blink Digitally publishing dashboard is a Streamlit-based dashboard that fetches, caches, cleans and visualizes book / review data from Google Sheets, generates monthly dynamic stats (pie charts, bar charts), produces downloadable PDF summaries, and pushes automated, prettified weekly client-review reminders and in-depth review tables to Slack channels (USA / UK). It includes data-management tools, an enhanced reviews view, and deployment-ready Streamlit configuration.
