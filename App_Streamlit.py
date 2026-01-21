@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from io import BytesIO
 
+from itertools import zip_longest
 import gspread
 import pandas as pd
 import plotly.express as px
@@ -2310,12 +2311,12 @@ def generate_summary_report_pdf(
 
     brand_table = Table(
         [["USA Brand", "Count", "UK Brand", "Count"]] +
-        list(zip(
+        list(zip_longest(
             list(usa_brands.keys()) + ["Total"],
             list(usa_brands.values()) + [sum(usa_brands.values())],
             list(uk_brands.keys()) + ["Total"],
             list(uk_brands.values()) + [sum(uk_brands.values())]
-        ))
+        ), fillvalue="")
     )
 
     brand_table.setStyle(TableStyle([
