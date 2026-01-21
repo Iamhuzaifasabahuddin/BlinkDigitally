@@ -2316,7 +2316,7 @@ def generate_summary_report_pdf(
             list(usa_brands.values()) + [sum(usa_brands.values())],
             list(uk_brands.keys()) + ["Total"],
             list(uk_brands.values()) + [sum(uk_brands.values())]
-        ), fillvalue="")
+        ))
     )
 
     brand_table.setStyle(TableStyle([
