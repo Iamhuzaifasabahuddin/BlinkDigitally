@@ -96,7 +96,7 @@ def normalize_name(name):
     return str(name).strip().title()
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=1800)
 def get_sheet_data(sheet_name: str) -> pd.DataFrame:
     """Get data from Google Sheets using gspread"""
     try:
