@@ -55,7 +55,7 @@ Architecture Overview
 
 Requirements
 Minimum tested Python packages (install in a virtualenv):
-- Python 3.9+
+- Python 3.13+
 - streamlit
 - gspread
 - google-auth (google-auth and google-auth-oauthlib if needed)
