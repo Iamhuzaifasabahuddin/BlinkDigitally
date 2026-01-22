@@ -196,7 +196,7 @@ def load_data_year(sheet_name: str, year: int) -> pd.DataFrame:
         logging.error(f"An Error Occurred: {e}")
         return pd.DataFrame()
 
-def load_data_search(sheet_name: str, year: int) -> pd.DataFrame:
+def load_data_search(sheet_name: str, end_year: int, start_year: int = get_min_year()) -> pd.DataFrame:
     """Load data from Google Sheets with optional month filtering"""
     try:
         data = get_sheet_data(sheet_name)
@@ -204,8 +204,8 @@ def load_data_search(sheet_name: str, year: int) -> pd.DataFrame:
 
         if "Publishing Date" in data.columns:
             data = data[
-                (data["Publishing Date"].dt.year >= get_min_year()) &
-                (data["Publishing Date"].dt.year <= year)
+                (data["Publishing Date"].dt.year >= start_year) &
+                (data["Publishing Date"].dt.year <= end_year)
             ]
 
         if data.empty:
@@ -230,7 +230,7 @@ def load_data_filter(sheet_name: str, start_date: datetime, end_date: datetime, 
         data = get_sheet_data(sheet_name)
         data = clean_data(data)
         if remove_duplicates:
-            data = load_data_search(sheet_name, end_date.year)
+            data = load_data_search(sheet_name, end_date.year, start_date.year)
             data = data.drop_duplicates(subset=["Name"], keep="first")
             for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
                 if col in data.columns:
