@@ -3084,13 +3084,18 @@ def main() -> None:
                                         .nunique()
                                         .reset_index(name="Total Published")
                                     )
-
-                                    pm_unique_clients_per_month = pm_unique_clients_per_month.sort_values(
-                                        ["Month", "Total Published"], ascending=[True, False]
+                                    pm_unique_clients_per_month_distribution = (
+                                        data_month
+                                        .groupby(["Month", "Project Manager"])["Name"]
+                                        .apply(list)
+                                        .reset_index(name="Clients")
                                     )
-
-                                    pm_unique_clients_per_month.index = range(1, len(pm_unique_clients_per_month)+1)
-                                    st.dataframe(pm_unique_clients_per_month)
+                                    merged_pm_client_distribution = pm_unique_clients_per_month.merge(
+                                        pm_unique_clients_per_month_distribution, on=["Month", "Project Manager"],
+                                        how="left")
+                                    merged_pm_client_distribution.index = range(1,
+                                                                                len(merged_pm_client_distribution) + 1)
+                                    st.dataframe(merged_pm_client_distribution)
                                 with st.expander(f"📈 Publishing Stats {choice} {number2}"):
                                     data_rm_dupes2 = data.copy()
                                     data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
@@ -3431,13 +3436,15 @@ def main() -> None:
                                         .nunique()
                                         .reset_index(name="Total Published")
                                     )
-
-                                    pm_unique_clients_per_month = pm_unique_clients_per_month.sort_values(
-                                        ["Month", "Total Published"], ascending=[True, False]
+                                    pm_unique_clients_per_month_distribution = (
+                                        data_month
+                                        .groupby(["Month", "Project Manager"])["Name"]
+                                        .apply(list)
+                                        .reset_index(name="Clients")
                                     )
-
-                                    pm_unique_clients_per_month.index = range(1, len(pm_unique_clients_per_month)+1)
-                                    st.dataframe(pm_unique_clients_per_month)
+                                    merged_pm_client_distribution = pm_unique_clients_per_month.merge(pm_unique_clients_per_month_distribution, on=["Month", "Project Manager"], how="left")
+                                    merged_pm_client_distribution.index = range(1, len(merged_pm_client_distribution)+1)
+                                    st.dataframe(merged_pm_client_distribution)
 
 
                                 with st.expander(f"📈 Publishing Stats {choice} - {get_min_year()} to {number4}"):
@@ -3802,13 +3809,18 @@ def main() -> None:
                                         .nunique()
                                         .reset_index(name="Total Published")
                                     )
-
-                                    pm_unique_clients_per_month = pm_unique_clients_per_month.sort_values(
-                                        ["Month", "Total Published"], ascending=[True, False]
+                                    pm_unique_clients_per_month_distribution = (
+                                        data_month
+                                        .groupby(["Month", "Project Manager"])["Name"]
+                                        .apply(list)
+                                        .reset_index(name="Clients")
                                     )
-
-                                    pm_unique_clients_per_month.index = range(1, len(pm_unique_clients_per_month)+1)
-                                    st.dataframe(pm_unique_clients_per_month)
+                                    merged_pm_client_distribution = pm_unique_clients_per_month.merge(
+                                        pm_unique_clients_per_month_distribution, on=["Month", "Project Manager"],
+                                        how="left")
+                                    merged_pm_client_distribution.index = range(1,
+                                                                                len(merged_pm_client_distribution) + 1)
+                                    st.dataframe(merged_pm_client_distribution)
                                 with st.expander(f"📈 Publishing Stats {choice} - {start_date.strftime("%B %Y")} to {end_date.strftime("%B %Y")}"):
                                     data_rm_dupes2 = data.copy()
                                     data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
