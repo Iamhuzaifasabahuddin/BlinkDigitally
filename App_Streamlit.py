@@ -2796,6 +2796,22 @@ def main() -> None:
                                 with st.expander("👏 Attained Reviews Per PM"):
                                     st.dataframe(attained_reviews_per_pm)
                                     st.dataframe(attained_details)
+                                    attained_count = (
+                                        attained_details
+                                        .groupby("Project Manager")
+                                        .size()
+                                        .reset_index(name="Count")
+                                    )
+                                    attained_clients = (
+                                        attained_details
+                                        .groupby("Project Manager")
+                                        ["Name"].apply(list)
+                                        .reset_index(name="Clients")
+                                    )
+                                    merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+                                    merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+                                    merged_attained.index = range(1, len(merged_attained)+1)
+                                    st.dataframe(merged_attained)
                                     st.dataframe(attained_details["Status"].value_counts())
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_details["Brand"].value_counts()
@@ -3147,6 +3163,22 @@ def main() -> None:
                                 with st.expander("👏 Attained Reviews Per PM"):
                                     st.dataframe(attained_pm)
                                     st.dataframe(attained_details_total)
+                                    attained_count = (
+                                        attained_details_total
+                                        .groupby("Project Manager")
+                                        .size()
+                                        .reset_index(name="Count")
+                                    )
+                                    attained_clients = (
+                                        attained_details_total
+                                        .groupby("Project Manager")
+                                        ["Name"].apply(list)
+                                        .reset_index(name="Clients")
+                                    )
+                                    merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+                                    merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+                                    merged_attained.index = range(1, len(merged_attained)+1)
+                                    st.dataframe(merged_attained)
                                     st.dataframe(attained_details_total["Status"].value_counts())
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_details_total["Brand"].value_counts()
@@ -3498,6 +3530,23 @@ def main() -> None:
                                 with st.expander("👏 Attained Reviews Per PM"):
                                     st.dataframe(attained_pm)
                                     st.dataframe(attained_details_total)
+                                    attained_count = (
+                                        attained_details_total
+                                        .groupby("Project Manager")
+                                        .size()
+                                        .reset_index(name="Count")
+                                    )
+                                    attained_clients = (
+                                        attained_details_total
+                                        .groupby("Project Manager")
+                                        ["Name"].apply(list)
+                                        .reset_index(name="Clients")
+                                    )
+                                    merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+                                    merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+                                    merged_attained.index = range(1, len(merged_attained)+1)
+                                    st.dataframe(merged_attained)
+
                                     st.dataframe(attained_details_total["Status"].value_counts())
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_details_total["Brand"].value_counts()
@@ -3872,6 +3921,22 @@ def main() -> None:
                                 with st.expander("👏 Attained Reviews Per PM"):
                                     st.dataframe(attained_pm)
                                     st.dataframe(attained_details_total)
+                                    attained_count = (
+                                        attained_details_total
+                                        .groupby("Project Manager")
+                                        .size()
+                                        .reset_index(name="Count")
+                                    )
+                                    attained_clients = (
+                                        attained_details_total
+                                        .groupby("Project Manager")
+                                        ["Name"].apply(list)
+                                        .reset_index(name="Clients")
+                                    )
+                                    merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+                                    merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+                                    merged_attained.index = range(1, len(merged_attained)+1)
+                                    st.dataframe(merged_attained)
                                     st.dataframe(attained_details_total["Status"].value_counts())
                                 with st.expander("🏷️ Reviews Per Brand"):
                                     attained_brands = attained_details_total["Brand"].value_counts()
