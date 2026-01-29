@@ -1215,6 +1215,7 @@ def summary(month: int, year: int):
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_d2d = usa_platforms.get("Draft2Digital", 0)
     usa_fav = usa_platforms.get("FAV", 0)
     usa_acx = usa_platforms.get("ACX", 0)
 
@@ -1222,6 +1223,7 @@ def summary(month: int, year: int):
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_d2d = uk_platforms.get("Draft2Digital", 0)
     uk_fav = uk_platforms.get("FAV", 0)
     uk_kobo = uk_platforms.get("Kobo", 0)
     uk_acx = uk_platforms.get("ACX", 0)
@@ -1390,9 +1392,9 @@ def summary(month: int, year: int):
 
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav, "ACX":usa_acx}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital": usa_d2d,  "FAV": usa_fav, "ACX":usa_acx}
     uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
-                    "Kobo": uk_kobo, "ACX":uk_acx}
+                    "Kobo": uk_kobo,"Draft2Digital": uk_d2d, "ACX":uk_acx}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1469,6 +1471,7 @@ def generate_year_summary(year: int):
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_d2d = usa_platforms.get("Draft2Digital", 0)
     usa_fav = usa_platforms.get("FAV", 0)
     usa_acx = usa_platforms.get("ACX", 0)
 
@@ -1476,6 +1479,7 @@ def generate_year_summary(year: int):
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_d2d = uk_platforms.get("Draft2Digital", 0)
     uk_fav = uk_platforms.get("FAV", 0)
     uk_kobo = uk_platforms.get("Kobo", 0)
     uk_acx = uk_platforms.get("ACX", 0)
@@ -1798,8 +1802,8 @@ def generate_year_summary(year: int):
                   'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav, "ACX": usa_acx}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram,"Draft2Digital":uk_d2d, "FAV": uk_fav,
                     "Kobo": uk_kobo, "ACX": uk_acx}
 
     printing_stats = {
@@ -1882,6 +1886,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
     usa_amazon = usa_platforms.get("Amazon", 0)
     usa_bn = usa_platforms.get("Barnes & Noble", 0)
     usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_d2d = usa_platforms.get("Draft2Digital", 0)
     usa_fav = usa_platforms.get("FAV", 0)
     usa_acx = usa_platforms.get("ACX", 0)
 
@@ -1889,6 +1894,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
     uk_amazon = uk_platforms.get("Amazon", 0)
     uk_bn = uk_platforms.get("Barnes & Noble", 0)
     uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_d2d = uk_platforms.get("Draft2Digital", 0)
     uk_fav = uk_platforms.get("FAV", 0)
     uk_kobo = uk_platforms.get("Kobo", 0)
     uk_acx = uk_platforms.get("ACX", 0)
@@ -2211,8 +2217,8 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
                   'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram, "FAV": usa_fav, "ACX": usa_acx}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "FAV": uk_fav,
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram,"Draft2Digital":uk_d2d, "FAV": uk_fav,
                     "Kobo": uk_kobo, "ACX": uk_acx}
 
     printing_stats = {
@@ -2683,6 +2689,7 @@ def main() -> None:
                             fav = platforms.get("FAV", "N/A")
                             acx = platforms.get("ACX", "N/A")
                             kobo = platforms.get("Kobo", "N/A")
+                            d2d = platforms.get("Draft2Digital", "N/A")
 
                             filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                                 ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
@@ -2746,6 +2753,7 @@ def main() -> None:
                                             - 📔 **Barnes & Noble:** `{bn}`
                                             - ⚡ **Ingram Spark:** `{ingram}`
                                             - 📚 **Kobo:** `{kobo}`
+                                            - 📚 **Draft2Digital:** `{d2d}`
                                             - 🔉 **Findaway Voices:** `{fav}`
                                             - 🔉 **ACX:** `{acx}`
                                             """)
@@ -3058,6 +3066,7 @@ def main() -> None:
                                 - 📔 **Barnes & Noble:** `{platforms.get("Barnes & Noble", "N/A")}`
                                 - ⚡ **Ingram Spark:** `{platforms.get("Ingram Spark", "N/A")}`
                                 - 📚 **Kobo:** `{platforms.get("Kobo", "N/A")}`
+                                - 📚 **Draft2Digital:** `{platforms.get("Draft2Digital", "N/A")}`
                                 - 🔉 **Findaway Voices:** `{platforms.get("FAV", "N/A")}`
                                 - 🔉 **ACX:** `{platforms.get("ACX", "N/A")}`
                                 """)
@@ -3426,6 +3435,7 @@ def main() -> None:
                                                 - 📔 **Barnes & Noble:** `{platforms.get("Barnes & Noble", "N/A")}`
                                                 - ⚡ **Ingram Spark:** `{platforms.get("Ingram Spark", "N/A")}`
                                                 - 📚 **Kobo:** `{platforms.get("Kobo", "N/A")}`
+                                                - 📚 **Draft2Digital:** `{platforms.get("Draft2Digital", "N/A")}`
                                                 - 🔉 **Findaway Voices:** `{platforms.get("FAV", "N/A")}`
                                                 - 🔉 **ACX:** `{platforms.get("ACX", "N/A")}`
                                                 """)
@@ -3815,7 +3825,8 @@ def main() -> None:
                                                 - 🅰 **Amazon:** `{platforms.get("Amazon", "N/A")}`
                                                 - 📔 **Barnes & Noble:** `{platforms.get("Barnes & Noble", "N/A")}`
                                                 - ⚡ **Ingram Spark:** `{platforms.get("Ingram Spark", "N/A")}`
-                                                - 📚 **Kobo:** `{platforms.get("Kobo", "N/A")}`
+                                                - 📚 **Kobo:** `{platforms.get("Kobo", "N/A")}` 
+                                                - 📚 **Draft2Digital:** `{platforms.get("Draft2Digital", "N/A")}`
                                                 - 🔉 **Findaway Voices:** `{platforms.get("FAV", "N/A")}`
                                                 - 🔉 **ACX:** `{platforms.get("ACX", "N/A")}`
                                                 """)
