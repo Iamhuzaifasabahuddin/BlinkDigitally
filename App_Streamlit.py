@@ -990,54 +990,50 @@ def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2:
 
 def get_names_in_both_years(sheet_name: str, year1: int, year2: int) -> tuple:
     """
-    Identifies names that appear in both June and July from a Google Sheet.
-    Returns:
-        - A set of matching names
-        - A dictionary with individual counts for June and July
+    Identifies names that appear in both years from a Google Sheet.
     """
     df = get_sheet_data(sheet_name)
 
     if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
-        logging.warning("Missing 'Name' or 'Date' columns or data is empty.")
+        logging.warning("Missing 'Name' or 'Publishing Date' columns or data is empty.")
         return set(), {}, 0
 
-    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], format="%d-%B-%Y", errors='coerce')
+    df['Publishing Date'] = pd.to_datetime(
+        df['Publishing Date'], format="%d-%B-%Y", errors='coerce'
+    )
     df = df.dropna(subset=['Publishing Date', 'Name'])
 
-    df['Month'] = df['Publishing Date'].dt.month_name()
     df['Year'] = df['Publishing Date'].dt.year
+    df['Name'] = df['Name'].str.strip()
 
-    year_1_names = set(
-        df[(df['Year'] == year1)]['Name'].str.strip()
-    )
+    year_1_names = set(df[df['Year'] == year1]['Name'])
+    year_2_names = set(df[df['Year'] == year2]['Name'])
 
-    year_2_names = set(
-        df[(df['Year'] == year2)]['Name'].str.strip()
-    )
+    names_in_both = year_1_names & year_2_names
 
-    if year_1_names & year_2_names:
-        names_in_both = year_1_names.intersection(year_2_names)
+    counts = {}
 
-        counts = {}
-        for name in names_in_both:
-            year_1_count = df[
-                (df['Year'] == year1) &
-                (df['Name'].str.strip() == name)
-                ].shape[0]
+    for name in names_in_both:
+        year1_df = df[(df['Year'] == year1) & (df['Name'] == name)]
+        year2_df = df[(df['Year'] == year2) & (df['Name'] == name)]
 
-            year_2_count = df[
-                (df['Year'] == year2) &
-                (df['Name'].str.strip() == name)
-                ].shape[0]
-
-            counts[name] = {
-                f"{year1}": year_1_count,
-                f"{year2}": year_2_count,
+        counts[name] = {
+            str(year1): {
+                "count": year1_df.shape[0],
+                "publishing_dates": year1_df['Publishing Date']
+                .dt.strftime("%d-%B-%Y")
+                .tolist()
+            },
+            str(year2): {
+                "count": year2_df.shape[0],
+                "publishing_dates": year2_df['Publishing Date']
+                .dt.strftime("%d-%B-%Y")
+                .tolist()
             }
+        }
 
-        return names_in_both, counts, len(names_in_both)
-    else:
-        return set(), {}, 0
+    return names_in_both, counts, len(names_in_both)
+
 
 def get_names_in_year(sheet_name: str, year: int):
     """
@@ -5012,6 +5008,15 @@ def main() -> None:
                                 st.json(data1, expanded=True)
                                 st.write("Detailed Names:")
                                 st.json(data2, expanded=False)
+                                for name, years in data2.items():
+                                    with st.expander(name):
+                                        for year, data in years.items():
+                                            st.markdown(f"### {year}")
+                                            st.write(f"**Count:** {data['count']}")
+                                            st.write("**Publishing Dates:**")
+                                            st.markdown(
+                                                "\n".join([f"- {d}" for d in data["publishing_dates"]])
+                                            )
 
         elif action == "Summary":
             st.header("📄 Generate Summary Report")
