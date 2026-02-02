@@ -86,7 +86,9 @@ name_usa = {
     "Muhammad Saad Sethi": "saad.sethi@topsoftdigitals.pk",
     "Tooba Shoaib": "tooba.shoaib@topsoftdigitals.pk",
     "Adrian Moses": "adrain.moses@topsoftdigitals.pk",
-    "Ancil Fernandes": "ancil.fernandes@topsoftdigitals.pk"
+    "Ancil Fernandes": "ancil.fernandes@topsoftdigitals.pk",
+    "Laiba Sheikh": "laiba.sheikh@topsoftdigitals.pk",
+    "Muhammad Abdullah Sheikh": "abdullah.sheikh@topsoftdigitals.pk"
 }
 
 names_uk = {
