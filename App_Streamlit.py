@@ -3199,13 +3199,16 @@ def main() -> None:
                         st.info(f"No Data Found for {choice} {number2}")
             with tab3:
                 st.subheader(f"📂 Start to Year Data for {choice}")
+                number5 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                          value=get_min_year(), step=1,
+                                          key="year_total_to_date_start")
                 number4 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1,
                                           key="year_total_to_date")
 
-                if number4 and sheet_name:
+                if number4 and number5 and sheet_name:
 
-                    data = load_data_search(sheet_name, number4)
+                    data = load_data_search(sheet_name, number4, number5)
                     if not data.empty:
                         data_rm_dupes = data.copy()
                         if "Name" in data_rm_dupes.columns:
@@ -3339,9 +3342,9 @@ def main() -> None:
                             negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
 
                         if data.empty:
-                            st.warning(f"⚠️ No Data Available for {choice} in {get_min_year()} to {number4}")
+                            st.warning(f"⚠️ No Data Available for {choice} in {number5} to {number4}")
                         else:
-                            st.markdown(f"### 📄 Year to Year Data for {choice} - {get_min_year()} to {number4}")
+                            st.markdown(f"### 📄 Year to Year Data for {choice} - {number5} to {number4}")
                             st.dataframe(data)
 
                             with st.expander("🧮 Clients with multiple platform publishing"):
@@ -3367,7 +3370,7 @@ def main() -> None:
                             st.download_button(
                                 label="📥 Download Excel",
                                 data=buffer,
-                                file_name=f"{choice}_Total_{get_min_year()}-{number4}.xlsx",
+                                file_name=f"{choice}_Total_{number5}-{number4}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 help="Click to download the Excel report",
                                 key="Year_to_date"
@@ -3437,7 +3440,7 @@ def main() -> None:
                                                 """)
                                 data_rm_dupes.index = range(1, len(data_rm_dupes) + 1)
 
-                                with st.expander(f"🤵🏻 Clients List {choice} - {get_min_year()} to {number4}"):
+                                with st.expander(f"🤵🏻 Clients List {choice} - {number5} to {number4}"):
                                     st.dataframe(data_rm_dupes)
                                 with st.expander("🤵🏻🤵🏻 Publishing Per Month"):
                                     data_month = data_rm_dupes.copy()
@@ -3511,7 +3514,7 @@ def main() -> None:
                                     publishing_per_year.index = range(1, len(publishing_per_year) + 1)
                                     st.dataframe(publishing_per_year)
 
-                                with st.expander(f"📈 Publishing Stats {choice} - {get_min_year()} to {number4}"):
+                                with st.expander(f"📈 Publishing Stats {choice} - {number5} to {number4}"):
                                     data_rm_dupes2 = data.copy()
                                     data_rm_dupes2 = data_rm_dupes2.drop_duplicates(["Name"], keep="first")
                                     publishing_stats = data_rm_dupes2.groupby('Publishing Date')["Name"].apply(
@@ -3524,11 +3527,11 @@ def main() -> None:
                                                                                 )
                                     publishing_merged.index = range(1, len(publishing_merged) + 1)
                                     st.dataframe(publishing_merged)
-                                with st.expander(f"💫 Self Publishing List {choice} - {get_min_year()} to {number4}"):
+                                with st.expander(f"💫 Self Publishing List {choice} - {number5} to {number4}"):
                                     self_publishing_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Self Publishing"]
                                     self_publishing_df.index = range(1, len(self_publishing_df) + 1)
                                     st.dataframe(self_publishing_df)
-                                with st.expander(f"🖨 Printing Only List {choice} - {get_min_year()} to {number4}"):
+                                with st.expander(f"🖨 Printing Only List {choice} - {number5} to {number4}"):
                                     printing_only_df = data_rm_dupes2[data_rm_dupes2["Issues"] == "Printing Only"]
                                     printing_only_df.index = range(1, len(printing_only_df) + 1)
                                     st.dataframe(printing_only_df)
