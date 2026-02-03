@@ -3484,6 +3484,32 @@ def main() -> None:
                                     merged_pm_client_distribution.index = range(1, len(merged_pm_client_distribution)+1)
                                     st.dataframe(merged_pm_client_distribution)
 
+                                    yearly_data = data_rm_dupes.copy()
+                                    yearly_data["Publishing Date"] = pd.to_datetime(yearly_data["Publishing Date"],
+                                                                                   errors="coerce")
+                                    yearly_data["Year"] = yearly_data["Publishing Date"].dt.to_period("Y").dt.strftime(
+                                        "%Y")
+
+                                    unique_clients_count_per_year = (
+                                        yearly_data.groupby("Year")["Name"].nunique()
+                                        .reset_index()
+                                    )
+                                    unique_clients_count_per_year.columns = ["Year", "Total Published"]
+                                    clients_list_per_year = (
+                                        yearly_data.groupby("Year")["Name"]
+                                        .apply(list)
+                                        .reset_index(name="Clients")
+                                    )
+
+                                    publishing_per_year = unique_clients_count_per_year.merge(
+                                        clients_list_per_year, on="Year", how="left"
+                                    )
+
+                                    publishing_per_year = publishing_per_year.sort_values(
+                                        by="Total Published", ascending=False
+                                    )
+                                    publishing_per_year.index = range(1, len(publishing_per_year) + 1)
+                                    st.dataframe(publishing_per_year)
 
                                 with st.expander(f"📈 Publishing Stats {choice} - {get_min_year()} to {number4}"):
                                     data_rm_dupes2 = data.copy()
