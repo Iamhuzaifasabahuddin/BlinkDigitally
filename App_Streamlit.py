@@ -2652,8 +2652,7 @@ def main() -> None:
                                     "Platform"].nunique().reset_index(name="Platform_Count")
 
                                 platforms_per_client = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
-                                    "Platform"].apply(
-                                    list).reset_index(name="Platforms")
+                                    "Platform"].unique().reset_index(name="Platforms")
                                 platform_stats = platform_counts.merge(platforms_per_client, how="left",
                                                                        on=["Name", "Book Name & Link"])
                                 platform_stats.index = range(1, len(platform_stats) + 1)
@@ -2986,8 +2985,7 @@ def main() -> None:
                                     "Platform"].nunique().reset_index(name="Platform_Count")
 
                                 platforms_per_client = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
-                                    "Platform"].apply(
-                                    list).reset_index(name="Platforms")
+                                    "Platform"].unique().reset_index(name="Platforms")
                                 platform_stats = platform_counts.merge(platforms_per_client, how="left",
                                                                        on=["Name", "Book Name & Link"])
                                 platform_stats.index = range(1, len(platform_stats) + 1)
@@ -3357,8 +3355,7 @@ def main() -> None:
                                     "Platform"].nunique().reset_index(name="Platform_Count")
 
                                 platforms_per_client = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
-                                    "Platform"].apply(
-                                    list).reset_index(name="Platforms")
+                                    "Platform"].unique().reset_index(name="Platforms")
                                 platform_stats = platform_counts.merge(platforms_per_client, how="left",
                                                                        on=["Name", "Book Name & Link"])
                                 platform_stats.index = range(1, len(platform_stats) + 1)
@@ -3774,8 +3771,7 @@ def main() -> None:
                                     "Platform"].nunique().reset_index(name="Platform_Count")
 
                                 platforms_per_client = data_multiple_platforms.groupby(["Name", "Book Name & Link"])[
-                                    "Platform"].apply(
-                                    list).reset_index(name="Platforms")
+                                    "Platform"].unique().reset_index(name="Platforms")
                                 platform_stats = platform_counts.merge(platforms_per_client, how="left",
                                                                        on=["Name", "Book Name & Link"])
                                 platform_stats.index = range(1, len(platform_stats) + 1)
