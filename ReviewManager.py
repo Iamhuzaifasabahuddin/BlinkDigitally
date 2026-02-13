@@ -95,7 +95,7 @@ names_uk = {
     "Youha": "youha.khan@topsoftdigitals.pk",
     "Hassan Siddiqui": "hassan.siddiqui@topsoftdigitals.pk",
     "Emaan Zaidi": "emaan.zaidi@topsoftdigitals.pk",
-    "Elishba": "elishba@topsoftdigitals.pk",
+    "Faarah Saif": "faarah.saif@topsoftdigitals.pk",
     "Shahrukh Yousuf": "shahrukh.yousuf@topsoftdigitals.pk"
 }
 
