@@ -1596,7 +1596,21 @@ def generate_year_summary(year: int):
         attained_details["Trustpilot Review Date"] = pd.to_datetime(
             attained_details["Trustpilot Review Date"], errors="coerce"
         )
-
+        attained_count = (
+            attained_details
+            .groupby("Project Manager")
+            .size()
+            .reset_index(name="Count")
+        )
+        attained_clients = (
+            attained_details
+            .groupby("Project Manager")
+            ["Name"].apply(list)
+            .reset_index(name="Clients")
+        )
+        merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+        merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+        merged_attained.index = range(1, len(merged_attained) + 1)
         if not usa_reviews_per_pm.empty:
             usa_attained_monthly = (
                 usa_reviews_per_pm.groupby(usa_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
@@ -1822,7 +1836,7 @@ def generate_year_summary(year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, merged_attained,  attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
 
 
 def generate_year_summary_multiple(start_year: int, end_year: int):
@@ -2011,6 +2025,21 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
         attained_details["Trustpilot Review Date"] = pd.to_datetime(
             attained_details["Trustpilot Review Date"], errors="coerce"
         )
+        attained_count = (
+            attained_details
+            .groupby("Project Manager")
+            .size()
+            .reset_index(name="Count")
+        )
+        attained_clients = (
+            attained_details
+            .groupby("Project Manager")
+            ["Name"].apply(list)
+            .reset_index(name="Clients")
+        )
+        merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+        merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+        merged_attained.index = range(1, len(merged_attained) + 1)
 
         if not usa_reviews_per_pm.empty:
             usa_attained_monthly = (
@@ -2237,7 +2266,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
         'uk': uk
     }
 
-    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, merged_attained, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
 
 
 def logging_function() -> None:
@@ -5383,7 +5412,7 @@ def main() -> None:
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month, Issues_usa, Issues_uk = generate_year_summary(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, merged_attained, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month, Issues_usa, Issues_uk = generate_year_summary(
                             number)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -5477,6 +5506,7 @@ def main() -> None:
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_df)
+                                st.dataframe(merged_attained)
                                 st.dataframe(attained_df["Status"].value_counts())
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_df["Brand"].value_counts()
@@ -5867,7 +5897,7 @@ def main() -> None:
             else:
                 if st.button("Generate Year Summary Report"):
                     with st.spinner("Generating Year Summary Report"):
-                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month, Issues_usa, Issues_uk = generate_year_summary_multiple(
+                        usa_review_data, uk_review_data, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus, total_unique_clients, combined, attained_reviews_per_pm, attained_df, merged_attained,  attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_per_month, publishing_per_month, Issues_usa, Issues_uk = generate_year_summary_multiple(
                             start_year, end_year)
                         pdf_data, pdf_filename = generate_summary_report_pdf(usa_review_data, uk_review_data,
                                                                              usa_brands, uk_brands,
@@ -5961,6 +5991,7 @@ def main() -> None:
                             with st.expander("👏 Reviews Per PM"):
                                 st.dataframe(attained_reviews_per_pm)
                                 st.dataframe(attained_df)
+                                st.dataframe(merged_attained)
                                 st.dataframe(attained_df["Status"].value_counts())
                             with st.expander("🏷️ Reviews Per Brand"):
                                 attained_brands = attained_df["Brand"].value_counts()
