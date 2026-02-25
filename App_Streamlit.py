@@ -1118,7 +1118,7 @@ def create_review_pie_chart(review_data: dict[str, int], title: str):
 
 def create_platform_comparison_chart(usa_data: dict[str, int], uk_data: dict[str, int]):
     """Create comparison chart for platforms"""
-    platforms = ['Amazon', 'Barnes & Noble', 'Ingram Spark', 'FAV']
+    platforms = ['Amazon', 'Barnes & Noble', 'Ingram Spark', "Draft2Digital", "Kobo", "LULU", "FAV", "ACX"]
 
     fig = go.Figure(data=[
         go.Bar(name='USA', x=platforms, y=list(usa_data.values()), marker_color="#23A0F8"),
@@ -1390,9 +1390,9 @@ def summary(month: int, year: int):
 
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d,"LULU":usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram,"Draft2Digital":uk_d2d,"LULU":uk_lulu, "FAV": uk_fav,
-                    "Kobo": uk_kobo, "ACX": uk_acx}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d,"Kobo": uk_kobo, "LULU":usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "Draft2Digital":uk_d2d,"Kobo": uk_kobo,"LULU":uk_lulu, "FAV": uk_fav,
+                     "ACX": uk_acx}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -1816,9 +1816,9 @@ def generate_year_summary(year: int):
                   'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d,"LULU":usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram,"Draft2Digital":uk_d2d,"LULU":uk_lulu, "FAV": uk_fav,
-                    "Kobo": uk_kobo, "ACX": uk_acx}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d,"Kobo": uk_kobo, "LULU":usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "Draft2Digital":uk_d2d,"Kobo": uk_kobo,"LULU":uk_lulu, "FAV": uk_fav,
+                     "ACX": uk_acx}
 
     printing_stats = {
         'Total_copies': Total_copies,
@@ -2248,9 +2248,9 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
                   'Aurora Writers': aurora_writers}
     uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
 
-    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d,"LULU":usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
-    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram,"Draft2Digital":uk_d2d,"LULU":uk_lulu, "FAV": uk_fav,
-                    "Kobo": uk_kobo, "ACX": uk_acx}
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,"Draft2Digital":usa_d2d,"Kobo": uk_kobo, "LULU":usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "Draft2Digital":uk_d2d,"Kobo": uk_kobo,"LULU":uk_lulu, "FAV": uk_fav,
+                     "ACX": uk_acx}
 
     printing_stats = {
         'Total_copies': Total_copies,
