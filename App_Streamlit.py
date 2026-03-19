@@ -4076,7 +4076,6 @@ def main() -> None:
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                     help="Click to download search results"
                                 )
-
                                 st.markdown("---")
                                 st.markdown("### 📊 Search Results Summary")
                                 col1, col2 = st.columns(2)
@@ -4094,6 +4093,30 @@ def main() -> None:
                                         st.markdown("**Platforms in Results:**")
                                         for platform, count in platforms.items():
                                             st.markdown(f"  - {platform}: `{count}`")
+
+                                st.markdown("### 📊 Search Results with unique titles only")
+                                drop_search_dupes = search_df.copy()
+                                drop_search_dupes = drop_search_dupes.drop_duplicates(subset=["Name", "Book Name & Link"])
+                                drop_search_dupes.index = range(1, len(drop_search_dupes)+1)
+                                st.dataframe(drop_search_dupes[["Name", "Book Name & Link"]])
+                                st.markdown("---")
+                                st.markdown("### 📊 Search Results with unique titles only")
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.markdown(f"- 🧾 **Total Matches:** `{len(drop_search_dupes)}`")
+                                    if "Brand" in drop_search_dupes.columns:
+                                        brands = drop_search_dupes["Brand"].value_counts()
+                                        st.markdown("**Brands in Results:**")
+                                        for brand, count in brands.items():
+                                            st.markdown(f"  - {brand}: `{count}`")
+
+                                with col2:
+                                    if "Platform" in drop_search_dupes.columns:
+                                        platforms = drop_search_dupes["Platform"].value_counts()
+                                        st.markdown("**Platforms in Results:**")
+                                        for platform, count in platforms.items():
+                                            st.markdown(f"  - {platform}: `{count}`")
+
                         else:
                             st.info("👆 Enter name/book/email above to search")
             with tab6:
