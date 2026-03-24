@@ -1387,7 +1387,7 @@ def summary(month: int, year: int):
     usa = country.get("USA", 0)
     canada = country.get("Canada", 0)
     uk = country.get("UK", 0)
-    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 35)
+    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 42)
     a_plus, a_plus_count = get_A_plus_month(month, year)
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
@@ -1814,7 +1814,7 @@ def generate_year_summary(year: int):
     usa = country.get("USA", 0)
     canada = country.get("Canada", 0)
     uk = country.get("UK", 0)
-    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 35)
+    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 42)
 
     a_plus, a_plus_count = get_A_plus_year(year)
 
@@ -2247,7 +2247,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
     usa = country.get("USA", 0)
     canada = country.get("Canada", 0)
     uk = country.get("UK", 0)
-    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 35)
+    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 42)
 
     a_plus, a_plus_count = get_A_plus_year_multiple(start_year, end_year)
 
@@ -4761,7 +4761,7 @@ def main() -> None:
                         country_canada = country_counts.get("Canada", 0)
                         total_titles = len(data)
 
-                        total_cost = (country_usa * 65) + (country_canada * 46) + (country_uk * 35)
+                        total_cost = (country_usa * 65) + (country_canada * 46) + (country_uk * 42)
 
 
                         st.markdown("---")
@@ -4845,7 +4845,7 @@ def main() -> None:
                     country_canada = country_counts.get("Canada", 0)
                     total_titles = len(data)
 
-                    total_cost = (country_usa * 65) + (country_canada * 46) + (country_uk * 35)
+                    total_cost = (country_usa * 65) + (country_canada * 46) + (country_uk * 42)
 
 
                     st.markdown("---")
@@ -4928,7 +4928,7 @@ def main() -> None:
                         country_uk = country_counts.get("UK", 0)
                         country_canada = country_counts.get("Canada", 0)
 
-                        total_cost = (country_usa * 65) + (country_canada * 46) + (country_uk * 35)
+                        total_cost = (country_usa * 65) + (country_canada * 46) + (country_uk * 42)
 
                         st.markdown("---")
 
