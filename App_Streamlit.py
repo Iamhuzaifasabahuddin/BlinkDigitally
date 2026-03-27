@@ -4336,6 +4336,8 @@ def main() -> None:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         help="Click to download the Excel report"
                     )
+                    with st.expander(f"🖨 Monthly Printing Data for {number2}"):
+                        st.dataframe(monthly)
 
                     st.markdown("---")
 
@@ -4447,7 +4449,8 @@ def main() -> None:
                         help="Click to download the Excel report",
                         key="Start_to_Year"
                     )
-
+                    with st.expander(f"🖨 Monthly Printing Data from 2025 to {number2}"):
+                        st.dataframe(monthly)
                     st.markdown("---")
 
                     st.markdown("### 📊 Summary Statistics (Start to Year)")
