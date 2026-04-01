@@ -1034,6 +1034,68 @@ def get_names_in_both_years(sheet_name: str, year1: int, year2: int) -> tuple:
 
     return names_in_both, counts, len(names_in_both)
 
+def get_clients_returning_in_month(
+    sheet_name: str,
+    start_year: int,
+    target_month: str,
+    target_year: int
+) -> tuple:
+    """
+    Identifies clients who were published starting from `start_year`
+    and also appear in the specified `target_month` and `target_year`.
+
+    Returns clients that are "duplicates" — same client, different books.
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Publishing Date' columns or data is empty.")
+        return set(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(
+        df['Publishing Date'], format="%d-%B-%Y", errors='coerce'
+    )
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+
+    df['Year'] = df['Publishing Date'].dt.year
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Name'] = df['Name'].str.strip()
+
+    baseline_df = df[
+        (df['Year'] == start_year)
+    ]
+
+    target_df = df[
+        (df['Year'] == target_year) &
+        (df['Month'] == target_month)
+    ]
+
+    baseline_clients = set(baseline_df['Name'])
+    target_clients = set(target_df['Name'])
+
+    returning_clients = baseline_clients & target_clients
+
+    counts = {}
+    for name in returning_clients:
+        client_baseline = baseline_df[baseline_df['Name'] == name]
+        client_target = target_df[target_df['Name'] == name]
+
+        counts[name] = {
+            f"from_{start_year}_baseline": {
+                "count": client_baseline.shape[0],
+                "publishing_dates": client_baseline['Publishing Date']
+                    .dt.strftime("%d-%B-%Y")
+                    .tolist()
+            },
+            f"{target_year}_{target_month}": {
+                "count": client_target.shape[0],
+                "publishing_dates": client_target['Publishing Date']
+                    .dt.strftime("%d-%B-%Y")
+                    .tolist()
+            }
+        }
+
+    return returning_clients, counts, len(returning_clients)
 
 def get_names_in_year(sheet_name: str, year: int):
     """
@@ -4962,7 +5024,7 @@ def main() -> None:
                     st.info("👆 Enter name/book above to search")
         elif action == "Generate Similarity":
 
-            tab1, tab2, tab3 = st.tabs(["Queries", "Yearly Queries", "Compare Years"])
+            tab1, tab2, tab3, tab4 = st.tabs(["Queries", "Yearly Queries", "Compare Years", "Custom"])
 
             def safe_month_index(month_offset: int, month_list_len: int) -> int:
                 """Ensure selectbox index is within valid range."""
@@ -5115,6 +5177,67 @@ def main() -> None:
                                             st.markdown(
                                                 "\n".join([f"- {d}" for d in data["publishing_dates"]])
                                             )
+            with tab4:
+                st.header("Compare clients Custom")
+                choice = st.selectbox(
+                    "Select Data To View",
+                    ["USA", "UK"],
+                    index=None,
+                    key="choice_tab4"
+                )
+                sheet_name = {"UK": sheet_uk, "USA": sheet_usa}.get(choice)
+
+                selected_month_1 = st.selectbox(
+                    "Select Month 1",
+                    month_list,
+                    index=current_month - 1,
+                    key="month1_tab4"
+                )
+                number1 = st.number_input(
+                    "Enter Year 1",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year-1,
+                    step=1,
+                    key="year1_tab4"
+                )
+
+                number2 = st.number_input(
+                    "Enter Year 2",
+                    min_value=int(get_min_year()),
+                    max_value=current_year,
+                    value=current_year,
+                    step=1,
+                    key="year2_tab4"
+                )
+
+                if sheet_name:
+                    if st.button(f"Search Similar Clients for {selected_month_1}", key="btn_generate_tab4"):
+                        with st.spinner("Searching repeating clients for targeted month"):
+                            data1, data2, data3 = get_clients_returning_in_month(
+                                sheet_name, number1,selected_month_1,
+                                number2)
+
+                            if not data1:
+                                st.info("No similarities found")
+                            else:
+                                st.metric(label="Total Number of Same Clients", value=data3)
+                                st.write("Names:")
+                                st.json(data1, expanded=True)
+                                st.write("Detailed Names:")
+                                st.json(data2, expanded=False)
+                                for name, years in data2.items():
+                                    with st.expander(name):
+                                        for year, data in years.items():
+                                            st.markdown(f"### {year}")
+                                            st.write(f"**Count:** {data['count']}")
+                                            st.write("**Publishing Dates:**")
+                                            st.markdown(
+                                                "\n".join([f"- {d}" for d in data["publishing_dates"]])
+                                            )
+
+
+
 
         elif action == "Summary":
             st.header("📄 Generate Summary Report")
