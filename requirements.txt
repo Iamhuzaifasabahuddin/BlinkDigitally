@@ -1,6 +1,6 @@
 gspread>=5.12.4
 matplotlib>=3.10.1
-pandas>=2.2.3
+pandas == 2.3.3
 plotly>=6.1.1
 python-dotenv>=1.1.0
 rapidfuzz>=3.13.0
