@@ -5178,7 +5178,7 @@ def main() -> None:
                                                 "\n".join([f"- {d}" for d in data["publishing_dates"]])
                                             )
             with tab4:
-                st.header("Compare clients Custom")
+                st.header("Compare clients custom")
                 choice = st.selectbox(
                     "Select Data To View",
                     ["USA", "UK"],
