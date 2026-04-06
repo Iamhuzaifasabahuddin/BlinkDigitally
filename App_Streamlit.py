@@ -1,27 +1,66 @@
 import calendar
 import io
+import logging
 from datetime import datetime
+from io import BytesIO
 
+from itertools import zip_longest
+import gspread
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import pytz
 import streamlit as st
-
-from utils.API_loader import get_sheet_data
-from utils.chats_creator import create_review_pie_chart, create_platform_comparison_chart, create_brand_chart
-from utils.data_cleaner import get_min_year, safe_concat, clean_data_reviews
-from utils.data_loader import load_data, load_reviews, load_data_year, load_reviews_year, load_data_search, \
-    load_reviews_year_to_date, load_data_filter, load_reviews_filter, sheet_usa, sheet_uk, sheet_sales
-from utils.diff_sheets_loader import get_printing_data_month, printing_data_year, printing_data_search, get_copyright_month, \
-    copyright_year, copyright_search
-from utils.pdf_generator import generate_summary_report_pdf
-from utils.similarity_loader import get_clients_returning_in_month, get_names_in_both_months, get_names_in_year, \
-    get_names_in_both_years
-from utils.summary_generators import summary, generate_year_summary, generate_year_summary_multiple
+from google.oauth2.service_account import Credentials
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus.flowables import HRFlowable
 
 st.set_page_config(page_title="Blink Digitally", page_icon="📊", layout="centered")
 
+creds_dict = {
+    "type": st.secrets["connections"]["gsheets"]["type"],
+    "project_id": st.secrets["connections"]["gsheets"]["project_id"],
+    "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
+    "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace("\\n", "\n"),
+    "client_email": st.secrets["connections"]["gsheets"]["client_email"],
+    "client_id": st.secrets["connections"]["gsheets"]["client_id"],
+    "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
+    "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
+    "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
+    "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
+}
+# Google Sheets setup
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+# creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+SPREADSHEET_ID = st.secrets["connections"]["gsheets"]["SPREADSHEET_ID"]
+
+
+@st.cache_resource
+def get_gsheets_client(creds_dict: dict, spreadsheet_id: str):
+    """Create and cache Google Sheets client + spreadsheet"""
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=SCOPES
+    )
+    client = gspread.authorize(creds)
+    spreadsheet = client.open_by_key(spreadsheet_id)
+    return spreadsheet
+
+
+spreadsheet = get_gsheets_client(creds_dict, SPREADSHEET_ID)
+
+# Sheet names
+sheet_usa = "USA"
+sheet_uk = "UK"
+sheet_audio = "AudioBook"
+sheet_printing = "Printing"
+sheet_copyright = "Copyright"
+sheet_a_plus = "A_plus"
+sheet_sales = "Sales"
 
 PKST_DATE = pytz.timezone("Asia/Karachi")
 
@@ -38,6 +77,2538 @@ st.markdown("""
     header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
+
+
+def get_min_year() -> int:
+    """Gets Minimum year from the data"""
+    # uk_clean = clean_data_reviews(sheet_uk)
+    # audio = clean_data_reviews(sheet_audio)
+    # usa_clean = clean_data_reviews(sheet_usa)
+    # combined = pd.concat([uk_clean, usa_clean, audio])
+    #
+    # combined["Publishing Date"] = pd.to_datetime(combined["Publishing Date"], errors="coerce")
+    #
+    # min_year = combined["Publishing Date"].dt.year.min()
+
+    return 2025
+
+
+def normalize_name(name):
+    """Normalize a name to consistent format (Title Case, stripped whitespace)"""
+    if pd.isna(name) or name == "":
+        return ""
+    return str(name).strip().title()
+
+
+@st.cache_data(ttl=1800)
+def get_sheet_data(sheet_name: str) -> pd.DataFrame:
+    """Get data from Google Sheets using gspread"""
+    try:
+        worksheet = spreadsheet.worksheet(sheet_name)
+        raw_data = worksheet.get_all_values()
+
+        if not raw_data:
+            return pd.DataFrame()
+
+        headers = raw_data[0]
+        rows = raw_data[1:]
+
+        data = pd.DataFrame(rows, columns=headers)
+        if "Project Manager" in data.columns:
+            data["Project Manager"] = data["Project Manager"].apply(normalize_name)
+
+        return data
+    except Exception as e:
+        print(f"Error getting data from sheet {sheet_name}: {e}")
+        logging.error(f"Error getting data from sheet {sheet_name}: {e}")
+        return pd.DataFrame()
+
+
+def clean_data(data: pd.DataFrame) -> pd.DataFrame:
+    """Clean and prepare the dataframe"""
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)", "Trustpilot Review Date"]].fillna("N/A")
+
+    return data
+
+
+def load_data(sheet_name: str, month_number: int, year: int) -> pd.DataFrame:
+    """Load data from Google Sheets with optional month filtering"""
+    try:
+        data = get_sheet_data(sheet_name)
+        data = clean_data(data)
+
+        if "Publishing Date" in data.columns:
+            data = data[(data["Publishing Date"].dt.month == month_number) & (data["Publishing Date"].dt.year == year)]
+
+        if data.empty:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Publishing Date", ascending=True)
+
+        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        # if "Name" in data.columns:
+        #     data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_data_year(sheet_name: str, year: int) -> pd.DataFrame:
+    """Load data from Google Sheets with optional month filtering"""
+    try:
+        data = get_sheet_data(sheet_name)
+        data = clean_data(data)
+
+        if "Publishing Date" in data.columns:
+            data = data[data["Publishing Date"].dt.year == year]
+
+        if data.empty:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Publishing Date", ascending=True)
+
+        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        data.index = range(1, len(data) + 1)
+        return data
+
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_data_search(sheet_name: str, end_year: int, start_year: int = get_min_year()) -> pd.DataFrame:
+    """Load data from Google Sheets with optional month filtering"""
+    try:
+        data = get_sheet_data(sheet_name)
+        data = clean_data(data)
+
+        if "Publishing Date" in data.columns:
+            data = data[
+                (data["Publishing Date"].dt.year >= start_year) &
+                (data["Publishing Date"].dt.year <= end_year)
+                ]
+
+        if data.empty:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Publishing Date", ascending=True)
+
+        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        data.index = range(1, len(data) + 1)
+        return data
+
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_data_filter(sheet_name: str, start_date: datetime, end_date: datetime,
+                     remove_duplicates: bool = False) -> pd.DataFrame:
+    """Load data from Google Sheets with optional month filtering"""
+    try:
+        data = get_sheet_data(sheet_name)
+        data = clean_data(data)
+        if remove_duplicates:
+            data = load_data_search(sheet_name, end_date.year, start_date.year)
+            data = data.drop_duplicates(subset=["Name"], keep="first")
+            for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+                if col in data.columns:
+                    data[col] = pd.to_datetime(data[col], errors="coerce")
+        if "Publishing Date" in data.columns:
+            data = data[
+                (data["Publishing Date"].dt.date >= start_date) &
+                (data["Publishing Date"].dt.date <= end_date)
+                ]
+
+        if data.empty:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Publishing Date", ascending=True)
+
+        for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+            if col in data.columns:
+                data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+        data.index = range(1, len(data) + 1)
+        return data
+
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews(sheet_name: str, year: int, month_number=None) -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns and month_number:
+            data = data[(data["Trustpilot Review Date"].dt.month == month_number) & (
+                    data["Trustpilot Review Date"].dt.year == year)]
+        else:
+            data = data[(data["Trustpilot Review Date"].dt.year == year)]
+
+        if data.empty:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        if "Name" in data.columns:
+            if "Trustpilot Review" in data.columns and "Trustpilot Review Date" in data.columns:
+                data = (
+                    data.sort_values(
+                        by=["Trustpilot Review", "Trustpilot Review Date"],
+                        key=lambda col: col.eq("Attained") if col.name == "Trustpilot Review" else col,
+                        ascending=[False, False]
+                    )
+                    .drop_duplicates(subset=["Name"], keep="last")
+                )
+            else:
+                data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews_year(sheet_name: str, year: int, name: str, type_: str = "Attained") -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns:
+            data = data[(data["Trustpilot Review Date"].dt.year == year)]
+
+        else:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        data_original = data.copy()
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            (data_original["Trustpilot Review"] == type_) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews_year_to_date(sheet_name: str, year: int, name: str, type_: str = "Attained") -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns:
+            data = data[
+                (data["Trustpilot Review Date"].dt.year >= get_min_year()) &
+                (data["Trustpilot Review Date"].dt.year <= year)
+                ]
+
+        else:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        data_original = data.copy()
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            (data_original["Trustpilot Review"] == type_) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews_filter(sheet_name: str, start_date: datetime, end_date: datetime, name: str,
+                        type_: str = "Attained") -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns:
+            data = data[
+                (data["Trustpilot Review Date"].dt.date >= start_date) &
+                (data["Trustpilot Review Date"].dt.date <= end_date)
+                ]
+
+        else:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        data_original = data.copy()
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            (data_original["Trustpilot Review"] == type_) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def load_reviews_year_multiple(sheet_name: str, start_year: int, end_year: int, name: str,
+                               type_: str = "Attained") -> pd.DataFrame:
+    data = get_sheet_data(sheet_name)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    date_columns = ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]
+    for col in date_columns:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].astype(str)
+
+    data[["Copyright", "Issues", "Last Edit (Revision)"]] = data[
+        ["Copyright", "Issues", "Last Edit (Revision)"]].fillna("N/A")
+    try:
+        if "Trustpilot Review Date" in data.columns:
+            data = data[
+                (data["Trustpilot Review Date"].dt.year >= start_year) &
+                (data["Trustpilot Review Date"].dt.year <= end_year)
+
+                ]
+
+        else:
+            return pd.DataFrame()
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+
+        data_original = data.copy()
+        data = data_original[
+            (data_original["Project Manager"] == name) &
+            (data_original["Trustpilot Review"] == type_) &
+            (data_original["Brand"].isin(
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+            ]
+
+        data = data.sort_values(by="Trustpilot Review Date", ascending=True)
+        data = data.drop_duplicates(subset=["Name"])
+        data.index = range(1, len(data) + 1)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        logging.error(f"An Error Occurred: {e}")
+        return pd.DataFrame()
+
+
+def clean_data_reviews(sheet_name: str) -> pd.DataFrame:
+    """Clean the data from Google Sheets"""
+    data = get_sheet_data(sheet_name)
+
+    if data.empty:
+        return data
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+
+    for col in ["Publishing Date", "Last Edit (Revision)", "Trustpilot Review Date"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data.sort_values(by="Publishing Date", ascending=True)
+    data.index = range(1, len(data) + 1)
+
+    return data
+
+
+def get_printing_data_month(month: int, year: int) -> pd.DataFrame:
+    """Get printing data for the current month"""
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+        data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[(data["Order Date"].dt.month == month) & (data["Order Date"].dt.year == year)]
+
+    data = data.sort_values(by="Order Date", ascending=True)
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = data["Order Cost"].fillna(0)
+        data["Order Cost"] = data["Order Cost"].astype(str)
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce").fillna(0)
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
+
+    data = data.sort_values(by="Order Date", ascending=True)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], errors="coerce").dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data
+
+
+def printing_data_year(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[data["Order Date"].dt.year == year]
+
+    data = data.sort_values(by="Order Date", ascending=True)
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
+
+    data['Month'] = data['Order Date'].dt.to_period('M')
+
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
+    month_totals = month_totals.sort_values(by="Total Cost ($)", ascending=False)
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals["Total Cost ($)"] = month_totals["Total Cost ($)"].map("${:,.2f}".format)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, month_totals
+
+
+def printing_data_search(year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[
+        (data["Order Date"].dt.year >= get_min_year()) &
+        (data["Order Date"].dt.year <= year)
+
+        ]
+
+    data = data.sort_values(by="Order Date", ascending=True)
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
+
+    data['Month'] = data['Order Date'].dt.to_period('M')
+
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
+    month_totals = month_totals.sort_values(by="Total Cost ($)", ascending=False)
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals["Total Cost ($)"] = month_totals["Total Cost ($)"].map("${:,.2f}".format)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, month_totals
+
+
+def printing_data_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    data = get_sheet_data(sheet_printing)
+
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Accepted" in columns:
+        end_col_index = columns.index("Accepted")
+        data = data.iloc[:, :end_col_index + 1]
+
+    data = data.astype(str)
+
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = pd.to_datetime(data[col], format="%d-%B-%Y", errors="coerce")
+
+    data = data[
+        (data["Order Date"].dt.year >= start_year) &
+        (data["Order Date"].dt.year <= end_year)
+        ]
+
+    data = data.sort_values(by="Order Date", ascending=True)
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "Order Cost" in data.columns:
+        data["Order Cost"] = pd.to_numeric(
+            data["Order Cost"].str.replace("$", "", regex=False).str.replace(",", "", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+    if "No of Copies" in data.columns:
+        data["No of Copies"] = pd.to_numeric(data["No of Copies"], errors='coerce').fillna(0)
+
+    data['Month'] = data['Order Date'].dt.to_period('M')
+
+    month_totals = data.groupby('Month').agg(
+        Total_Copies=('No of Copies', 'sum'),
+        Total_Cost=('Order Cost', 'sum')
+    ).reset_index()
+
+    month_totals['Month'] = month_totals['Month'].dt.strftime('%B %Y')
+    month_totals.columns = ["Month", "Total Copies", "Total Cost ($)"]
+    month_totals = month_totals.sort_values(by="Total Cost ($)", ascending=False)
+    month_totals.index = range(1, len(month_totals) + 1)
+    month_totals["Total Cost ($)"] = month_totals["Total Cost ($)"].map("${:,.2f}".format)
+    for col in ["Order Date", "Shipping Date", "Fulfilled"]:
+        if col in data.columns:
+            data[col] = data[col].dt.strftime("%d-%B-%Y")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, month_totals
+
+
+def get_copyright_month(month: int, year: int) -> tuple[pd.DataFrame, int, int]:
+    """Get copyright data for the current month"""
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return pd.DataFrame(), 0, 0
+
+    columns = list(data.columns)
+    if "Country" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.month == month) & (data["Submission Date"].dt.year == year)]
+
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count, result_count_no
+
+
+def copyright_year(year: int) -> tuple[pd.DataFrame, int, int]:
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return pd.DataFrame(), 0, 0
+
+    columns = list(data.columns)
+    if "Country" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year == year)]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count, result_count_no
+
+
+def copyright_search(year: int) -> tuple[pd.DataFrame, int, int]:
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return pd.DataFrame(), 0, 0
+
+    columns = list(data.columns)
+    if "Country" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year >= get_min_year()) &
+            (data["Submission Date"].dt.year <= year)
+
+            ]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count, result_count_no
+
+
+def copyright_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, int, int]:
+    data = get_sheet_data(sheet_copyright)
+
+    if data.empty:
+        return pd.DataFrame(), 0, 0
+
+    columns = list(data.columns)
+    if "Country" in columns:
+        end_col_index = columns.index("Country")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = pd.to_datetime(data["Submission Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["Submission Date"].dt.year >= start_year) &
+            (data["Submission Date"].dt.year <= end_year)
+
+            ]
+    data = data.sort_values(by=["Submission Date"], ascending=True)
+
+    result_count = len(data[data["Result"] == "Yes"]) if "Result" in data.columns else 0
+    result_count_no = len(data[data["Result"] == "No"]) if "Result" in data.columns else 0
+    if "Submission Date" in data.columns:
+        data["Submission Date"] = data["Submission Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count, result_count_no
+
+
+def get_A_plus_month(month: int, year: int) -> tuple[pd.DataFrame, int]:
+    data = get_sheet_data(sheet_a_plus)
+    if data.empty:
+        return pd.DataFrame(), 0
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["A+ Content Date"].dt.month == month) & (data["A+ Content Date"].dt.year == year)]
+    data = data.sort_values(by=["A+ Content Date"], ascending=True)
+
+    result_count = len(data[data["Status"] == "Published"]) if "Status" in data.columns else 0
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = data["A+ Content Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def get_A_plus_year(year: int) -> tuple[pd.DataFrame, int]:
+    data = get_sheet_data(sheet_a_plus)
+    if data.empty:
+        return pd.DataFrame(), 0
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], format="%d-%B-%Y", errors='coerce')
+        data = data[
+            (data["A+ Content Date"].dt.year == year)]
+    data = data.sort_values(by=["A+ Content Date"], ascending=True)
+
+    result_count = len(data[data["Status"] == "Published"]) if "Status" in data.columns else 0
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = data["A+ Content Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def get_A_plus_year_multiple(start_year: int, end_year: int) -> tuple[pd.DataFrame, int]:
+    data = get_sheet_data(sheet_a_plus)
+    if data.empty:
+        return pd.DataFrame(), 0
+
+    columns = list(data.columns)
+    if "Issues" in columns:
+        end_col_index = columns.index("Issues")
+        data = data.iloc[:, :end_col_index + 1]
+    data = data.astype(str)
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = pd.to_datetime(data["A+ Content Date"], errors='coerce')
+        data = data[
+            (data["A+ Content Date"].dt.year >= start_year) &
+            (data["A+ Content Date"].dt.year <= end_year)
+            ]
+    data = data.sort_values(by=["A+ Content Date"], ascending=True)
+
+    result_count = len(data[data["Status"] == "Published"]) if "Status" in data.columns else 0
+
+    if "A+ Content Date" in data.columns:
+        data["A+ Content Date"] = data["A+ Content Date"].dt.strftime("%d-%B-%Y")
+
+    data = data.fillna("N/A")
+
+    data.index = range(1, len(data) + 1)
+
+    return data, result_count
+
+
+def get_names_in_both_months(sheet_name: str, month_1: str, year1: int, month_2: str, year2: int) -> tuple:
+    """
+    Identifies names that appear in both June and July from a Google Sheet.
+    Returns:
+        - A set of matching names
+        - A dictionary with individual counts for June and July
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Date' columns or data is empty.")
+        return set(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], format="%d-%B-%Y", errors='coerce')
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Year'] = df['Publishing Date'].dt.year
+
+    month_1_names = set(
+        df[(df['Month'] == month_1) & (df['Year'] == year1)]['Name'].str.strip()
+    )
+
+    month_2_names = set(
+        df[(df['Month'] == month_2) & (df['Year'] == year2)]['Name'].str.strip()
+    )
+
+    if month_1_names & month_2_names:
+        names_in_both = month_1_names.intersection(month_2_names)
+
+        counts = {}
+        for name in names_in_both:
+            month_1_count = df[
+                (df['Month'] == month_1) &
+                (df['Year'] == year1) &
+                (df['Name'].str.strip() == name)
+                ].shape[0]
+
+            month_2_count = df[
+                (df['Month'] == month_2) &
+                (df['Year'] == year2) &
+                (df['Name'].str.strip() == name)
+                ].shape[0]
+
+            counts[name] = {
+                f"{month_1}-{year1}": month_1_count,
+                f"{month_2}-{year2}": month_2_count,
+            }
+
+        return names_in_both, counts, len(names_in_both)
+    else:
+        return set(), {}, 0
+
+
+def get_names_in_both_years(sheet_name: str, year1: int, year2: int) -> tuple:
+    """
+    Identifies names that appear in both years from a Google Sheet.
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Publishing Date' columns or data is empty.")
+        return set(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(
+        df['Publishing Date'], format="%d-%B-%Y", errors='coerce'
+    )
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+
+    df['Year'] = df['Publishing Date'].dt.year
+    df['Name'] = df['Name'].str.strip()
+
+    year_1_names = set(df[df['Year'] == year1]['Name'])
+    year_2_names = set(df[df['Year'] == year2]['Name'])
+
+    names_in_both = year_1_names & year_2_names
+
+    counts = {}
+
+    for name in names_in_both:
+        year1_df = df[(df['Year'] == year1) & (df['Name'] == name)]
+        year2_df = df[(df['Year'] == year2) & (df['Name'] == name)]
+
+        counts[name] = {
+            str(year1): {
+                "count": year1_df.shape[0],
+                "publishing_dates": year1_df['Publishing Date']
+                .dt.strftime("%d-%B-%Y")
+                .tolist()
+            },
+            str(year2): {
+                "count": year2_df.shape[0],
+                "publishing_dates": year2_df['Publishing Date']
+                .dt.strftime("%d-%B-%Y")
+                .tolist()
+            }
+        }
+
+    return names_in_both, counts, len(names_in_both)
+
+
+def get_clients_returning_in_month(
+        sheet_name: str,
+        start_year: int,
+        target_month: str,
+        target_year: int
+) -> tuple:
+    """
+    Identifies clients who were published starting from `start_year`
+    and also appear in the specified `target_month` and `target_year`.
+
+    Returns clients that are "duplicates" — same client, different books.
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Publishing Date' columns or data is empty.")
+        return set(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(
+        df['Publishing Date'], format="%d-%B-%Y", errors='coerce'
+    )
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+
+    df['Year'] = df['Publishing Date'].dt.year
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Name'] = df['Name'].str.strip()
+
+    baseline_df = df[
+        (df['Year'] == start_year)
+    ]
+
+    target_df = df[
+        (df['Year'] == target_year) &
+        (df['Month'] == target_month)
+        ]
+
+    baseline_clients = set(baseline_df['Name'])
+    target_clients = set(target_df['Name'])
+
+    returning_clients = baseline_clients & target_clients
+
+    counts = {}
+    for name in returning_clients:
+        client_baseline = baseline_df[baseline_df['Name'] == name]
+        client_target = target_df[target_df['Name'] == name]
+
+        counts[name] = {
+            f"from_{start_year}_baseline": {
+                "count": client_baseline.shape[0],
+                "publishing_dates": client_baseline['Publishing Date']
+                .dt.strftime("%d-%B-%Y")
+                .tolist()
+            },
+            f"{target_year}_{target_month}": {
+                "count": client_target.shape[0],
+                "publishing_dates": client_target['Publishing Date']
+                .dt.strftime("%d-%B-%Y")
+                .tolist()
+            }
+        }
+
+    return returning_clients, counts, len(returning_clients)
+
+
+def get_names_in_year(sheet_name: str, year: int):
+    """
+    Finds names that appear in multiple months within the same year.
+
+    Returns:
+        - A DataFrame of names with counts per month
+        - A dictionary summary of names with their total appearances and months active
+        - Total count of such names
+    """
+    df = get_sheet_data(sheet_name)
+
+    if df.empty or "Name" not in df.columns or "Publishing Date" not in df.columns:
+        logging.warning("Missing 'Name' or 'Publishing Date' columns, or data is empty.")
+        return pd.DataFrame(), {}, 0
+
+    df['Publishing Date'] = pd.to_datetime(df['Publishing Date'], format="%d-%B-%Y", errors='coerce')
+    df = df.dropna(subset=['Publishing Date', 'Name'])
+    df['Month'] = df['Publishing Date'].dt.month_name()
+    df['Year'] = df['Publishing Date'].dt.year
+
+    df = df[df['Year'] == year]
+
+    if df.empty:
+        logging.warning(f"No records found for year {year}.")
+        return pd.DataFrame(), {}, 0
+
+    monthly_counts = (
+        df.groupby(['Name', 'Month'])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(columns=[
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ], fill_value=0)
+    )
+
+    monthly_counts['Active Months'] = (monthly_counts > 0).sum(axis=1)
+    multi_month_names = monthly_counts[monthly_counts['Active Months'] > 1].copy()
+
+    month_cols = multi_month_names.columns[:-2]
+    summary = {}
+    for name in multi_month_names.index:
+        active_months = [month for month in month_cols if multi_month_names.at[name, month] > 0]
+
+        indexed_months = {i + 1: month for i, month in enumerate(active_months)}
+
+        summary[name] = {
+            "Months Active": indexed_months,
+            "Month Count": int(multi_month_names.at[name, "Active Months"]),
+        }
+
+    return multi_month_names, summary, len(multi_month_names)
+
+
+def create_review_pie_chart(review_data: dict[str, int], title: str):
+    """Create pie chart for review distribution"""
+    global labels, values
+    if isinstance(review_data, dict):
+        if not review_data or sum(review_data.values()) == 0:
+            return None
+        values = list(review_data.values())
+        labels = list(review_data.keys())
+
+    custom_colors = {
+        "Attained": "#7dff8d",
+        "Pending": "#ffc444",
+        "Negative": "#ff4b4b",
+        "Sent": "#77e5f7"
+    }
+
+    fig = px.pie(
+        values=values,
+        names=labels,
+        title=title,
+        color=labels,
+        color_discrete_map=custom_colors
+    )
+    fig.update_traces(textposition="inside", textinfo="percent+label")
+    return fig
+
+
+def create_platform_comparison_chart(usa_data: dict[str, int], uk_data: dict[str, int]):
+    """Create comparison chart for platforms"""
+    platforms = ['Amazon', 'Barnes & Noble', 'Ingram Spark', "Draft2Digital", "Kobo", "LULU", "FAV", "ACX"]
+
+    fig = go.Figure(data=[
+        go.Bar(name='USA', x=platforms, y=list(usa_data.values()), marker_color="#23A0F8"),
+        go.Bar(name='UK', x=platforms, y=list(uk_data.values()), marker_color="#ff7f0e")
+    ])
+
+    fig.update_layout(
+        title='Platform Distribution: USA vs UK',
+        barmode='group',
+        xaxis_title='Platforms',
+        yaxis_title='Number of Reviews'
+    )
+    return fig
+
+
+def create_brand_chart(usa_brands: dict[str, int], uk_brands: dict[str, int]):
+    """Create brand distribution chart"""
+    all_brands = list(usa_brands.keys()) + list(uk_brands.keys())
+    all_values = list(usa_brands.values()) + list(uk_brands.values())
+    regions = ['USA'] * len(usa_brands) + ['UK'] * len(uk_brands)
+
+    fig = px.bar(
+        x=all_brands,
+        y=all_values,
+        color=regions,
+        title='Brand Distribution by Region',
+        color_discrete_map={'USA': '#23A0F8', 'UK': '#ff7f0e'},
+        labels={
+            "x": "Brands",
+            "y": "Number of Clients"
+        }
+    )
+    return fig
+
+
+def safe_concat(dfs):
+    dfs = [df for df in dfs if not df.empty]
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+
+def summary(month: int, year: int):
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.month == month) &
+        (usa_clean["Publishing Date"].dt.year == year)
+        ]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.month == month) &
+        (uk_clean["Publishing Date"].dt.year == year)
+        ]
+
+    usa_clean_platforms = usa_clean[
+        (usa_clean["Publishing Date"].dt.month == month) &
+        (usa_clean["Publishing Date"].dt.year == year)
+        ]
+    uk_clean_platforms = uk_clean[
+        (uk_clean["Publishing Date"].dt.month == month) &
+        (uk_clean["Publishing Date"].dt.year == year)
+        ]
+
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+        return
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+        return
+    if usa_clean.empty and uk_clean.empty:
+        return
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="last")
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="last")
+    Issues_usa = usa_clean["Issues"].value_counts()
+    Issues_uk = uk_clean["Issues"].value_counts()
+    total_usa = usa_clean["Name"].nunique()
+    total_uk = uk_clean["Name"].nunique()
+    total_unique_clients = total_usa + total_uk
+
+    combined = pd.concat([usa_clean[["Name", "Brand", "Project Manager", "Email"]],
+                          uk_clean[["Name", "Brand", "Project Manager", "Email"]]])
+    combined.index = range(1, len(combined) + 1)
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    aurora_writers = brands.get("Aurora Writers", 0)
+    kdp = brands.get("KDP", 0)
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", 0)
+    book_publication = uk_brand.get("Book Publication", 0)
+
+    usa_platforms = usa_clean_platforms["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_d2d = usa_platforms.get("Draft2Digital", 0)
+    usa_lulu = usa_platforms.get("LULU", 0)
+    usa_kobo = usa_platforms.get("Kobo", 0)
+    usa_fav = usa_platforms.get("FAV", 0)
+    usa_acx = usa_platforms.get("ACX", 0)
+
+    uk_platforms = uk_clean_platforms["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_d2d = uk_platforms.get("Draft2Digital", 0)
+    uk_lulu = uk_platforms.get("LULU", 0)
+    uk_fav = uk_platforms.get("FAV", 0)
+    uk_kobo = uk_platforms.get("Kobo", 0)
+    uk_acx = uk_platforms.get("ACX", 0)
+
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
+
+    if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
+        usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
+        usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        usa_review_sent = usa_review_pending = usa_review_na = 0
+
+    if "Trustpilot Review" in uk_clean.columns and "Brand" in uk_clean.columns:
+        uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
+        uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        uk_review_sent = uk_review_pending = uk_review_na = 0
+    combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    pending_sent_details = combined_pending_sent[
+        ((combined_pending_sent["Trustpilot Review"] == "Sent") |
+         (combined_pending_sent["Trustpilot Review"] == "Pending")) &
+        (combined_pending_sent["Brand"].isin(allowed_brands))
+        ]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
+    pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+
+    usa_reviews_df = load_reviews(sheet_usa, year, month)
+    uk_reviews_df = load_reviews(sheet_uk, year, month)
+    combined_data = safe_concat([usa_reviews_df, uk_reviews_df])
+
+    if not usa_reviews_df.empty:
+        usa_attained_pm = (
+            usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Attained"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+        usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+
+        usa_negative_pm = (
+            usa_reviews_df[usa_reviews_df["Trustpilot Review"] == "Negative"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        usa_negative_pm.index = range(1, len(usa_negative_pm) + 1)
+        usa_total_negative = usa_negative_pm["Negative Reviews"].sum()
+    else:
+        usa_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        usa_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        usa_total_attained = 0
+        usa_total_negative = 0
+
+    if not uk_reviews_df.empty:
+        uk_attained_pm = (
+            uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Attained"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+        uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+
+        uk_negative_pm = (
+            uk_reviews_df[uk_reviews_df["Trustpilot Review"] == "Negative"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        uk_negative_pm.index = range(1, len(uk_negative_pm) + 1)
+        uk_total_negative = uk_negative_pm["Negative Reviews"].sum()
+    else:
+        uk_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        uk_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        uk_total_attained = 0
+        uk_total_negative = 0
+
+    if not combined_data.empty:
+        attained_reviews_per_pm = (
+            combined_data[combined_data["Trustpilot Review"] == "Attained"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index(name="Attained Reviews")
+        )
+        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
+        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+        negative_reviews_per_pm = (
+            combined_data[combined_data["Trustpilot Review"] == "Negative"]
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index(name="Negative Reviews")
+        )
+        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(by="Negative Reviews", ascending=False)
+        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
+
+        review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            review_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        attained_details = review_details_df[
+            review_details_df["Trustpilot Review"] == "Attained"
+            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+        attained_details.index = range(1, len(attained_details) + 1)
+
+        negative_details = review_details_df[
+            review_details_df["Trustpilot Review"] == "Negative"
+            ][["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]]
+        negative_details.index = range(1, len(negative_details) + 1)
+
+    else:
+        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        attained_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        negative_details = attained_details.copy()
+
+    usa_review = {
+        "Attained": usa_total_attained,
+        "Sent": usa_review_sent,
+        "Pending": usa_review_pending,
+        "Negative": usa_review_na + usa_total_negative
+    }
+
+    uk_review = {
+        "Attained": uk_total_attained,
+        "Sent": uk_review_sent,
+        "Pending": uk_review_pending,
+        "Negative": uk_review_na + uk_total_negative
+    }
+
+    printing_data = get_printing_data_month(month, year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
+
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count, result_count_no = get_copyright_month(month, year)
+    Total_copyrights = len(copyright_data)
+
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", 0)
+    canada = country.get("Canada", 0)
+    uk = country.get("UK", 0)
+    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 42)
+    a_plus, a_plus_count = get_A_plus_month(month, year)
+
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
+                  'Aurora Writers': aurora_writers}
+
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,
+                     "Draft2Digital": usa_d2d, "Kobo": usa_kobo, "LULU": usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "Draft2Digital": uk_d2d,
+                    "Kobo": uk_kobo, "LULU": uk_lulu, "FAV": uk_fav,
+                    "ACX": uk_acx}
+
+    printing_stats = {
+        'Total_copies': Total_copies,
+        'Total_cost': Total_cost,
+        'Highest_cost': Highest_cost,
+        'Lowest_cost': Lowest_cost,
+        'Highest_copies': Highest_copies,
+        'Lowest_copies': Lowest_copies,
+        'Average': Average
+    }
+
+    copyright_stats = {
+        'Total_copyrights': Total_copyrights,
+        'Total_cost_copyright': Total_cost_copyright,
+        'result_count': result_count,
+        'result_count_no': result_count_no,
+        'usa_copyrights': usa,
+        'canada_copyrights': canada,
+        'uk': uk
+    }
+
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, pending_sent_details, negative_reviews_per_pm, negative_details, Issues_usa, Issues_uk
+
+
+def generate_year_summary(year: int):
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.year == year)
+    ]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.year == year)
+    ]
+
+    usa_clean_platforms = usa_clean[
+        (usa_clean["Publishing Date"].dt.year == year)
+    ]
+    uk_clean_platforms = uk_clean[
+        (uk_clean["Publishing Date"].dt.year == year)
+    ]
+
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+        return
+    if usa_clean.empty and uk_clean.empty:
+        return
+
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="first")
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="first")
+    Issues_usa = usa_clean["Issues"].value_counts()
+    Issues_uk = uk_clean["Issues"].value_counts()
+    total_usa = usa_clean["Name"].nunique()
+    total_uk = uk_clean["Name"].nunique()
+    total_unique_clients = total_usa + total_uk
+
+    combined = pd.concat([usa_clean[["Name", "Brand", "Project Manager", "Email"]],
+                          uk_clean[["Name", "Brand", "Project Manager", "Email"]]])
+    combined.index = range(1, len(combined) + 1)
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    aurora_writers = brands.get("Aurora Writers", 0)
+    kdp = brands.get("KDP", 0)
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", 0)
+    book_publication = uk_brand.get("Book Publication", 0)
+
+    usa_platforms = usa_clean_platforms["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_d2d = usa_platforms.get("Draft2Digital", 0)
+    usa_lulu = usa_platforms.get("LULU", 0)
+    usa_kobo = usa_platforms.get("Kobo", 0)
+    usa_fav = usa_platforms.get("FAV", 0)
+    usa_acx = usa_platforms.get("ACX", 0)
+
+    uk_platforms = uk_clean_platforms["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_d2d = uk_platforms.get("Draft2Digital", 0)
+    uk_lulu = uk_platforms.get("LULU", 0)
+    uk_fav = uk_platforms.get("FAV", 0)
+    uk_kobo = uk_platforms.get("Kobo", 0)
+    uk_acx = uk_platforms.get("ACX", 0)
+
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
+
+    if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
+        usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
+        usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        usa_review_sent = usa_review_pending = usa_review_na = 0
+
+    if "Trustpilot Review" in uk_clean.columns and "Brand" in uk_clean.columns:
+        uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
+        uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        uk_review_sent = uk_review_pending = uk_review_na = 0
+
+    combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    pending_sent_details = combined_pending_sent[
+        ((combined_pending_sent["Trustpilot Review"] == "Sent") |
+         (combined_pending_sent["Trustpilot Review"] == "Pending")) &
+        (combined_pending_sent["Brand"].isin(allowed_brands))
+        ]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
+    pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+
+    pm_list_usa = list(set((usa_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+    pm_list_uk = list(set((uk_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+
+    usa_reviews_per_pm = safe_concat([load_reviews_year(sheet_usa, year, pm, "Attained") for pm in pm_list_usa])
+    uk_reviews_per_pm = safe_concat([load_reviews_year(sheet_uk, year, pm, "Attained") for pm in pm_list_uk])
+    combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
+
+    usa_monthly = (
+        usa_clean.groupby(usa_clean["Publishing Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="USA Published")
+    )
+    usa_monthly["Month"] = usa_monthly["Publishing Date"].dt.strftime("%B %Y")
+    usa_monthly = usa_monthly[["Month", "USA Published"]]
+
+    uk_monthly = (
+        uk_clean.groupby(uk_clean["Publishing Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="UK Published")
+    )
+    uk_monthly["Month"] = uk_monthly["Publishing Date"].dt.strftime("%B %Y")
+    uk_monthly = uk_monthly[["Month", "UK Published"]]
+
+    combined_monthly = pd.merge(
+        usa_monthly,
+        uk_monthly,
+        on="Month",
+        how="outer"
+    ).fillna(0)
+
+    combined_monthly["Total Published"] = combined_monthly["USA Published"] + combined_monthly["UK Published"]
+
+    combined_monthly["Month_Num"] = pd.to_datetime(combined_monthly["Month"], format="%B %Y")
+    combined_monthly = combined_monthly.sort_values("Total Published", ascending=False).drop(columns="Month_Num")
+
+    combined_monthly.index = range(1, len(combined_monthly) + 1)
+
+    if not usa_reviews_per_pm.empty:
+        usa_attained_pm = (
+            usa_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+        usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    else:
+        usa_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        usa_total_attained = 0
+
+    if not uk_reviews_per_pm.empty:
+        uk_attained_pm = (
+            uk_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+        uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+    else:
+        uk_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        uk_total_attained = 0
+
+    if not combined_data.empty:
+        attained_reviews_per_pm = (
+            combined_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
+        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+        review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            review_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        attained_details = review_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        attained_details.index = range(1, len(attained_details) + 1)
+
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        )
+        attained_count = (
+            attained_details
+            .groupby("Project Manager")
+            .size()
+            .reset_index(name="Count")
+        )
+        attained_clients = (
+            attained_details
+            .groupby("Project Manager")
+            ["Name"].apply(list)
+            .reset_index(name="Clients")
+        )
+        merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+        merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+        merged_attained.index = range(1, len(merged_attained) + 1)
+        if not usa_reviews_per_pm.empty:
+            usa_attained_monthly = (
+                usa_reviews_per_pm.groupby(usa_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Attained Reviews")
+            )
+            usa_attained_monthly["Month"] = usa_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_attained_monthly = usa_attained_monthly[["Month", "USA Attained Reviews"]]
+        else:
+            usa_attained_monthly = pd.DataFrame(columns=["Month", "USA Attained Reviews"])
+
+        if not uk_reviews_per_pm.empty:
+            uk_attained_monthly = (
+                uk_reviews_per_pm.groupby(uk_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Attained Reviews")
+            )
+            uk_attained_monthly["Month"] = uk_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_attained_monthly = uk_attained_monthly[["Month", "UK Attained Reviews"]]
+        else:
+            uk_attained_monthly = pd.DataFrame(columns=["Month", "UK Attained Reviews"])
+        attained_reviews_per_month = pd.merge(
+            usa_attained_monthly,
+            uk_attained_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        attained_reviews_per_month["Total Attained Reviews"] = (
+                attained_reviews_per_month["USA Attained Reviews"] + attained_reviews_per_month["UK Attained Reviews"]
+        )
+
+        attained_reviews_per_month["Month_Num"] = pd.to_datetime(attained_reviews_per_month["Month"], format="%B %Y")
+        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews",
+                                                                            ascending=False)
+        attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+        attained_reviews_per_month = attained_reviews_per_month.drop(columns="Month_Num")
+
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        attained_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        attained_reviews_per_month = pd.DataFrame(columns=["Month", "Total Attained Reviews"])
+
+    usa_negative_per_pm = [load_reviews_year(sheet_usa, year, pm, "Negative") for pm in pm_list_usa]
+    usa_negative_per_pm = safe_concat([df for df in usa_negative_per_pm if not df.empty])
+
+    uk_negative_per_pm = [load_reviews_year(sheet_uk, year, pm, "Negative") for pm in pm_list_uk]
+    uk_negative_per_pm = safe_concat([df for df in uk_negative_per_pm if not df.empty])
+
+    combined_negative_data = safe_concat([usa_negative_per_pm, uk_negative_per_pm])
+
+    if not usa_negative_per_pm.empty:
+        usa_negative_pm = (
+            usa_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        usa_negative_pm.index = range(1, len(usa_negative_pm) + 1)
+        usa_total_negative = usa_negative_pm["Negative Reviews"].sum()
+    else:
+        usa_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        usa_total_negative = 0
+
+    if not uk_negative_per_pm.empty:
+        uk_negative_pm = (
+            uk_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        uk_negative_pm.index = range(1, len(uk_negative_pm) + 1)
+        uk_total_negative = uk_negative_pm["Negative Reviews"].sum()
+    else:
+        uk_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        uk_total_negative = 0
+
+    if not combined_negative_data.empty:
+
+        negative_reviews_per_pm = (
+            combined_negative_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        negative_reviews_per_pm.columns = ["Project Manager", "Negative Reviews"]
+        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(by="Negative Reviews", ascending=False)
+        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
+
+        negative_details_df = combined_negative_data.sort_values(by="Project Manager", ascending=True)
+        negative_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        negative_details = negative_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        negative_details.index = range(1, len(negative_details) + 1)
+
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        )
+
+        if not usa_negative_per_pm.empty:
+            usa_negative_monthly = (
+                usa_negative_per_pm.groupby(usa_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Negative Reviews")
+            )
+            usa_negative_monthly["Month"] = usa_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_negative_monthly = usa_negative_monthly[["Month", "USA Negative Reviews"]]
+        else:
+            usa_negative_monthly = pd.DataFrame(columns=["Month", "USA Negative Reviews"])
+
+        # UK monthly negative reviews
+        if not uk_negative_per_pm.empty:
+            uk_negative_monthly = (
+                uk_negative_per_pm.groupby(uk_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Negative Reviews")
+            )
+            uk_negative_monthly["Month"] = uk_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_negative_monthly = uk_negative_monthly[["Month", "UK Negative Reviews"]]
+        else:
+            uk_negative_monthly = pd.DataFrame(columns=["Month", "UK Negative Reviews"])
+
+        # Merge USA and UK negative trends
+        negative_reviews_per_month = pd.merge(
+            usa_negative_monthly,
+            uk_negative_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        negative_reviews_per_month["Total Negative Reviews"] = (
+                negative_reviews_per_month["USA Negative Reviews"] + negative_reviews_per_month["UK Negative Reviews"]
+        )
+
+        # Sort by month
+        negative_reviews_per_month["Month_Num"] = pd.to_datetime(negative_reviews_per_month["Month"], format="%B %Y")
+        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews",
+                                                                            ascending=False)
+        negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
+        negative_reviews_per_month = negative_reviews_per_month.drop(columns="Month_Num")
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        negative_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
+
+    usa_review = {
+        "Attained": usa_total_attained,
+        "Sent": usa_review_sent,
+        "Pending": usa_review_pending,
+        "Negative": usa_total_negative
+    }
+
+    uk_review = {
+        "Attained": uk_total_attained,
+        "Sent": uk_review_sent,
+        "Pending": uk_review_pending,
+        "Negative": uk_total_negative
+    }
+
+    printing_data, monthly_printing = printing_data_year(year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
+
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count, result_count_no = copyright_year(year)
+    Total_copyrights = len(copyright_data)
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", 0)
+    canada = country.get("Canada", 0)
+    uk = country.get("UK", 0)
+    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 42)
+
+    a_plus, a_plus_count = get_A_plus_year(year)
+
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
+                  'Aurora Writers': aurora_writers}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,
+                     "Draft2Digital": usa_d2d, "Kobo": usa_kobo, "LULU": usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "Draft2Digital": uk_d2d,
+                    "Kobo": uk_kobo, "LULU": uk_lulu, "FAV": uk_fav,
+                    "ACX": uk_acx}
+
+    printing_stats = {
+        'Total_copies': Total_copies,
+        'Total_cost': Total_cost,
+        'Highest_cost': Highest_cost,
+        'Lowest_cost': Lowest_cost,
+        'Highest_copies': Highest_copies,
+        'Lowest_copies': Lowest_copies,
+        'Average': Average
+    }
+
+    copyright_stats = {
+        'Total_copyrights': Total_copyrights,
+        'Total_cost_copyright': Total_cost_copyright,
+        'result_count': result_count,
+        'result_count_no': result_count_no,
+        'usa_copyrights': usa,
+        'canada_copyrights': canada,
+        'uk': uk
+    }
+
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, merged_attained, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
+
+
+def generate_year_summary_multiple(start_year: int, end_year: int):
+    uk_clean = clean_data_reviews(sheet_uk)
+    usa_clean = clean_data_reviews(sheet_usa)
+
+    usa_clean = usa_clean[
+        (usa_clean["Publishing Date"].dt.year >= start_year) &
+        (usa_clean["Publishing Date"].dt.year <= end_year)
+
+        ]
+    uk_clean = uk_clean[
+        (uk_clean["Publishing Date"].dt.year >= start_year) &
+        (uk_clean["Publishing Date"].dt.year <= end_year)
+        ]
+
+    usa_clean_platforms = usa_clean[
+        (usa_clean["Publishing Date"].dt.year >= start_year) &
+        (usa_clean["Publishing Date"].dt.year <= end_year)
+        ]
+    uk_clean_platforms = uk_clean[
+        (uk_clean["Publishing Date"].dt.year >= start_year) &
+        (uk_clean["Publishing Date"].dt.year <= end_year)
+        ]
+
+    if usa_clean.empty:
+        print("No values found in USA sheet.")
+    if uk_clean.empty:
+        print("No values found in UK sheet.")
+        return
+    if usa_clean.empty and uk_clean.empty:
+        return
+
+    usa_clean = usa_clean.drop_duplicates(subset=["Name"], keep="first")
+    uk_clean = uk_clean.drop_duplicates(subset=["Name"], keep="first")
+    Issues_usa = usa_clean["Issues"].value_counts()
+    Issues_uk = uk_clean["Issues"].value_counts()
+    total_usa = usa_clean["Name"].nunique()
+    total_uk = uk_clean["Name"].nunique()
+    total_unique_clients = total_usa + total_uk
+
+    combined = pd.concat([usa_clean[["Name", "Brand", "Project Manager", "Email"]],
+                          uk_clean[["Name", "Brand", "Project Manager", "Email"]]])
+    combined.index = range(1, len(combined) + 1)
+
+    brands = usa_clean["Brand"].value_counts()
+    writers_clique = brands.get("Writers Clique", 0)
+    bookmarketeers = brands.get("BookMarketeers", 0)
+    aurora_writers = brands.get("Aurora Writers", 0)
+    kdp = brands.get("KDP", 0)
+
+    uk_brand = uk_clean["Brand"].value_counts()
+    authors_solution = uk_brand.get("Authors Solution", 0)
+    book_publication = uk_brand.get("Book Publication", 0)
+
+    usa_platforms = usa_clean_platforms["Platform"].value_counts()
+    usa_amazon = usa_platforms.get("Amazon", 0)
+    usa_bn = usa_platforms.get("Barnes & Noble", 0)
+    usa_ingram = usa_platforms.get("Ingram Spark", 0)
+    usa_d2d = usa_platforms.get("Draft2Digital", 0)
+    usa_lulu = usa_platforms.get("LULU", 0)
+    usa_fav = usa_platforms.get("FAV", 0)
+    usa_kobo = usa_platforms.get("Kobo", 0)
+    usa_acx = usa_platforms.get("ACX", 0)
+
+    uk_platforms = uk_clean_platforms["Platform"].value_counts()
+    uk_amazon = uk_platforms.get("Amazon", 0)
+    uk_bn = uk_platforms.get("Barnes & Noble", 0)
+    uk_ingram = uk_platforms.get("Ingram Spark", 0)
+    uk_d2d = uk_platforms.get("Draft2Digital", 0)
+    uk_lulu = uk_platforms.get("LULU", 0)
+    uk_fav = uk_platforms.get("FAV", 0)
+    uk_kobo = uk_platforms.get("Kobo", 0)
+    uk_acx = uk_platforms.get("ACX", 0)
+
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
+
+    if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
+        usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
+        usa_review_sent = usa_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        usa_review_pending = usa_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        usa_review_na = usa_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        usa_review_sent = usa_review_pending = usa_review_na = 0
+
+    if "Trustpilot Review" in uk_clean.columns and "Brand" in uk_clean.columns:
+        uk_filtered = uk_clean[uk_clean["Brand"].isin(allowed_brands)]
+        uk_review_sent = uk_filtered["Trustpilot Review"].value_counts().get("Sent", 0)
+        uk_review_pending = uk_filtered["Trustpilot Review"].value_counts().get("Pending", 0)
+        uk_review_na = uk_filtered["Trustpilot Review"].value_counts().get("Negative", 0)
+    else:
+        uk_review_sent = uk_review_pending = uk_review_na = 0
+
+    combined_pending_sent = pd.concat([usa_clean, uk_clean], ignore_index=True)
+    pending_sent_details = combined_pending_sent[
+        ((combined_pending_sent["Trustpilot Review"] == "Sent") |
+         (combined_pending_sent["Trustpilot Review"] == "Pending")) &
+        (combined_pending_sent["Brand"].isin(allowed_brands))
+        ]
+    pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
+    pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+
+    pm_list_usa = list(set((usa_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+    pm_list_uk = list(set((uk_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+
+    usa_reviews_per_pm = safe_concat(
+        [load_reviews_year_multiple(sheet_usa, start_year, end_year, pm, "Attained") for pm in pm_list_usa])
+    uk_reviews_per_pm = safe_concat(
+        [load_reviews_year_multiple(sheet_uk, start_year, end_year, pm, "Attained") for pm in pm_list_uk])
+    combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
+
+    usa_monthly = (
+        usa_clean.groupby(usa_clean["Publishing Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="USA Published")
+    )
+    usa_monthly["Month"] = usa_monthly["Publishing Date"].dt.strftime("%B %Y")
+    usa_monthly = usa_monthly[["Month", "USA Published"]]
+
+    uk_monthly = (
+        uk_clean.groupby(uk_clean["Publishing Date"].dt.to_period("M"))
+        .size()
+        .reset_index(name="UK Published")
+    )
+    uk_monthly["Month"] = uk_monthly["Publishing Date"].dt.strftime("%B %Y")
+    uk_monthly = uk_monthly[["Month", "UK Published"]]
+
+    combined_monthly = pd.merge(
+        usa_monthly,
+        uk_monthly,
+        on="Month",
+        how="outer"
+    ).fillna(0)
+
+    combined_monthly["Total Published"] = combined_monthly["USA Published"] + combined_monthly["UK Published"]
+
+    combined_monthly["Month_Num"] = pd.to_datetime(combined_monthly["Month"], format="%B %Y")
+    combined_monthly = combined_monthly.sort_values("Total Published", ascending=False).drop(columns="Month_Num")
+
+    combined_monthly.index = range(1, len(combined_monthly) + 1)
+
+    if not usa_reviews_per_pm.empty:
+        usa_attained_pm = (
+            usa_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        usa_attained_pm.index = range(1, len(usa_attained_pm) + 1)
+        usa_total_attained = usa_attained_pm["Attained Reviews"].sum()
+    else:
+        usa_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        usa_total_attained = 0
+
+    if not uk_reviews_per_pm.empty:
+        uk_attained_pm = (
+            uk_reviews_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_attained_pm.columns = ["Project Manager", "Attained Reviews"]
+        uk_attained_pm.index = range(1, len(uk_attained_pm) + 1)
+        uk_total_attained = uk_attained_pm["Attained Reviews"].sum()
+    else:
+        uk_attained_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        uk_total_attained = 0
+
+    if not combined_data.empty:
+        attained_reviews_per_pm = (
+            combined_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        attained_reviews_per_pm.columns = ["Project Manager", "Attained Reviews"]
+        attained_reviews_per_pm = attained_reviews_per_pm.sort_values(by="Attained Reviews", ascending=False)
+        attained_reviews_per_pm.index = range(1, len(attained_reviews_per_pm) + 1)
+
+        review_details_df = combined_data.sort_values(by="Project Manager", ascending=True)
+        review_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            review_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        attained_details = review_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        attained_details.index = range(1, len(attained_details) + 1)
+
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        )
+        attained_count = (
+            attained_details
+            .groupby("Project Manager")
+            .size()
+            .reset_index(name="Count")
+        )
+        attained_clients = (
+            attained_details
+            .groupby("Project Manager")
+            ["Name"].apply(list)
+            .reset_index(name="Clients")
+        )
+        merged_attained = attained_count.merge(attained_clients, on="Project Manager", how="left")
+        merged_attained = merged_attained.sort_values(by="Count", ascending=False)
+        merged_attained.index = range(1, len(merged_attained) + 1)
+
+        if not usa_reviews_per_pm.empty:
+            usa_attained_monthly = (
+                usa_reviews_per_pm.groupby(usa_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Attained Reviews")
+            )
+            usa_attained_monthly["Month"] = usa_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_attained_monthly = usa_attained_monthly[["Month", "USA Attained Reviews"]]
+        else:
+            usa_attained_monthly = pd.DataFrame(columns=["Month", "USA Attained Reviews"])
+
+        if not uk_reviews_per_pm.empty:
+            uk_attained_monthly = (
+                uk_reviews_per_pm.groupby(uk_reviews_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Attained Reviews")
+            )
+            uk_attained_monthly["Month"] = uk_attained_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_attained_monthly = uk_attained_monthly[["Month", "UK Attained Reviews"]]
+        else:
+            uk_attained_monthly = pd.DataFrame(columns=["Month", "UK Attained Reviews"])
+        attained_reviews_per_month = pd.merge(
+            usa_attained_monthly,
+            uk_attained_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        attained_reviews_per_month["Total Attained Reviews"] = (
+                attained_reviews_per_month["USA Attained Reviews"] + attained_reviews_per_month["UK Attained Reviews"]
+        )
+
+        attained_reviews_per_month["Month_Num"] = pd.to_datetime(attained_reviews_per_month["Month"], format="%B %Y")
+        attained_reviews_per_month = attained_reviews_per_month.sort_values(by="Total Attained Reviews",
+                                                                            ascending=False)
+        attained_reviews_per_month.index = range(1, len(attained_reviews_per_month) + 1)
+        attained_reviews_per_month = attained_reviews_per_month.drop(columns="Month_Num")
+
+        attained_details["Trustpilot Review Date"] = pd.to_datetime(
+            attained_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        attained_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Attained Reviews"])
+        attained_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        attained_reviews_per_month = pd.DataFrame(columns=["Month", "Total Attained Reviews"])
+
+    usa_negative_per_pm = [load_reviews_year_multiple(sheet_usa, start_year, end_year, pm, "Negative") for pm in
+                           pm_list_usa]
+    usa_negative_per_pm = safe_concat([df for df in usa_negative_per_pm if not df.empty])
+
+    uk_negative_per_pm = [load_reviews_year_multiple(sheet_uk, start_year, end_year, pm, "Negative") for pm in
+                          pm_list_uk]
+    uk_negative_per_pm = safe_concat([df for df in uk_negative_per_pm if not df.empty])
+
+    combined_negative_data = safe_concat([usa_negative_per_pm, uk_negative_per_pm])
+
+    if not usa_negative_per_pm.empty:
+        usa_negative_pm = (
+            usa_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        usa_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        usa_negative_pm.index = range(1, len(usa_negative_pm) + 1)
+        usa_total_negative = usa_negative_pm["Negative Reviews"].sum()
+    else:
+        usa_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        usa_total_negative = 0
+
+    if not uk_negative_per_pm.empty:
+        uk_negative_pm = (
+            uk_negative_per_pm
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        uk_negative_pm.columns = ["Project Manager", "Negative Reviews"]
+        uk_negative_pm.index = range(1, len(uk_negative_pm) + 1)
+        uk_total_negative = uk_negative_pm["Negative Reviews"].sum()
+    else:
+        uk_negative_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        uk_total_negative = 0
+
+    if not combined_negative_data.empty:
+
+        negative_reviews_per_pm = (
+            combined_negative_data
+            .groupby("Project Manager")["Trustpilot Review"]
+            .count()
+            .reset_index()
+        )
+        negative_reviews_per_pm.columns = ["Project Manager", "Negative Reviews"]
+        negative_reviews_per_pm = negative_reviews_per_pm.sort_values(by="Negative Reviews", ascending=False)
+        negative_reviews_per_pm.index = range(1, len(negative_reviews_per_pm) + 1)
+
+        negative_details_df = combined_negative_data.sort_values(by="Project Manager", ascending=True)
+        negative_details_df["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details_df["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+        negative_details = negative_details_df[
+            ["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"]
+        ]
+        negative_details.index = range(1, len(negative_details) + 1)
+
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        )
+
+        if not usa_negative_per_pm.empty:
+            usa_negative_monthly = (
+                usa_negative_per_pm.groupby(usa_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="USA Negative Reviews")
+            )
+            usa_negative_monthly["Month"] = usa_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            usa_negative_monthly = usa_negative_monthly[["Month", "USA Negative Reviews"]]
+        else:
+            usa_negative_monthly = pd.DataFrame(columns=["Month", "USA Negative Reviews"])
+
+        # UK monthly negative reviews
+        if not uk_negative_per_pm.empty:
+            uk_negative_monthly = (
+                uk_negative_per_pm.groupby(uk_negative_per_pm["Trustpilot Review Date"].dt.to_period("M"))
+                .size()
+                .reset_index(name="UK Negative Reviews")
+            )
+            uk_negative_monthly["Month"] = uk_negative_monthly["Trustpilot Review Date"].dt.strftime("%B %Y")
+            uk_negative_monthly = uk_negative_monthly[["Month", "UK Negative Reviews"]]
+        else:
+            uk_negative_monthly = pd.DataFrame(columns=["Month", "UK Negative Reviews"])
+
+        # Merge USA and UK negative trends
+        negative_reviews_per_month = pd.merge(
+            usa_negative_monthly,
+            uk_negative_monthly,
+            on="Month",
+            how="outer"
+        ).fillna(0)
+
+        negative_reviews_per_month["Total Negative Reviews"] = (
+                negative_reviews_per_month["USA Negative Reviews"] + negative_reviews_per_month["UK Negative Reviews"]
+        )
+
+        # Sort by month
+        negative_reviews_per_month["Month_Num"] = pd.to_datetime(negative_reviews_per_month["Month"], format="%B %Y")
+        negative_reviews_per_month = negative_reviews_per_month.sort_values(by="Total Negative Reviews",
+                                                                            ascending=False)
+        negative_reviews_per_month.index = range(1, len(negative_reviews_per_month) + 1)
+        negative_reviews_per_month = negative_reviews_per_month.drop(columns="Month_Num")
+        negative_details["Trustpilot Review Date"] = pd.to_datetime(
+            negative_details["Trustpilot Review Date"], errors="coerce"
+        ).dt.strftime("%d-%B-%Y")
+
+    else:
+        negative_reviews_per_pm = pd.DataFrame(columns=["Project Manager", "Negative Reviews"])
+        negative_details = pd.DataFrame(
+            columns=["Project Manager", "Name", "Brand", "Trustpilot Review Date", "Trustpilot Review Links", "Status"])
+        negative_reviews_per_month = pd.DataFrame(columns=["Month", "Total Negative Reviews"])
+
+    usa_review = {
+        "Attained": usa_total_attained,
+        "Sent": usa_review_sent,
+        "Pending": usa_review_pending,
+        "Negative": usa_total_negative
+    }
+
+    uk_review = {
+        "Attained": uk_total_attained,
+        "Sent": uk_review_sent,
+        "Pending": uk_review_pending,
+        "Negative": uk_total_negative
+    }
+
+    printing_data, monthly_printing = printing_data_year_multiple(start_year, end_year)
+    Total_copies = printing_data["No of Copies"].sum() if "No of Copies" in printing_data.columns else 0
+    Total_cost = printing_data["Order Cost"].sum() if "Order Cost" in printing_data.columns else 0
+    Highest_cost = printing_data["Order Cost"].max() if "Order Cost" in printing_data.columns else 0
+    Highest_copies = printing_data["No of Copies"].max() if "No of Copies" in printing_data.columns else 0
+    Lowest_cost = printing_data["Order Cost"].min() if "Order Cost" in printing_data.columns else 0
+    Lowest_copies = printing_data["No of Copies"].min() if "No of Copies" in printing_data.columns else 0
+
+    Average = Total_cost / Total_copies if Total_copies > 0 else 0
+    if all(col in printing_data.columns for col in ["Order Cost", "No of Copies"]):
+        printing_data['Cost_Per_Copy'] = printing_data['Order Cost'] / printing_data['No of Copies']
+
+    copyright_data, result_count, result_count_no = copyright_year_multiple(start_year, end_year)
+    Total_copyrights = len(copyright_data)
+    country = copyright_data["Country"].value_counts()
+    usa = country.get("USA", 0)
+    canada = country.get("Canada", 0)
+    uk = country.get("UK", 0)
+    Total_cost_copyright = (usa * 65) + (canada * 46) + (uk * 42)
+
+    a_plus, a_plus_count = get_A_plus_year_multiple(start_year, end_year)
+
+    usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
+                  'Aurora Writers': aurora_writers}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+
+    usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,
+                     "Draft2Digital": usa_d2d, "Kobo": usa_kobo, "LULU": usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
+    uk_platforms = {'Amazon': uk_amazon, 'Barnes & Noble': uk_bn, 'Ingram Spark': uk_ingram, "Draft2Digital": uk_d2d,
+                    "Kobo": uk_kobo, "LULU": uk_lulu, "FAV": uk_fav,
+                    "ACX": uk_acx}
+
+    printing_stats = {
+        'Total_copies': Total_copies,
+        'Total_cost': Total_cost,
+        'Highest_cost': Highest_cost,
+        'Lowest_cost': Lowest_cost,
+        'Highest_copies': Highest_copies,
+        'Lowest_copies': Lowest_copies,
+        'Average': Average
+    }
+
+    copyright_stats = {
+        'Total_copyrights': Total_copyrights,
+        'Total_cost_copyright': Total_cost_copyright,
+        'result_count': result_count,
+        'result_count_no': result_count_no,
+        'usa_copyrights': usa,
+        'canada_copyrights': canada,
+        'uk': uk
+    }
+
+    return usa_review, uk_review, usa_brands, uk_brands, usa_platforms, uk_platforms, printing_stats, monthly_printing, copyright_stats, a_plus_count, total_unique_clients, combined, attained_reviews_per_pm, attained_details, merged_attained, attained_reviews_per_month, pending_sent_details, negative_reviews_per_pm, negative_details, negative_reviews_per_month, combined_monthly, Issues_usa, Issues_uk
+
+
+def logging_function() -> None:
+    """Creates a console and file logging handler that logs messages
+        Returns:
+              None: Returns nothing but calls the logging function
+    """
+    logging.basicConfig(level=logging.INFO, format='%(funcName)s --> %(message)s : %(asctime)s - %(levelname)s',
+                        datefmt="%d-%m-%Y %I:%M:%S %p")
+
+    file_handler = logging.FileHandler('Reviews.log')
+    file_handler.setLevel(level=logging.WARNING)
+    formatter = logging.Formatter('%(funcName)s --> %(message)s : %(asctime)s - %(levelname)s',
+                                  "%d-%m-%Y %I:%M:%S %p")
+    file_handler.setFormatter(formatter)
+
+    logger = logging.getLogger('')
+    logger.addHandler(file_handler)
+
+
+def generate_summary_report_pdf(
+        usa_review_data,
+        uk_review_data,
+        usa_brands,
+        uk_brands,
+        usa_platforms,
+        uk_platforms,
+        printing_stats,
+        copyright_stats,
+        a_plus,
+        selected_month=None,
+        start_year=None,
+        end_year=None,
+        filename=None
+):
+    """
+    Generate a PDF summary report with proper year / range handling
+    """
+
+    if selected_month and start_year and end_year:
+        title_text = f"{selected_month} ({start_year}–{end_year}) Summary Report"
+        filename = f"{selected_month}_{start_year}_{end_year}_Summary_Report.pdf"
+
+    elif selected_month and start_year:
+        title_text = f"{selected_month} {start_year} Summary Report"
+        filename = f"{selected_month}_{start_year}_Summary_Report.pdf"
+
+    elif start_year and end_year:
+        title_text = f"{start_year}–{end_year} Summary Report"
+        filename = f"{start_year}_{end_year}_Summary_Report.pdf"
+
+    elif start_year:
+        title_text = f"{start_year} Summary Report"
+        filename = f"{start_year}_Summary_Report.pdf"
+
+    else:
+        title_text = "Summary Report"
+        filename = "Summary_Report.pdf"
+
+    filename = filename.replace(" ", "_")
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=18
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        textColor=colors.darkblue
+    )
+
+    section_style = ParagraphStyle(
+        'Section',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceBefore=20,
+        spaceAfter=12,
+        textColor=colors.darkgreen
+    )
+
+    subsection_style = ParagraphStyle(
+        'SubSection',
+        parent=styles['Heading3'],
+        fontSize=12,
+        spaceBefore=12,
+        spaceAfter=8,
+        textColor=colors.darkblue
+    )
+
+    story = []
+    story.append(Paragraph(title_text, title_style))
+    story.append(Spacer(1, 20))
+
+    usa_total = sum(usa_review_data.values())
+    uk_total = sum(uk_review_data.values())
+
+    usa_attained = usa_review_data.get("Attained", 0)
+    uk_attained = uk_review_data.get("Attained", 0)
+
+    combined_total = usa_total + uk_total
+    combined_attained = usa_attained + uk_attained
+
+    usa_pct = (usa_attained / usa_total * 100) if usa_total else 0
+    uk_pct = (uk_attained / uk_total * 100) if uk_total else 0
+    combined_pct = (combined_attained / combined_total * 100) if combined_total else 0
+
+    story.append(Paragraph("📝 Review Analytics", section_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+    story.append(Spacer(1, 12))
+
+    review_table = Table([
+        ["Region", "Total Reviews", "Attained", "Success Rate"],
+        ["USA", f"{usa_total:,}", f"{usa_attained:,}", f"{usa_pct:.1f}%"],
+        ["UK", f"{uk_total:,}", f"{uk_attained:,}", f"{uk_pct:.1f}%"],
+        ["Combined", f"{combined_total:,}", f"{combined_attained:,}", f"{combined_pct:.1f}%"],
+    ])
+
+    review_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
+    ]))
+
+    story.append(review_table)
+
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("📱 Platform Distribution", subsection_style))
+
+    for label, platforms in [("USA", usa_platforms), ("UK", uk_platforms)]:
+        story.append(Paragraph(f"{label} Platforms", styles['Normal']))
+        table = Table([["Platform", "Count"]] + [[k, v] for k, v in platforms.items()])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 12))
+
+    story.append(Paragraph("🏷️ Brand Performance", subsection_style))
+
+    brand_table = Table(
+        [["USA Brand", "Count", "UK Brand", "Count"]] +
+        list(zip_longest(
+            list(usa_brands.keys()) + ["Total"],
+            list(usa_brands.values()) + [sum(usa_brands.values())],
+            list(uk_brands.keys()) + ["Total"],
+            list(uk_brands.values()) + [sum(uk_brands.values())]
+        ))
+    )
+
+    brand_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
+    ]))
+
+    story.append(brand_table)
+
+    story.append(PageBreak())
+    story.append(Paragraph("🖨️ Printing Analytics", section_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+
+    printing_table = Table([
+        ["Metric", "Value"],
+        ["Total Copies", f"{printing_stats['Total_copies']:,}"],
+        ["Total Cost", f"${printing_stats['Total_cost']:,.2f}"],
+        ["Avg Cost/Copy", f"${printing_stats['Average']:.2f}"]
+    ])
+
+    printing_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+
+    story.append(printing_table)
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("©️ Copyright Analytics", section_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+
+    success_rate = (
+        copyright_stats['result_count'] /
+        copyright_stats['Total_copyrights'] * 100
+        if copyright_stats['Total_copyrights'] else 0
+    )
+
+    copyright_table = Table([
+        ["Metric", "Value"],
+        ["Total Copyrights", copyright_stats['Total_copyrights']],
+        ["Success Rate", f"{success_rate:.1f}%"],
+        ["Total Cost", f"${copyright_stats['Total_cost_copyright']:,}"]
+    ])
+
+    copyright_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.purple),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+
+    story.append(copyright_table)
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("A+ Content", section_style))
+    story.append(Table([["Total A+", a_plus]]))
+
+    story.append(Spacer(1, 30))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+    story.append(
+        Paragraph(
+            f"Generated on {datetime.now().strftime('%B %d, %Y %I:%M %p')}",
+            styles['Normal']
+        )
+    )
+
+    doc.build(story)
+
+    pdf_data = buffer.getvalue()
+    buffer.close()
+
+    return pdf_data, filename
 
 
 def sales(month: int, year: int) -> pd.DataFrame:
@@ -301,7 +2872,7 @@ def main() -> None:
                                             - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
                                             - 💫 **Self Publishing:** `{Issues.get("Self Publishing", 0)}`
                                             - 🖨 **Printing Only:** `{Issues.get("Printing Only", 0)}`
-                                            
+
                                             **Brands**
                                             - 📘 **BookMarketeers:** `{bookmarketeers}`
                                             - 📘 **Aurora Writers:** `{aurora_writers}`
@@ -309,7 +2880,7 @@ def main() -> None:
                                             - 📕 **KDP:** `{kdp}`
                                             - 📔 **Authors Solution:** `{authors_solution}`
                                             - 📘 **Book Publication:** `{book_publication}`
-    
+
                                             **Platforms**
                                             - 🅰 **Amazon:** `{amazon}`
                                             - 📔 **Barnes & Noble:** `{bn}`
@@ -615,7 +3186,7 @@ def main() -> None:
                                 - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
                                 - 💫 **Self Publishing:** `{Issues.get("Self Publishing", 0)}`
                                 - 🖨 **Printing Only:** `{Issues.get("Printing Only", 0)}`
-    
+
                                 **Brands**
                                 - 📘 **BookMarketeers:** `{brands.get("BookMarketeers", "N/A")}`
                                 - 📘 **Aurora Writers:** `{brands.get("Aurora Writers", "N/A")}`
@@ -623,7 +3194,7 @@ def main() -> None:
                                 - 📕 **KDP:** `{brands.get("KDP", "N/A")}`
                                 - 📔 **Authors Solution:** `{brands.get("Authors Solution", "N/A")}`
                                 - 📘 **Book Publication:** `{brands.get("Book Publication", "N/A")}`
-    
+
                                 **Platforms**
                                 - 🅰 **Amazon:** `{platforms.get("Amazon", "N/A")}`
                                 - 📔 **Barnes & Noble:** `{platforms.get("Barnes & Noble", "N/A")}`
@@ -988,7 +3559,7 @@ def main() -> None:
                                                 - 📉 **Negative Rate:** `{round((negative / total_reviews) * 100, 1) if total_reviews > 0 else 0}%`
                                                 - 💫 **Self Publishing:** `{Issues.get("Self Publishing", 0)}`
                                                 - 🖨 **Printing Only:** `{Issues.get("Printing Only", 0)}`
-    
+
                                                 **Brands**
                                                 - 📘 **BookMarketeers:** `{brands.get("BookMarketeers", "N/A")}`
                                                 - 📘 **Aurora Writers:** `{brands.get("Aurora Writers", "N/A")}`
@@ -996,7 +3567,7 @@ def main() -> None:
                                                 - 📕 **KDP:** `{brands.get("KDP", "N/A")}`
                                                 - 📔 **Authors Solution:** `{brands.get("Authors Solution", "N/A")}`
                                                 - 📘 **Book Publication:** `{brands.get("Book Publication", "N/A")}`
-    
+
                                                 **Platforms**
                                                 - 🅰 **Amazon:** `{platforms.get("Amazon", "N/A")}`
                                                 - 📔 **Barnes & Noble:** `{platforms.get("Barnes & Noble", "N/A")}`
@@ -1761,23 +4332,23 @@ def main() -> None:
                         st.markdown("### 📊 Summary Statistics")
 
                         st.markdown(f"""
-        
+
                            - 🧾 **Total Orders:** {len(data)}
-        
+
                            - 📦 **Total Copies Printed:** `{Total_copies}`
-        
+
                            - 💰 **Total Cost:** `${Total_cost:,.2f}`
-        
+
                            - 📈 **Highest Order Cost:** `${Highest_cost:,.2f}`
-        
+
                            - 📉 **Lowest Order Cost:** `${Lowest_cost:,.2f}`
-        
+
                            - 🔢 **Highest Copies in One Order:** `{Highest_copies}`
-        
+
                            - 🧮 **Lowest Copies in One Order:** `{Lowest_copies}`
-        
+
                            - 🧾 **Average Cost per Copy:** `${Average:,.2f}`
-        
+
                            """)
                         st.markdown("---")
 
@@ -2706,6 +5277,9 @@ def main() -> None:
                                             st.markdown(
                                                 "\n".join([f"- {d}" for d in data["publishing_dates"]])
                                             )
+
+
+
 
         elif action == "Summary":
             st.header("📄 Generate Summary Report")
