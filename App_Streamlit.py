@@ -61,6 +61,7 @@ sheet_printing = "Printing"
 sheet_copyright = "Copyright"
 sheet_a_plus = "A_plus"
 sheet_sales = "Sales"
+sheet_nielsen = "Nielsen ISBN"
 
 PKST_DATE = pytz.timezone("Asia/Karachi")
 
@@ -2662,6 +2663,17 @@ def sales_year(year: int) -> pd.DataFrame:
 
     return data
 
+def nielsen_isbn() -> pd.DataFrame:
+    data = get_sheet_data(sheet_nielsen)
+    if data.empty:
+        return pd.DataFrame()
+
+    columns = list(data.columns)
+    if "Author" in columns:
+        end_col_index = columns.index("Author")
+        data = data.iloc[:, :end_col_index + 1]
+
+    return data
 
 def main() -> None:
     with st.container():
@@ -2672,7 +2684,7 @@ def main() -> None:
         action = st.selectbox("What would you like to do?",
                               ["View Data", "Printing", "Copyright", "Generate Similarity",
                                "Summary",
-                               "Year Summary", "Custom Summary", "Reviews", "Sales"],
+                               "Year Summary", "Custom Summary", "Reviews", "Sales", "ISBN"],
                               index=None,
                               placeholder="Select Action")
 
@@ -5277,10 +5289,6 @@ def main() -> None:
                                             st.markdown(
                                                 "\n".join([f"- {d}" for d in data["publishing_dates"]])
                                             )
-
-
-
-
         elif action == "Summary":
             st.header("📄 Generate Summary Report")
             selected_month = st.selectbox(
@@ -5906,7 +5914,6 @@ def main() -> None:
                         mime="application/pdf",
                         help="Click to download the PDF report"
                     )
-
         elif action == "Sales":
             tab1, tab2 = st.tabs(["Monthly", "Yearly"])
 
@@ -5982,7 +5989,6 @@ def main() -> None:
 
                 else:
                     st.warning(f"⚠️ No Data Available for Sales in {year}")
-
         elif action == "Reviews" and number:
             uk_clean = clean_data_reviews(sheet_uk)
             usa_clean = clean_data_reviews(sheet_usa)
@@ -6071,7 +6077,6 @@ def main() -> None:
 
             else:
                 st.warning("No combined review data found.")
-
         elif action == "Custom Summary":
 
             start_year = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
@@ -6392,7 +6397,61 @@ def main() -> None:
                         mime="application/pdf",
                         help="Click to download the PDF report"
                     )
+        elif action == "ISBN":
 
 
+            st.title("Nielsen ISBN")
+
+            t1, t2, t3 = st.tabs(["All", "Search", "Filter By Brand"])
+
+            data = nielsen_isbn()
+            with t1:
+                st.subheader("All Records")
+                df_all = data.copy()
+                df_all.index = range(1, len(df_all) + 1)
+                st.dataframe(df_all)
+            with t2:
+                st.subheader("Search")
+
+                search_term = st.text_input(
+                    "Search by ISBN / Book / Author",
+                    placeholder="Enter Search Term",
+                    key="search_term"
+                )
+
+                if search_term and search_term.strip():
+                    search_term_clean = search_term.strip()
+
+                    search_df = data[
+                        data["ISBN"].str.contains(search_term_clean, case=False, na=False)
+                        | data["Title"].str.contains(search_term_clean, case=False, na=False)
+                        | data["Author"].str.contains(search_term_clean, case=False, na=False)
+                        | data["Subtitle"].str.contains(search_term_clean, case=False, na=False)
+                        ]
+
+                    if search_df.empty:
+                        st.warning("No such ISBNs found!")
+                    else:
+                        search_df.index = range(1, len(search_df) + 1)
+                        st.dataframe(search_df)
+                else:
+                    st.info("👆 Enter ISBN/book/author above to search")
+
+            with t3:
+                st.subheader("Filter By Brand")
+
+                if "Brand" in data.columns:
+                    brands = sorted(data["Brand"].dropna().unique())
+                    selected_brand = st.selectbox("Select Brand", brands)
+
+                    filtered_df = data[data["Brand"] == selected_brand]
+
+                    if filtered_df.empty:
+                        st.warning("No records found for this brand.")
+                    else:
+                        filtered_df.index = range(1, len(filtered_df) + 1)
+                        st.dataframe(filtered_df)
+                else:
+                    st.error("Brand column not found in dataset.")
 if __name__ == '__main__':
     main()
