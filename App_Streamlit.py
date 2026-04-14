@@ -3692,8 +3692,18 @@ def main() -> None:
                                     st.dataframe(printing_only_df)
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
+                                    df = attained_reviews_per_month.copy()
+                                    df["Month"] = pd.to_datetime(df["Month"])
+                                    df["Year"] = df["Month"].dt.year
+                                    yearly_total = df.groupby("Year")["Total Attained Reviews"].sum()
+                                    st.dataframe(yearly_total)
                                 with st.expander("🔴 Negative Reviews Per Month"):
                                     st.dataframe(negative_reviews_per_month)
+                                    df = negative_reviews_per_month.copy()
+                                    df["Month"] = pd.to_datetime(df["Month"])
+                                    df["Year"] = df["Month"].dt.year
+                                    yearly_total = df.groupby("Year")["Total Negative Reviews"].sum()
+                                    st.dataframe(yearly_total)
                             with col2:
                                 st.markdown("---")
                                 st.markdown("#### 🔍 Review & Publishing Status")
@@ -4092,8 +4102,18 @@ def main() -> None:
                                     st.dataframe(printing_only_df)
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
+                                    df = attained_reviews_per_month.copy()
+                                    df["Month"] = pd.to_datetime(df["Month"])
+                                    df["Year"] = df["Month"].dt.year
+                                    yearly_total = df.groupby("Year")["Total Attained Reviews"].sum()
+                                    st.dataframe(yearly_total)
                                 with st.expander("🔴 Negative Reviews Per Month"):
                                     st.dataframe(negative_reviews_per_month)
+                                    df = negative_reviews_per_month.copy()
+                                    df["Month"] = pd.to_datetime(df["Month"])
+                                    df["Year"] = df["Month"].dt.year
+                                    yearly_total = df.groupby("Year")["Total Negative Reviews"].sum()
+                                    st.dataframe(yearly_total)
                             with col2:
                                 st.markdown("---")
                                 st.markdown("#### 🔍 Review & Publishing Status")
@@ -5700,9 +5720,31 @@ def main() -> None:
                             )
                             with st.expander("🟢 Attained Reviews Per Month"):
                                 st.dataframe(attained_reviews_per_month)
+                                df = attained_reviews_per_month.copy()
+                                df["Month"] = pd.to_datetime(df["Month"])
+                                df["Year"] = df["Month"].dt.year
+                                yearly_total = df.groupby("Year")["Total Attained Reviews"].sum()
+                                st.dataframe(yearly_total)
+
+                                usa_yearly = df.groupby("Year")["USA Attained Reviews"].sum()
+                                uk_yearly = df.groupby("Year")["UK Attained Reviews"].sum()
+
+                                st.dataframe(usa_yearly)
+                                st.dataframe(uk_yearly)
 
                             with st.expander("🔴 Negative Reviews Per Month"):
                                 st.dataframe(negative_per_month)
+                                df = negative_per_month.copy()
+                                df["Month"] = pd.to_datetime(df["Month"])
+                                df["Year"] = df["Month"].dt.year
+                                yearly_total = df.groupby("Year")["Total Negative Reviews"].sum()
+                                st.dataframe(yearly_total)
+
+                                usa_yearly = df.groupby("Year")["USA Negative Reviews"].sum()
+                                uk_yearly = df.groupby("Year")["UK Negative Reviews"].sum()
+
+                                st.dataframe(usa_yearly)
+                                st.dataframe(uk_yearly)
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                             if uk_pie:
@@ -6183,9 +6225,32 @@ def main() -> None:
                             )
                             with st.expander("🟢 Attained Reviews Per Month"):
                                 st.dataframe(attained_reviews_per_month)
+                                df = attained_reviews_per_month.copy()
+                                df["Month"] = pd.to_datetime(df["Month"])
+                                df["Year"] = df["Month"].dt.year
+                                yearly_total = df.groupby("Year")["Total Attained Reviews"].sum()
+                                st.dataframe(yearly_total)
+
+                                usa_yearly = df.groupby("Year")["USA Attained Reviews"].sum()
+                                uk_yearly = df.groupby("Year")["UK Attained Reviews"].sum()
+
+                                st.dataframe(usa_yearly)
+                                st.dataframe(uk_yearly)
+
 
                             with st.expander("🔴 Negative Reviews Per Month"):
                                 st.dataframe(negative_per_month)
+                                df = negative_per_month.copy()
+                                df["Month"] = pd.to_datetime(df["Month"])
+                                df["Year"] = df["Month"].dt.year
+                                yearly_total = df.groupby("Year")["Total Negative Reviews"].sum()
+                                st.dataframe(yearly_total)
+
+                                usa_yearly = df.groupby("Year")["USA Negative Reviews"].sum()
+                                uk_yearly = df.groupby("Year")["UK Negative Reviews"].sum()
+
+                                st.dataframe(usa_yearly)
+                                st.dataframe(uk_yearly)
                         with col2:
                             uk_pie = create_review_pie_chart(uk_review_data, "UK Trustpilot Reviews")
                             if uk_pie:
