@@ -1606,9 +1606,11 @@ def generate_year_summary(year: int):
         ]
     pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
+    pms_uk = load_data_search(sheet_uk, current_year)
+    pms_usa = load_data_search(sheet_usa, current_year)
+    pm_list_usa = list(set((pms_usa["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+    pm_list_uk = list(set((pms_uk["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
 
-    pm_list_usa = list(set((usa_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
-    pm_list_uk = list(set((uk_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
 
     usa_reviews_per_pm = safe_concat([load_reviews_year(sheet_usa, year, pm, "Attained") for pm in pm_list_usa])
     uk_reviews_per_pm = safe_concat([load_reviews_year(sheet_uk, year, pm, "Attained") for pm in pm_list_uk])
@@ -2040,9 +2042,10 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
         ]
     pending_sent_details = pending_sent_details[["Name", "Brand", "Project Manager", "Trustpilot Review", "Status"]]
     pending_sent_details.index = range(1, len(pending_sent_details) + 1)
-
-    pm_list_usa = list(set((usa_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
-    pm_list_uk = list(set((uk_clean["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+    pms_uk = load_data_search(sheet_uk, current_year)
+    pms_usa = load_data_search(sheet_usa, current_year)
+    pm_list_usa = list(set((pms_usa["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+    pm_list_uk = list(set((pms_uk["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
 
     usa_reviews_per_pm = safe_concat(
         [load_reviews_year_multiple(sheet_usa, start_year, end_year, pm, "Attained") for pm in pm_list_usa])
@@ -2989,12 +2992,13 @@ def main() -> None:
                 if number2 and sheet_name:
 
                     data = load_data_year(sheet_name, number2)
+                    pms = load_data_search(sheet_name, current_year)
                     if not data.empty:
                         data_rm_dupes = data.copy()
                         if "Name" in data_rm_dupes.columns:
                             data_rm_dupes = data_rm_dupes.drop_duplicates(subset=["Name"], keep="first")
 
-                        pm_list = list(set((data["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
+                        pm_list = list(set((pms["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
                         reviews_per_pm = [load_reviews_year(choice, number2, pm, "Attained") for pm in pm_list]
                         reviews_per_pm = safe_concat([df for df in reviews_per_pm if not df.empty])
 
