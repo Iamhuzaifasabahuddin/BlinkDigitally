@@ -3693,10 +3693,33 @@ def main() -> None:
                                 with st.expander("🟢 Attained Reviews Per Month"):
                                     st.dataframe(attained_reviews_per_month)
                                     df = attained_reviews_per_month.copy()
-                                    df["Month"] = pd.to_datetime(df["Month"])
+                                    df2 = attained_details_total.copy()
+
+                                    df["Month"] = pd.to_datetime(df["Month"], errors="coerce")
                                     df["Year"] = df["Month"].dt.year
-                                    yearly_total = df.groupby("Year")["Total Attained Reviews"].sum()
-                                    st.dataframe(yearly_total)
+
+                                    yearly_total = (
+                                        df.groupby("Year")["Total Attained Reviews"]
+                                        .sum()
+                                        .reset_index(name="Total Reviews")
+                                    )
+
+                                    df2["Trustpilot Review Date"] = pd.to_datetime(
+                                        df2["Trustpilot Review Date"], errors="coerce"
+                                    )
+
+                                    df2["Year"] = df2["Trustpilot Review Date"].dt.year
+
+                                    yearly_names = (
+                                        df2.groupby("Year")["Name"]
+                                        .apply(list)
+                                        .reset_index(name="Clients")
+                                    )
+
+                                    merged_yearly = yearly_total.merge(yearly_names, how="left", on="Year")
+
+                                    merged_yearly.index = range(1, len(merged_yearly) + 1)
+                                    st.dataframe(merged_yearly)
                                 with st.expander("🔴 Negative Reviews Per Month"):
                                     st.dataframe(negative_reviews_per_month)
                                     df = negative_reviews_per_month.copy()

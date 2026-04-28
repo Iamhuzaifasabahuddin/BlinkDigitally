@@ -13,7 +13,7 @@
 .testing/App.py
 .testing
 *.log
-AutoReview.py
-Publishing Form Extractor.py
+Misc/AutoReview.py
+Misc/Publishing Form Extractor.py
 
 testing_phase.py
