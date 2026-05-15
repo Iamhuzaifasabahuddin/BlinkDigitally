@@ -76,19 +76,19 @@ name_usa = {
     "Aiza Ali": "aiza.ali@topsoftdigitals.pk",
     "Ahmed Asif": "ahmed.asif@topsoftdigitals.pk",
     "Asad Waqas": "asad.waqas@topsoftdigitals.pk",
-    "Kamal Muhammad Issa": "kamal.muhammed.issa@topsoftdigitals.pk",
     "Maheen Sami": "maheen.sami@topsoftdigitals.pk",
     "Mubashir Khan": "Mubashir.khan@topsoftdigitals.pk",
     "Muhammad Ali": "muhammad.ali@topsoftdigitals.pk",
     "Valencia Angelo": "valencia.angelo@topsoftdigitals.pk",
     "Ukasha Asadullah": "ukasha.asadullah@topsoftdigitals.pk",
     "Ahsan Javed": "ahsan.javed@topsoftdigitals.pk",
-    "Muhammad Saad Sethi": "saad.sethi@topsoftdigitals.pk",
     "Tooba Shoaib": "tooba.shoaib@topsoftdigitals.pk",
     "Adrian Moses": "adrain.moses@topsoftdigitals.pk",
     "Ancil Fernandes": "ancil.fernandes@topsoftdigitals.pk",
     "Laiba Sheikh": "laiba.sheikh@topsoftdigitals.pk",
-    "Muhammad Abdullah Sheikh": "abdullah.sheikh@topsoftdigitals.pk"
+    "Muhammad Abdullah Sheikh": "abdullah.sheikh@topsoftdigitals.pk",
+    "Wadia Salman Ghouri": "wadia.ghouri@topsoftdigitals.pk"
+
 }
 
 names_uk = {
