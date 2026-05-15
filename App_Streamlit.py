@@ -1611,38 +1611,61 @@ def generate_year_summary(year: int):
     pm_list_usa = list(set((pms_usa["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
     pm_list_uk = list(set((pms_uk["Project Manager"].dropna().unique().tolist() + ["Unknown"])))
 
-
     usa_reviews_per_pm = safe_concat([load_reviews_year(sheet_usa, year, pm, "Attained") for pm in pm_list_usa])
     uk_reviews_per_pm = safe_concat([load_reviews_year(sheet_uk, year, pm, "Attained") for pm in pm_list_uk])
     combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
 
     usa_monthly = (
-        usa_clean.groupby(usa_clean["Publishing Date"].dt.to_period("M"))
+        usa_clean.groupby(
+            usa_clean["Publishing Date"].dt.to_period("M")
+        )
         .size()
         .reset_index(name="USA Published")
     )
+
     usa_monthly["Month"] = usa_monthly["Publishing Date"].dt.strftime("%B %Y")
-    usa_monthly = usa_monthly[["Month", "USA Published"]]
+
+    usa_monthly["Month_Sort"] = (
+        usa_monthly["Publishing Date"]
+        .dt.to_timestamp()
+    )
+
+    usa_monthly = usa_monthly[["Month", "Month_Sort", "USA Published"]]
 
     uk_monthly = (
-        uk_clean.groupby(uk_clean["Publishing Date"].dt.to_period("M"))
+        uk_clean.groupby(
+            uk_clean["Publishing Date"].dt.to_period("M")
+        )
         .size()
         .reset_index(name="UK Published")
     )
+
     uk_monthly["Month"] = uk_monthly["Publishing Date"].dt.strftime("%B %Y")
-    uk_monthly = uk_monthly[["Month", "UK Published"]]
+
+    uk_monthly["Month_Sort"] = (
+        uk_monthly["Publishing Date"]
+        .dt.to_timestamp()
+    )
+
+    uk_monthly = uk_monthly[["Month", "Month_Sort", "UK Published"]]
 
     combined_monthly = pd.merge(
         usa_monthly,
         uk_monthly,
-        on="Month",
+        on=["Month", "Month_Sort"],
         how="outer"
     ).fillna(0)
 
-    combined_monthly["Total Published"] = combined_monthly["USA Published"] + combined_monthly["UK Published"]
+    combined_monthly["Total Published"] = (
+            combined_monthly["USA Published"] +
+            combined_monthly["UK Published"]
+    )
 
-    combined_monthly["Month_Num"] = pd.to_datetime(combined_monthly["Month"], format="%B %Y")
-    combined_monthly = combined_monthly.sort_values("Total Published", ascending=False).drop(columns="Month_Num")
+    combined_monthly = (
+        combined_monthly
+        .sort_values("Month_Sort")
+        .drop(columns="Month_Sort")
+    )
 
     combined_monthly.index = range(1, len(combined_monthly) + 1)
 
@@ -2054,32 +2077,56 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
     combined_data = safe_concat([usa_reviews_per_pm, uk_reviews_per_pm])
 
     usa_monthly = (
-        usa_clean.groupby(usa_clean["Publishing Date"].dt.to_period("M"))
+        usa_clean.groupby(
+            usa_clean["Publishing Date"].dt.to_period("M")
+        )
         .size()
         .reset_index(name="USA Published")
     )
+
     usa_monthly["Month"] = usa_monthly["Publishing Date"].dt.strftime("%B %Y")
-    usa_monthly = usa_monthly[["Month", "USA Published"]]
+
+    usa_monthly["Month_Sort"] = (
+        usa_monthly["Publishing Date"]
+        .dt.to_timestamp()
+    )
+
+    usa_monthly = usa_monthly[["Month", "Month_Sort", "USA Published"]]
 
     uk_monthly = (
-        uk_clean.groupby(uk_clean["Publishing Date"].dt.to_period("M"))
+        uk_clean.groupby(
+            uk_clean["Publishing Date"].dt.to_period("M")
+        )
         .size()
         .reset_index(name="UK Published")
     )
+
     uk_monthly["Month"] = uk_monthly["Publishing Date"].dt.strftime("%B %Y")
-    uk_monthly = uk_monthly[["Month", "UK Published"]]
+
+    uk_monthly["Month_Sort"] = (
+        uk_monthly["Publishing Date"]
+        .dt.to_timestamp()
+    )
+
+    uk_monthly = uk_monthly[["Month", "Month_Sort", "UK Published"]]
 
     combined_monthly = pd.merge(
         usa_monthly,
         uk_monthly,
-        on="Month",
+        on=["Month", "Month_Sort"],
         how="outer"
     ).fillna(0)
 
-    combined_monthly["Total Published"] = combined_monthly["USA Published"] + combined_monthly["UK Published"]
+    combined_monthly["Total Published"] = (
+            combined_monthly["USA Published"] +
+            combined_monthly["UK Published"]
+    )
 
-    combined_monthly["Month_Num"] = pd.to_datetime(combined_monthly["Month"], format="%B %Y")
-    combined_monthly = combined_monthly.sort_values("Total Published", ascending=False).drop(columns="Month_Num")
+    combined_monthly = (
+        combined_monthly
+        .sort_values("Month_Sort")
+        .drop(columns="Month_Sort")
+    )
 
     combined_monthly.index = range(1, len(combined_monthly) + 1)
 
@@ -2666,6 +2713,7 @@ def sales_year(year: int) -> pd.DataFrame:
 
     return data
 
+
 def nielsen_isbn() -> pd.DataFrame:
     data = get_sheet_data(sheet_nielsen)
     if data.empty:
@@ -2677,6 +2725,7 @@ def nielsen_isbn() -> pd.DataFrame:
         data = data.iloc[:, :end_col_index + 1]
 
     return data
+
 
 def main() -> None:
     with st.container():
@@ -3227,30 +3276,41 @@ def main() -> None:
                                     st.dataframe(data_rm_dupes)
                                 with st.expander("🤵🏻🤵🏻 Publishing Per Month"):
                                     data_month = data_rm_dupes.copy()
-                                    data_month["Publishing Date"] = pd.to_datetime(data_month["Publishing Date"],
-                                                                                   errors="coerce")
 
-                                    data_month["Month"] = data_month["Publishing Date"].dt.to_period("M").dt.strftime(
-                                        "%B %Y")
+                                    data_month["Publishing Date"] = pd.to_datetime(
+                                        data_month["Publishing Date"],
+                                        errors="coerce"
+                                    )
+
+                                    data_month["Month"] = data_month["Publishing Date"].dt.strftime("%B %Y")
+
+                                    data_month["Month_Sort"] = (
+                                        data_month["Publishing Date"]
+                                        .dt.to_period("M")
+                                        .dt.to_timestamp()
+                                    )
 
                                     unique_clients_count_per_month = (
-                                        data_month.groupby("Month")["Name"].nunique()
-                                        .reset_index()
+                                        data_month.groupby(["Month", "Month_Sort"])["Name"]
+                                        .nunique()
+                                        .reset_index(name="Total Published")
                                     )
-                                    unique_clients_count_per_month.columns = ["Month", "Total Published"]
+
                                     clients_list_per_month = (
-                                        data_month.groupby("Month")["Name"]
+                                        data_month.groupby(["Month", "Month_Sort"])["Name"]
                                         .apply(list)
                                         .reset_index(name="Clients")
                                     )
 
                                     publishing_per_month = unique_clients_count_per_month.merge(
-                                        clients_list_per_month, on="Month", how="left"
+                                        clients_list_per_month,
+                                        on=["Month", "Month_Sort"],
+                                        how="left"
                                     )
 
-                                    publishing_per_month = publishing_per_month.sort_values(
-                                        by="Total Published", ascending=False
-                                    )
+                                    publishing_per_month = publishing_per_month.sort_values("Month_Sort")
+
+                                    publishing_per_month = publishing_per_month.drop(columns="Month_Sort")
                                     publishing_per_month.index = range(1, len(publishing_per_month) + 1)
                                     st.dataframe(publishing_per_month)
 
@@ -3600,30 +3660,41 @@ def main() -> None:
                                     st.dataframe(data_rm_dupes)
                                 with st.expander("🤵🏻🤵🏻 Publishing Per Month"):
                                     data_month = data_rm_dupes.copy()
-                                    data_month["Publishing Date"] = pd.to_datetime(data_month["Publishing Date"],
-                                                                                   errors="coerce")
 
-                                    data_month["Month"] = data_month["Publishing Date"].dt.to_period("M").dt.strftime(
-                                        "%B %Y")
+                                    data_month["Publishing Date"] = pd.to_datetime(
+                                        data_month["Publishing Date"],
+                                        errors="coerce"
+                                    )
+
+                                    data_month["Month"] = data_month["Publishing Date"].dt.strftime("%B %Y")
+
+                                    data_month["Month_Sort"] = (
+                                        data_month["Publishing Date"]
+                                        .dt.to_period("M")
+                                        .dt.to_timestamp()
+                                    )
 
                                     unique_clients_count_per_month = (
-                                        data_month.groupby("Month")["Name"].nunique()
-                                        .reset_index()
+                                        data_month.groupby(["Month", "Month_Sort"])["Name"]
+                                        .nunique()
+                                        .reset_index(name="Total Published")
                                     )
-                                    unique_clients_count_per_month.columns = ["Month", "Total Published"]
+
                                     clients_list_per_month = (
-                                        data_month.groupby("Month")["Name"]
+                                        data_month.groupby(["Month", "Month_Sort"])["Name"]
                                         .apply(list)
                                         .reset_index(name="Clients")
                                     )
 
                                     publishing_per_month = unique_clients_count_per_month.merge(
-                                        clients_list_per_month, on="Month", how="left"
+                                        clients_list_per_month,
+                                        on=["Month", "Month_Sort"],
+                                        how="left"
                                     )
 
-                                    publishing_per_month = publishing_per_month.sort_values(
-                                        by="Total Published", ascending=False
-                                    )
+                                    publishing_per_month = publishing_per_month.sort_values("Month_Sort")
+
+                                    publishing_per_month = publishing_per_month.drop(columns="Month_Sort")
                                     publishing_per_month.index = range(1, len(publishing_per_month) + 1)
                                     st.dataframe(publishing_per_month)
 
@@ -6264,7 +6335,6 @@ def main() -> None:
                                 st.dataframe(usa_yearly)
                                 st.dataframe(uk_yearly)
 
-
                             with st.expander("🔴 Negative Reviews Per Month"):
                                 st.dataframe(negative_per_month)
                                 df = negative_per_month.copy()
@@ -6491,7 +6561,6 @@ def main() -> None:
                     )
         elif action == "ISBN":
 
-
             st.title("Nielsen ISBN")
 
             t1, t2, t3 = st.tabs(["All", "Search", "Filter By Brand"])
@@ -6545,5 +6614,7 @@ def main() -> None:
                         st.dataframe(filtered_df)
                 else:
                     st.error("Brand column not found in dataset.")
+
+
 if __name__ == '__main__':
     main()
