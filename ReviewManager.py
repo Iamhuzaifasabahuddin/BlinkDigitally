@@ -804,7 +804,7 @@ def main():
             month_list = list(calendar.month_name)[1:]
             current_month = datetime.today().strftime("%B")
 
-            tab_m, tab_y, tab_u, tab_s = st.tabs(["Monthly", "Yearly", "Upcoming", "Search"])
+            tab_m, tab_y, tab_u, tab_s, tab_pm = st.tabs(["Monthly", "Yearly", "Upcoming", "Search", "Filter By PM"])
 
             with tab_m:
 
@@ -890,7 +890,61 @@ def main():
                              "Type", "Accepted"]])
                         else:
                             st.info("👆 Enter a name / book above to search")
+            with tab_pm:
+                st.subheader(f"👤 Filter Data by Project Manager ({region})")
 
+                year_pm = st.number_input(
+                    "Enter Year",
+                    min_value=2025,
+                    step=1,
+                    value=current_year,
+                    key="year_pm"
+                )
+
+                if year_pm and sheet_name:
+                    data = printing_data_search(year_pm, region)
+
+                    if data.empty:
+                        st.warning(f"⚠️ No Data Available for {region} in {year_pm}")
+                    else:
+                        # Merge PM lists
+                        pm_list = name_usa if region == "USA" else names_uk
+
+                        selected_pm = st.selectbox(
+                            "Select Project Manager",
+                            options=pm_list,
+                            key="pm_filter"
+                        )
+
+                        if selected_pm == "All":
+                            filtered_df = data
+                        else:
+                            filtered_df = data[
+                                data["Project Manager"].str.contains(
+                                    selected_pm,
+                                    case=False,
+                                    na=False
+                                )
+                            ]
+
+                        if filtered_df.empty:
+                            st.warning(f"⚠️ No records found for PM: {selected_pm}")
+                        else:
+                            st.success(f"✅ Found {len(filtered_df)} record(s) for {selected_pm}")
+
+                            filtered_df.index = range(1, len(filtered_df) + 1)
+
+                            st.dataframe(
+                                filtered_df[
+                                    [
+                                        "Name", "Brand", "Project Manager", "Address",
+                                        "Book", "Format", "Ink Type", "No of Copies",
+                                        "Order Date", "Delivery Method", "Status",
+                                        "Courier", "Tracking Number", "Shipping Date",
+                                        "Fulfilled", "Type", "Accepted"
+                                    ]
+                                ]
+                            )
         elif action == "Send Pending Reviews":
             if not st.session_state.authenticated_admin:
                 st.error("🚫 You do not have permission to access this section.")
