@@ -4546,7 +4546,7 @@ def main() -> None:
                     else:
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
             with tab2:
-                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year,
+                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1)
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
                 uk_brands = ["Authors Solution", "Book Publication"]
@@ -4658,7 +4658,7 @@ def main() -> None:
                 else:
                     st.warning(f"⚠️ No Data Available for Printing in {number2}")
             with tab3:
-                number2 = st.number_input("Enter Year2", min_value=int(get_min_year()), max_value=current_year,
+                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1, key="printing_year_to_year")
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
                 uk_brands = ["Authors Solution", "Book Publication"]
@@ -4770,7 +4770,7 @@ def main() -> None:
                 else:
                     st.warning(f"⚠️ No Data Available for Printing in Start to Year {number2}")
             with tab4:
-                number3 = st.number_input("Enter Year3", min_value=int(get_min_year()), max_value=current_year,
+                number3 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1)
                 data, _ = printing_data_search(number3)
                 search_term = st.text_input("Search by Name / Book", placeholder="Enter Search Term", key="search_term")
