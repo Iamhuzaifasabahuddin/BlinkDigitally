@@ -3,8 +3,8 @@ import io
 import logging
 from datetime import datetime
 from io import BytesIO
-
 from itertools import zip_longest
+
 import gspread
 import pandas as pd
 import plotly.express as px
@@ -350,7 +350,7 @@ def load_reviews_year(sheet_name: str, year: int, name: str, type_: str = "Attai
             (data_original["Project Manager"] == name) &
             (data_original["Trustpilot Review"] == type_) &
             (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"]))
             ]
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
@@ -399,7 +399,7 @@ def load_reviews_year_to_date(sheet_name: str, year: int, name: str, type_: str 
             (data_original["Project Manager"] == name) &
             (data_original["Trustpilot Review"] == type_) &
             (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"]))
             ]
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
@@ -449,7 +449,7 @@ def load_reviews_filter(sheet_name: str, start_date: datetime, end_date: datetim
             (data_original["Project Manager"] == name) &
             (data_original["Trustpilot Review"] == type_) &
             (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"]))
             ]
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
@@ -500,7 +500,7 @@ def load_reviews_year_multiple(sheet_name: str, start_year: int, end_year: int, 
             (data_original["Project Manager"] == name) &
             (data_original["Trustpilot Review"] == type_) &
             (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"]))
             ]
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
@@ -1298,6 +1298,7 @@ def summary(month: int, year: int):
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", 0)
     book_publication = uk_brand.get("Book Publication", 0)
+    books_publisher = uk_brand.get("Books Publisher", 0)
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -1481,7 +1482,7 @@ def summary(month: int, year: int):
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
                   'Aurora Writers': aurora_writers}
 
-    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication, 'Books Publisher': books_publisher}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,
                      "Draft2Digital": usa_d2d, "Kobo": usa_kobo, "LULU": usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
@@ -1559,6 +1560,7 @@ def generate_year_summary(year: int):
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", 0)
     book_publication = uk_brand.get("Book Publication", 0)
+    books_publisher = uk_brand.get("Books Publisher", 0)
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -1935,7 +1937,7 @@ def generate_year_summary(year: int):
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
                   'Aurora Writers': aurora_writers}
-    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication, 'Books Publisher': books_publisher}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,
                      "Draft2Digital": usa_d2d, "Kobo": usa_kobo, "LULU": usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
@@ -2018,6 +2020,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
     uk_brand = uk_clean["Brand"].value_counts()
     authors_solution = uk_brand.get("Authors Solution", 0)
     book_publication = uk_brand.get("Book Publication", 0)
+    books_publisher = uk_brand.get("Books Publisher", 0)
 
     usa_platforms = usa_clean_platforms["Platform"].value_counts()
     usa_amazon = usa_platforms.get("Amazon", 0)
@@ -2039,7 +2042,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
     uk_kobo = uk_platforms.get("Kobo", 0)
     uk_acx = uk_platforms.get("ACX", 0)
 
-    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication"]
+    allowed_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution", "Book Publication", "Books Publisher"]
 
     if "Trustpilot Review" in usa_clean.columns and "Brand" in usa_clean.columns:
         usa_filtered = usa_clean[usa_clean["Brand"].isin(allowed_brands)]
@@ -2399,7 +2402,7 @@ def generate_year_summary_multiple(start_year: int, end_year: int):
 
     usa_brands = {'BookMarketeers': bookmarketeers, 'Writers Clique': writers_clique, 'KDP': kdp,
                   'Aurora Writers': aurora_writers}
-    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication}
+    uk_brands = {'Authors Solution': authors_solution, 'Book Publication': book_publication, 'Books Publisher': books_publisher}
 
     usa_platforms = {'Amazon': usa_amazon, 'Barnes & Noble': usa_bn, 'Ingram Spark': usa_ingram,
                      "Draft2Digital": usa_d2d, "Kobo": usa_kobo, "LULU": usa_lulu, "FAV": usa_fav, "ACX": usa_acx}
@@ -2877,6 +2880,7 @@ def main() -> None:
                             kdp = brands.get("KDP", "N/A")
                             authors_solution = brands.get("Authors Solution", "N/A")
                             book_publication = brands.get("Book Publication", "N/A")
+                            books_publisher = brands.get("Books Publisher", "N/A")
 
                             platforms = data["Platform"].value_counts()
                             amazon = platforms.get("Amazon", "N/A")
@@ -2890,7 +2894,7 @@ def main() -> None:
 
                             filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                                 ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
-                                 "Book Publication"])]
+                                 "Book Publication", "Books Publisher"])]
                             sent = filtered_data["Trustpilot Review"].value_counts().get("Sent", 0)
                             pending = filtered_data["Trustpilot Review"].value_counts().get("Pending", 0)
                             pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (
@@ -2944,6 +2948,7 @@ def main() -> None:
                                             - 📕 **KDP:** `{kdp}`
                                             - 📔 **Authors Solution:** `{authors_solution}`
                                             - 📘 **Book Publication:** `{book_publication}`
+                                            - 📘 **Books Publisher:** `{books_publisher}`
 
                                             **Platforms**
                                             - 🅰 **Amazon:** `{amazon}`
@@ -3213,7 +3218,7 @@ def main() -> None:
 
                             filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                                 ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
-                                 "Book Publication"])]
+                                 "Book Publication", "Books Publisher"])]
                             pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (
                                     filtered_data["Trustpilot Review"] == "Pending")]
                             review_counts = filtered_data["Trustpilot Review"].value_counts()
@@ -3259,6 +3264,7 @@ def main() -> None:
                                 - 📕 **KDP:** `{brands.get("KDP", "N/A")}`
                                 - 📔 **Authors Solution:** `{brands.get("Authors Solution", "N/A")}`
                                 - 📘 **Book Publication:** `{brands.get("Book Publication", "N/A")}`
+                                - 📘 **Books Publisher:** `{brands.get("Books Publisher", "N/A")}`
 
                                 **Platforms**
                                 - 🅰 **Amazon:** `{platforms.get("Amazon", "N/A")}`
@@ -3597,7 +3603,7 @@ def main() -> None:
 
                             filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                                 ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
-                                 "Book Publication"])]
+                                 "Book Publication", "Books Publisher"])]
                             pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (
                                     filtered_data["Trustpilot Review"] == "Pending")]
                             review_counts = filtered_data["Trustpilot Review"].value_counts()
@@ -3643,6 +3649,7 @@ def main() -> None:
                                                 - 📕 **KDP:** `{brands.get("KDP", "N/A")}`
                                                 - 📔 **Authors Solution:** `{brands.get("Authors Solution", "N/A")}`
                                                 - 📘 **Book Publication:** `{brands.get("Book Publication", "N/A")}`
+                                                - 📘 **Books Publisher:** `{brands.get("Books Publisher", "N/A")}`
 
                                                 **Platforms**
                                                 - 🅰 **Amazon:** `{platforms.get("Amazon", "N/A")}`
@@ -4065,7 +4072,7 @@ def main() -> None:
 
                             filtered_data = data_rm_dupes[data_rm_dupes["Brand"].isin(
                                 ["BookMarketeers", "Writers Clique", "Aurora Writers", "Authors Solution",
-                                 "Book Publication"])]
+                                 "Book Publication", "Books Publisher"])]
                             pending_sent_details = filtered_data[(filtered_data["Trustpilot Review"] == "Sent") | (
                                     filtered_data["Trustpilot Review"] == "Pending")]
                             review_counts = filtered_data["Trustpilot Review"].value_counts()
@@ -4111,6 +4118,7 @@ def main() -> None:
                                                 - 📕 **KDP:** `{brands.get("KDP", "N/A")}`
                                                 - 📔 **Authors Solution:** `{brands.get("Authors Solution", "N/A")}`
                                                 - 📘 **Book Publication:** `{brands.get("Book Publication", "N/A")}`
+                                                - 📘 **Books Publisher:** `{brands.get("Books Publisher", "N/A")}`
 
                                                 **Platforms**
                                                 - 🅰 **Amazon:** `{platforms.get("Amazon", "N/A")}`
@@ -4373,7 +4381,7 @@ def main() -> None:
                 )
 
                 usa_brands = ["BookMarketeers", "Writers Clique", "KDP", "Aurora Writers"]
-                uk_brands = ["Authors Solution", "Book Publication"]
+                uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
 
                 if number4 and sheet_name:
                     selected_brand = usa_brands if sheet_name == "USA" else uk_brands
@@ -4409,7 +4417,7 @@ def main() -> None:
 
             with tab1:
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-                uk_brands = ["Authors Solution", "Book Publication"]
+                uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
                 selected_month = st.selectbox(
                     "Select Month",
                     month_list,
@@ -4549,7 +4557,7 @@ def main() -> None:
                 number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1)
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-                uk_brands = ["Authors Solution", "Book Publication"]
+                uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
                 data, monthly = printing_data_year(number2)
 
                 if not data.empty:
@@ -4661,7 +4669,7 @@ def main() -> None:
                 number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
                                           value=current_year, step=1, key="printing_year_to_year")
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-                uk_brands = ["Authors Solution", "Book Publication"]
+                uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
                 data, monthly = printing_data_search(number2)
 
                 if not data.empty:
@@ -4891,7 +4899,7 @@ def main() -> None:
                     st.markdown("---")
 
                     usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-                    uk_brands = ["Authors Solution", "Book Publication"]
+                    uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
 
                     def country_stats(df, brands):
                         df = df[df["Brand"].isin(brands)]

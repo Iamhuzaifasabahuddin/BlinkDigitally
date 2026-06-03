@@ -96,7 +96,8 @@ names_uk = {
     "Hassan Siddiqui": "hassan.siddiqui@topsoftdigitals.pk",
     "Emaan Zaidi": "emaan.zaidi@topsoftdigitals.pk",
     "Faarah Saif": "faarah.saif@topsoftdigitals.pk",
-    "Shahrukh Yousuf": "shahrukh.yousuf@topsoftdigitals.pk"
+    "Shahrukh Yousuf": "shahrukh.yousuf@topsoftdigitals.pk",
+    "Areeba Arzooo": "areeba.arzoo@topsoftdigitals.pk"
 }
 
 general_message = """Hiya
@@ -106,6 +107,7 @@ WC: https://writersclique.com/
 AW: https://aurorawriters.com/
 AS: https://authorssolution.co.uk/
 BP: https://bookpublication.co.uk/
+BP: https://bookspublisher.co.uk/
 """
 
 
@@ -179,7 +181,7 @@ def load_sent_reviews(sheet_name: str, name: str):
         (data_original["Project Manager"] == name) &
         ((data_original["Trustpilot Review"] == "Pending") | (data_original["Trustpilot Review"] == "Sent")) &
         (data_original["Brand"].isin(
-            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"])) &
         (data_original["Status"] == "Published")
         ]
 
@@ -205,7 +207,7 @@ def load_pending_reviews(sheet_name: str, name: str) -> tuple:
         (data_original["Project Manager"] == name) &
         (data_original["Trustpilot Review"] == "Pending") &
         (data_original["Brand"].isin(
-            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+            ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"])) &
         (data_original["Status"] == "Published")
         ]
 
@@ -252,7 +254,7 @@ def load_attained_reviews(sheet_name: str, name: str, year: int, month_number=No
             (data_original["Project Manager"] == name) &
             (data_original["Trustpilot Review"] == "Attained") &
             (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"]))
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"]))
             ]
 
         data = data.sort_values(by="Trustpilot Review Date", ascending=True)
@@ -295,7 +297,7 @@ def load_total_reviews(sheet_name: str, name: str, year: int, month_number=None)
             ((data_original["Trustpilot Review"] == "Pending") |
              (data_original["Trustpilot Review"] == "Sent")) &
             (data_original["Brand"].isin(
-                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers"])) &
+                ["BookMarketeers", "Writers Clique", "Authors Solution", "Book Publication", "Aurora Writers", "Books Publisher"])) &
             (data_original["Status"] == "Published")
             ]
         data_count["Publishing Date"] = pd.to_datetime(
@@ -439,7 +441,7 @@ def printing_data_month(month: int, year: int, choice: str) -> pd.DataFrame:
     """Get printing data filtered by month"""
     try:
         usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-        uk_brands = ["Authors Solution", "Book Publication"]
+        uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
 
         if choice == "USA":
             selected_brands = usa_brands
@@ -483,7 +485,7 @@ def printing_data_month(month: int, year: int, choice: str) -> pd.DataFrame:
 def printing_data_year(year: int, choice: str) -> pd.DataFrame:
     data = get_sheet_data("Printing")
     usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-    uk_brands = ["Authors Solution", "Book Publication"]
+    uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
 
     if choice == "USA":
         selected_brands = usa_brands
@@ -529,7 +531,7 @@ def printing_data_year(year: int, choice: str) -> pd.DataFrame:
 def printing_data_search(year: int, choice: str) -> pd.DataFrame:
     data = get_sheet_data("Printing")
     usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-    uk_brands = ["Authors Solution", "Book Publication"]
+    uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
 
     if choice == "USA":
         selected_brands = usa_brands
@@ -576,7 +578,7 @@ def printing_data_search(year: int, choice: str) -> pd.DataFrame:
 def get_printing_upcoming(choice: str):
     data = get_sheet_data("Printing")
     usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
-    uk_brands = ["Authors Solution", "Book Publication"]
+    uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
 
     if choice == "USA":
         selected_brands = usa_brands
