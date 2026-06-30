@@ -4779,7 +4779,7 @@ def main() -> None:
                     st.warning(f"⚠️ No Data Available for Printing in Start to Year {number2}")
             with tab4:
                 number3 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
-                                          value=current_year, step=1)
+                                          value=current_year, step=1, key="search_key")
                 data, _ = printing_data_search(number3)
                 search_term = st.text_input("Search by Name / Book", placeholder="Enter Search Term", key="search_term")
 
