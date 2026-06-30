@@ -4555,7 +4555,7 @@ def main() -> None:
                         st.warning(f"⚠️ No Data Available for Printing in {selected_month} {number}")
             with tab2:
                 number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
-                                          value=current_year, step=1)
+                                          value=current_year, step=1, key="year_key")
                 usa_brands = ["BookMarketeers", "Writers Clique", "Aurora Writers", "KDP"]
                 uk_brands = ["Authors Solution", "Book Publication", "Books Publisher"]
                 data, monthly = printing_data_year(number2)
