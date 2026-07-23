@@ -87,7 +87,8 @@ name_usa = {
     "Ancil Fernandes": "ancil.fernandes@topsoftdigitals.pk",
     "Laiba Sheikh": "laiba.sheikh@topsoftdigitals.pk",
     "Muhammad Abdullah Sheikh": "abdullah.sheikh@topsoftdigitals.pk",
-    "Wadia Salman Ghouri": "wadia.ghouri@topsoftdigitals.pk"
+    "Wadia Salman Ghouri": "wadia.ghouri@topsoftdigitals.pk",
+    "Asna Misbah": "asna.misbah@topsoftdigitals.pk"
 
 }
 
