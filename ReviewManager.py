@@ -99,7 +99,8 @@ names_uk = {
     "Faarah Saif": "faarah.saif@topsoftdigitals.pk",
     "Shahrukh Yousuf": "shahrukh.yousuf@topsoftdigitals.pk",
     "Areeba Arzoo": "areeba.arzoo@topsoftdigitals.pk",
-    "Anisha Naz": "anisha.naz@topsoftdigitals.pk"
+    "Anisha Naz": "anisha.naz@topsoftdigitals.pk",
+    "Fatima Tuz Zehra": "fatimatuzzehra@topsoftdigitals.pk"
 }
 
 general_message = """Hiya
