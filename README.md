@@ -161,5 +161,11 @@ Changelog — v1.2.0
 ---
 
 Contact / questions
-- Repo owner: Iamhuzaifasabahuddin
+- Repo owner: [Iamhuzaifasabahuddin](https://iamhuzaifasabahuddin.github.io/Portfolio/)
 - For help with credentials or deployment, create an issue in the repo describing the environment and logs.
+
+---
+
+<div align="center">
+  <a href="https://iamhuzaifasabahuddin.github.io/Portfolio/"><strong>About the author →</strong></a>
+</div>
