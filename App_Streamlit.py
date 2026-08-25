@@ -52,6 +52,7 @@ sheet_copyright = "Copyright"
 sheet_a_plus = "A_plus"
 sheet_sales = "Sales"
 sheet_nielsen = "Nielsen ISBN"
+sheet_chargeback = "Chargeback"
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -926,6 +927,7 @@ def summary(month: int, year: int) -> dict:
         "usa_platforms": bps["usa_platforms"], "uk_platforms": bps["uk_platforms"],
         "printing_stats": printing_stats, "copyright_stats": copyright_stats,
         "a_plus_count": a_plus_count, "total_unique_clients": total_unique_clients,
+        "chargeback": _chargeback_for_period(month, year),
         "combined": combined, "attained_reviews_per_pm": attained_reviews_per_pm,
         "attained_details": attained_details, "pending_sent_details": bps["pending_sent_details"],
         "negative_reviews_per_pm": negative_reviews_per_pm, "negative_details": negative_details,
@@ -1078,6 +1080,7 @@ def generate_year_summary(start_year: int, end_year: int = None) -> dict:
         "usa_platforms": bps["usa_platforms"], "uk_platforms": bps["uk_platforms"],
         "printing_stats": printing_stats, "monthly_printing": monthly_printing,
         "copyright_stats": copyright_stats, "a_plus_count": a_plus_count,
+        "chargeback": _chargeback_for_period(start_year=start_year, end_year=end_year),
         "total_unique_clients": total_unique_clients, "combined": combined,
         "attained_reviews_per_pm": attained_reviews_per_pm, "attained_details": attained_details,
         "merged_attained": merged_attained, "attained_reviews_per_month": attained_reviews_per_month,
@@ -1291,6 +1294,95 @@ def nielsen_isbn() -> pd.DataFrame:
     if data.empty:
         return pd.DataFrame()
     return clean_data(data, truncate_at="Author")
+
+
+CHARGEBACK_DATE_COLUMNS = ["Payment Date", "Chargeback Date", "Claim Submission Date",
+                           "Rebuttal Date", "Result Date"]
+
+
+def _parse_money(value) -> float:
+    if pd.isna(value):
+        return 0.0
+    cleaned = str(value).replace("$", "").replace(",", "").strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+
+def load_chargeback() -> pd.DataFrame:
+    data = get_sheet_data(sheet_chargeback)
+    if data.empty:
+        return data
+    if "Payment" in data.columns:
+        data["Payment"] = data["Payment"].apply(_parse_money)
+    if "Result" in data.columns:
+        result = data["Result"].astype(str).str.strip()
+        data["Favourable"] = result.str.contains("Favourable", case=False, na=False)
+        data["Lost"] = result.str.contains("Rejected|Lost", case=False, na=False)
+        data["Awaiting"] = ~(data["Favourable"] | data["Lost"])
+    if "Chargeback Date" in data.columns:
+        data["_Chargeback_dt"] = pd.to_datetime(
+            data["Chargeback Date"], format=DATE_FORMAT, errors="coerce")
+    return format_dates(data, CHARGEBACK_DATE_COLUMNS)
+
+
+def render_chargeback_stats(df: pd.DataFrame, heading: str = "### 📊 Chargeback Statistics") -> None:
+    total = len(df)
+    total_payment = df["Payment"].sum() if "Payment" in df else 0.0
+    fav = df[df["Favourable"]] if "Favourable" in df else df.iloc[0:0]
+    lost = df[df["Lost"]] if "Lost" in df else df.iloc[0:0]
+    awaiting = df[df["Awaiting"]] if "Awaiting" in df else df.iloc[0:0]
+    fav_count = len(fav)
+    payment_saved = fav["Payment"].sum() if "Payment" in df else 0.0
+    lost_count = len(lost)
+    lost_payment = lost["Payment"].sum() if "Payment" in df else 0.0
+    awaiting_count = len(awaiting)
+    awaiting_payment = awaiting["Payment"].sum() if "Payment" in df else 0.0
+    decided = fav_count + lost_count
+    win_rate = (fav_count / decided * 100) if decided else 0.0
+    st.markdown(heading)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("💳 Total Chargebacks", total)
+    c2.metric("💰 Total Payment at Risk", f"${total_payment:,.2f}")
+    c3.metric("✅ Payment Saved", f"${payment_saved:,.2f}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🏆 Won (Favourable)", f"{fav_count} ({win_rate:.1f}%)")
+    c2.metric("❌ Lost (Rejected)", f"{lost_count}")
+    c3.metric("💸 Lost Payment", f"${lost_payment:,.2f}")
+    c1, c2 = st.columns(2)
+    c1.metric("⏳ Awaiting Decision", f"{awaiting_count}")
+    c2.metric("⏳ Payment Pending Decision", f"${awaiting_payment:,.2f}")
+
+
+def _chargeback_for_period(month=None, year=None, start_year=None, end_year=None) -> pd.DataFrame:
+    data = load_chargeback()
+    if data.empty or "_Chargeback_dt" not in data.columns:
+        return data
+    dt = data["_Chargeback_dt"]
+    if start_year and end_year:
+        mask = (dt.dt.year >= start_year) & (dt.dt.year <= end_year)
+    elif year:
+        mask = dt.dt.year == year
+        if month:
+            mask = mask & (dt.dt.month == month)
+    elif month:
+        mask = dt.dt.month == month
+    else:
+        return data
+    return data[mask]
+
+
+def render_chargeback_section(cb: pd.DataFrame, download_name: str) -> None:
+    if cb is None or cb.empty:
+        st.info("No chargeback data available for this period.")
+        return
+    render_chargeback_stats(cb, "### 📊 Chargeback Statistics")
+    disp = cb.drop(columns=[c for c in ["_Chargeback_dt"] if c in cb.columns])
+    disp.index = range(1, len(disp) + 1)
+    st.markdown("### 📄 Chargeback Records")
+    st.dataframe(disp)
+    download_excel_button(disp, download_name)
 
 
 # ---------------------------------------------------------------------------
@@ -1898,6 +1990,10 @@ def render_month_summary_report(data: dict, title: str, excel_filename: str, pdf
         st.metric("A+ Count", f"{a_plus} Published")
 
     st.divider()
+    st.markdown('<h2 class="section-header">💳 Chargeback Analytics</h2>', unsafe_allow_html=True)
+    render_chargeback_section(data.get("chargeback"), f"Chargeback_{excel_filename}")
+
+    st.divider()
     st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
 
     summary_col1, summary_col2, summary_col3 = st.columns(3)
@@ -2170,6 +2266,10 @@ def render_year_summary_report(data: dict, title: str, excel_filename: str, pdf_
         st.metric("A+ Count", f"{a_plus} Published")
 
     st.divider()
+    st.markdown('<h2 class="section-header">💳 Chargeback Analytics</h2>', unsafe_allow_html=True)
+    render_chargeback_section(data.get("chargeback"), f"Chargeback_{excel_filename}")
+
+    st.divider()
     st.markdown('<h2 class="section-header">📈 Executive Summary</h2>', unsafe_allow_html=True)
 
     summary_col1, summary_col2, summary_col3 = st.columns(3)
@@ -2212,7 +2312,7 @@ def main() -> None:
             st.success("Fetched new data")
         action = st.selectbox("What would you like to do?",
                               ["View Data", "Printing", "Copyright", "Generate Similarity",
-                               "Summary", "Year Summary", "Custom Summary", "Reviews", "Sales", "ISBN"],
+                               "Summary", "Year Summary", "Custom Summary", "Reviews", "Sales", "ISBN", "Chargeback"],
                               index=None,
                               placeholder="Select Action")
 
@@ -3171,6 +3271,92 @@ def main() -> None:
                         st.dataframe(filtered_df)
                 else:
                     st.error("Brand column not found in dataset.")
+
+        elif action == "Chargeback":
+            st.title("💳 Chargeback")
+            tab_all, tab_month, tab_year, tab_brand = st.tabs(
+                ["All", "Monthly", "Yearly", "Brand-wise"])
+
+            with tab_all:
+                data = load_chargeback()
+                if data.empty:
+                    st.warning("⚠️ No Chargeback data available.")
+                else:
+                    render_chargeback_stats(data, "### 📊 Overall Chargeback Statistics")
+                    st.markdown("### 📄 All Chargeback Records")
+                    disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
+                    disp.index = range(1, len(disp) + 1)
+                    st.dataframe(disp)
+                    download_excel_button(disp, "Chargeback.xlsx")
+
+            with tab_month:
+                selected_month = st.selectbox("Select Month", month_list, index=current_month - 1,
+                                              placeholder="Select Month", key="chargeback_month")
+                number = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                         value=current_year, step=1, key="chargeback_month_year")
+                selected_month_number = month_list.index(selected_month) + 1 if selected_month else None
+                if selected_month and number:
+                    data = load_chargeback()
+                    if "_Chargeback_dt" in data.columns:
+                        data = data[(data["_Chargeback_dt"].dt.month == selected_month_number) &
+                                    (data["_Chargeback_dt"].dt.year == number)]
+                    if data.empty:
+                        st.warning(f"⚠️ No Chargeback data for {selected_month} {number}.")
+                    else:
+                        render_chargeback_stats(
+                            data, f"### 📊 Chargeback Statistics — {selected_month} {number}")
+                        st.markdown("### 📄 Records")
+                        disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
+                        disp.index = range(1, len(disp) + 1)
+                        st.dataframe(disp)
+
+            with tab_year:
+                number2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1, key="chargeback_year")
+                data = load_chargeback()
+                if "_Chargeback_dt" in data.columns:
+                    data = data[data["_Chargeback_dt"].dt.year == number2]
+                if data.empty:
+                    st.warning(f"⚠️ No Chargeback data for {number2}.")
+                else:
+                    render_chargeback_stats(data, f"### 📊 Chargeback Statistics — {number2}")
+                    st.markdown("### 📄 Records")
+                    disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
+                    disp.index = range(1, len(disp) + 1)
+                    st.dataframe(disp)
+
+            with tab_brand:
+                data = load_chargeback()
+                if data.empty or "Brand" not in data.columns:
+                    st.warning("⚠️ No Chargeback data available.")
+                else:
+                    rows = []
+                    for brand, grp in data.groupby("Brand"):
+                        total = len(grp)
+                        total_payment = grp["Payment"].sum()
+                        fav = grp[grp["Favourable"]]
+                        lost = grp[grp["Lost"]]
+                        payment_saved = fav["Payment"].sum()
+                        lost_payment = lost["Payment"].sum()
+                        rows.append({
+                            "Brand": brand,
+                            "Chargebacks": total,
+                            "Payment at Risk": f"${total_payment:,.2f}",
+                            "Won": len(fav),
+                            "Payment Saved": f"${payment_saved:,.2f}",
+                            "Lost": len(lost),
+                            "Lost Payment": f"${lost_payment:,.2f}",
+                        })
+                    summary = pd.DataFrame(rows).sort_values(by="Payment Saved", ascending=False)
+                    summary.index = range(1, len(summary) + 1)
+                    summary.index.name = "#"
+                    st.markdown("### 🏷️ Brand-wise Breakdown")
+                    st.dataframe(summary)
+                    download_excel_button(summary, "Chargeback_Brandwise.xlsx")
+                    st.markdown("### 📄 All Records")
+                    disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
+                    disp.index = range(1, len(disp) + 1)
+                    st.dataframe(disp)
 
 
 if __name__ == '__main__':
