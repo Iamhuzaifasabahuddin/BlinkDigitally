@@ -90,7 +90,8 @@ name_usa = {
     "Wadia Salman Ghouri": "wadia.ghouri@topsoftdigitals.pk",
     "Asna Misbah": "asna.misbah@topsoftdigitals.pk",
     "Shafi Jafri": "shafi.jafri@topsoftdigitals.pk",
-    "Irfan Mansoori": "irfan.mansoori@topsoftdigitals.pk"
+    "Irfan Mansoori": "irfan.mansoori@topsoftdigitals.pk",
+    "Wasif Khan": "wasif.khan@topsoftdigitals.pk"
 
 }
 
