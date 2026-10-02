@@ -91,7 +91,11 @@ name_usa = {
     "Asna Misbah": "asna.misbah@topsoftdigitals.pk",
     "Shafi Jafri": "shafi.jafri@topsoftdigitals.pk",
     "Irfan Mansoori": "irfan.mansoori@topsoftdigitals.pk",
-    "Wasif Khan": "wasif.khan@topsoftdigitals.pk"
+    "Wasif Khan": "wasif.khan@",
+    "Faisal Azizi": "faisal.azizi@topsoftdigitals.pk",
+    "Muhammad Mubashir": "muhammad.mubashir@topsoftdigitals.pk",
+    "Muhammad Mujtaba": "muhammad.mujtaba@topsoftdigitals.pk",
+    "Yumna Sajid": "yumna.sajid@topsoftdigitals.pk"
 
 }
 
