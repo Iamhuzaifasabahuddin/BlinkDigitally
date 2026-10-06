@@ -53,6 +53,7 @@ sheet_a_plus = "A_plus"
 sheet_sales = "Sales"
 sheet_nielsen = "Nielsen ISBN"
 sheet_chargeback = "Chargeback"
+sheet_other_charges = "other_charges"
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1296,6 +1297,109 @@ def nielsen_isbn() -> pd.DataFrame:
     return clean_data(data, truncate_at="Author")
 
 
+def load_other_charges() -> pd.DataFrame:
+    """Load Other Charges sheet (Service Name, Category, Client, Date, Year, Country, Quantity, Total)."""
+    for name in [sheet_other_charges, "Other Charges", "Other_charges"]:
+        try:
+            data = get_sheet_data(name)
+        except Exception:
+            continue
+        if not data.empty:
+            break
+    else:
+        return pd.DataFrame()
+    if data.empty:
+        return data
+    data.columns = [c.strip() for c in data.columns]
+    if "Quantity" in data.columns:
+        data["Quantity"] = pd.to_numeric(
+            data["Quantity"].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0)
+    if "Total" in data.columns:
+        data["Total"] = data["Total"].apply(_parse_money)
+    if "Date" in data.columns:
+        fixed = data["Date"].astype(str).str.replace("Novemeber", "November", case=False, regex=False)
+        data["_Other_dt"] = pd.to_datetime(fixed, format=DATE_FORMAT, errors="coerce")
+        missing = data["_Other_dt"].isna()
+        if missing.any():
+            data.loc[missing, "_Other_dt"] = pd.to_datetime(fixed[missing], errors="coerce")
+    for col in ("Category", "Client", "Country"):
+        if col in data.columns:
+            data[col] = data[col].astype(str).str.strip().replace({"nan": "", "None": "", "N/A": ""})
+            data[col] = data[col].replace("", "N/A")
+    return data
+
+
+def _other_charges_for_period(df: pd.DataFrame, month=None, year=None) -> pd.DataFrame:
+    if df.empty or "_Other_dt" not in df.columns:
+        return df
+    dt = df["_Other_dt"]
+    if month and year:
+        mask = (dt.dt.month == month) & (dt.dt.year == year)
+    elif year:
+        mask = dt.dt.year == year
+        if "Year" in df.columns:  # fall back to Year col for unparsable dates
+            mask = mask | (pd.to_numeric(df["Year"], errors="coerce") == year)
+    else:
+        return df
+    return df[mask]
+
+
+def render_other_charges_stats(df: pd.DataFrame, heading: str = "### 📊 Other Charges Statistics") -> None:
+    total = len(df)
+    amount = df["Total"].sum() if "Total" in df else 0.0
+    qty = df["Quantity"].sum() if "Quantity" in df else 0
+    clients = df["Client"].nunique() if "Client" in df else 0
+    cats = df["Category"].nunique() if "Category" in df else 0
+    st.markdown(heading)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🧾 Total Records", total)
+    c2.metric("💰 Total Amount", f"${amount:,.2f}")
+    c3.metric("🔢 Total Quantity", f"{qty:,.2f}")
+    c1, c2 = st.columns(2)
+    c1.metric("👥 Unique Clients", clients)
+    c2.metric("🏷️ Categories", cats)
+
+
+def other_charges_breakdown(df: pd.DataFrame, by: str) -> pd.DataFrame:
+    """Group by Category/Client/Country: records, quantity, amount."""
+    if df.empty or by not in df.columns:
+        return pd.DataFrame()
+    out = df.groupby(by, dropna=False).agg(
+        Records=("Total", "size") if "Total" in df else ("Client", "size"),
+        Total_Quantity=("Quantity", "sum") if "Quantity" in df else ("Records", "size"),
+        Total_Amount=("Total", "sum") if "Total" in df else ("Records", "size"),
+    ).reset_index().rename(columns={"Total_Quantity": "Total Quantity", "Total_Amount": "Total Amount"})
+    out = out.sort_values(by="Total Amount", ascending=False)
+    out["Total Amount"] = out["Total Amount"].map("${:,.2f}".format)
+    out.index = range(1, len(out) + 1)
+    return out
+
+
+def filter_other_charges(df: pd.DataFrame, text_q="", categories=None, countries=None,
+                         clients=None, min_amt=None, max_amt=None) -> pd.DataFrame:
+    """Multi-filter: text on Service Name/Client + category/country/client lists + Total range."""
+    out = df
+    if text_q and text_q.strip():
+        q = text_q.strip()
+        mask = pd.Series(False, index=out.index)
+        for c in ("Service Name", "Client", "Category"):
+            if c in out.columns:
+                mask = mask | out[c].astype(str).str.contains(q, case=False, na=False)
+        out = out[mask]
+    if categories and "Category" in out.columns:
+        out = out[out["Category"].isin(categories)]
+    if countries and "Country" in out.columns:
+        out = out[out["Country"].isin(countries)]
+    if clients and "Client" in out.columns:
+        out = out[out["Client"].isin(clients)]
+    if "Total" in out.columns:
+        if min_amt is not None:
+            out = out[out["Total"] >= min_amt]
+        if max_amt is not None:
+            out = out[out["Total"] <= max_amt]
+    return out
+
+
 CHARGEBACK_DATE_COLUMNS = ["Payment Date", "Chargeback Date", "Claim Submission Date",
                            "Rebuttal Date", "Result Date"]
 
@@ -1373,10 +1477,52 @@ def _chargeback_for_period(month=None, year=None, start_year=None, end_year=None
     return data[mask]
 
 
+def _chargeback_card_col(df: pd.DataFrame):
+    """Find the card-ending column (handles 'Card Ending' variants)."""
+    if "Card Ending" in df.columns:
+        return "Card Ending"
+    for c in df.columns:
+        low = c.lower()
+        if "card" in low and ("end" in low or "last" in low or "4" in low):
+            return c
+    for c in df.columns:
+        if "card" in c.lower():
+            return c
+    return None
+
+
+def filter_chargeback(df: pd.DataFrame, name_q: str = "", card_q: str = "", payment_q: str = "") -> pd.DataFrame:
+    """Filter chargeback rows by Name, Card Ending and Payment (all partial, case-insensitive)."""
+    out = df
+    if name_q and name_q.strip() and "Name" in out.columns:
+        out = out[out["Name"].astype(str).str.contains(name_q.strip(), case=False, na=False)]
+    card_col = _chargeback_card_col(out)
+    if card_q and card_q.strip() and card_col:
+        out = out[out[card_col].astype(str).str.contains(card_q.strip(), case=False, na=False)]
+    if payment_q and payment_q.strip() and "Payment" in out.columns:
+        q = payment_q.replace("$", "").replace(",", "").strip()
+        out = out[out["Payment"].astype(str).str.contains(q, case=False, na=False)]
+    return out
+
+
 def render_chargeback_section(cb: pd.DataFrame, download_name: str) -> None:
     if cb is None or cb.empty:
         st.info("No chargeback data available for this period.")
         return
+    st.markdown("### 🔍 Search Chargebacks")
+    sc1, sc2, sc3 = st.columns(3)
+    with sc1:
+        name_q = st.text_input("Search by Name", placeholder="Enter name", key=f"cb_name_{download_name}")
+    with sc2:
+        card_q = st.text_input("Search by Card Ending", placeholder="e.g. 1234", key=f"cb_card_{download_name}")
+    with sc3:
+        pay_q = st.text_input("Search by Payment", placeholder="e.g. 100", key=f"cb_pay_{download_name}")
+    if name_q or card_q or pay_q:
+        cb = filter_chargeback(cb, name_q, card_q, pay_q)
+        if cb.empty:
+            st.warning("⚠️ No results found for this search.")
+            return
+        st.success(f"✅ Found {len(cb)} result(s)")
     render_chargeback_stats(cb, "### 📊 Chargeback Statistics")
     disp = cb.drop(columns=[c for c in ["_Chargeback_dt"] if c in cb.columns])
     disp.index = range(1, len(disp) + 1)
@@ -2312,7 +2458,8 @@ def main() -> None:
             st.success("Fetched new data")
         action = st.selectbox("What would you like to do?",
                               ["View Data", "Printing", "Copyright", "Generate Similarity",
-                               "Summary", "Year Summary", "Custom Summary", "Reviews", "Sales", "ISBN", "Chargeback"],
+                               "Summary", "Year Summary", "Custom Summary", "Reviews", "Sales", "ISBN", "Chargeback",
+                               "Other Charges"],
                               index=None,
                               placeholder="Select Action")
 
@@ -3274,20 +3421,11 @@ def main() -> None:
 
         elif action == "Chargeback":
             st.title("💳 Chargeback")
-            tab_all, tab_month, tab_year, tab_brand = st.tabs(
-                ["All", "Monthly", "Yearly", "Brand-wise"])
+            tab_all, tab_month, tab_year, tab_brand, tab_search = st.tabs(
+                ["All", "Monthly", "Yearly", "Brand-wise", "Search"])
 
             with tab_all:
-                data = load_chargeback()
-                if data.empty:
-                    st.warning("⚠️ No Chargeback data available.")
-                else:
-                    render_chargeback_stats(data, "### 📊 Overall Chargeback Statistics")
-                    st.markdown("### 📄 All Chargeback Records")
-                    disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
-                    disp.index = range(1, len(disp) + 1)
-                    st.dataframe(disp)
-                    download_excel_button(disp, "Chargeback.xlsx")
+                render_chargeback_section(load_chargeback(), "Chargeback.xlsx")
 
             with tab_month:
                 selected_month = st.selectbox("Select Month", month_list, index=current_month - 1,
@@ -3357,6 +3495,151 @@ def main() -> None:
                     disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
                     disp.index = range(1, len(disp) + 1)
                     st.dataframe(disp)
+
+            with tab_search:
+                data = load_chargeback()
+                if data.empty:
+                    st.warning("⚠️ No Chargeback data available.")
+                else:
+                    s1, s2, s3 = st.columns(3)
+                    with s1:
+                        name_q = st.text_input("Search by Name", placeholder="Enter name",
+                                              key="cb_search_name")
+                    with s2:
+                        card_q = st.text_input("Search by Card Ending", placeholder="e.g. 1234",
+                                              key="cb_search_card")
+                    with s3:
+                        pay_q = st.text_input("Search by Payment", placeholder="e.g. 100",
+                                             key="cb_search_pay")
+                    if name_q or card_q or pay_q:
+                        results = filter_chargeback(data, name_q, card_q, pay_q)
+                        if results.empty:
+                            st.warning("⚠️ No results found for this search.")
+                        else:
+                            st.success(f"✅ Found {len(results)} result(s)")
+                            render_chargeback_stats(results, "### 📊 Search Results Statistics")
+                            disp = results.drop(columns=[c for c in ["_Chargeback_dt"] if c in results.columns])
+                            disp.index = range(1, len(disp) + 1)
+                            st.dataframe(disp)
+                            download_excel_button(disp, "Chargeback_Search.xlsx")
+                    else:
+                        st.info("👆 Enter name, card ending or payment above to search")
+
+        elif action == "Other Charges":
+            st.title("🧾 Other Charges")
+            tab_month, tab_year, tab_cat, tab_client, tab_search = st.tabs(
+                ["Monthly", "Yearly", "Category-wise", "Client-wise", "Search"])
+
+            with tab_month:
+                sel_month = st.selectbox("Select Month", month_list, index=current_month - 1,
+                                         key="oc_month")
+                oc_year = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1, key="oc_month_year")
+                m_no = month_list.index(sel_month) + 1 if sel_month else None
+                data = _other_charges_for_period(load_other_charges(), m_no, oc_year)
+                if data.empty:
+                    st.warning(f"⚠️ No Other Charges for {sel_month} {oc_year}.")
+                else:
+                    render_other_charges_stats(data, f"### 📊 Statistics — {sel_month} {oc_year}")
+                    st.markdown("### 🏷️ Category Breakdown")
+                    st.dataframe(other_charges_breakdown(data, "Category"))
+                    disp = data.drop(columns=[c for c in ["_Other_dt"] if c in data.columns])
+                    disp.index = range(1, len(disp) + 1)
+                    show = disp.copy()
+                    if "Total" in show.columns:
+                        show["Total"] = show["Total"].map("${:,.2f}".format)
+                    st.markdown("### 📄 Records")
+                    st.dataframe(show)
+                    download_excel_button(disp, f"OtherCharges_{sel_month}_{oc_year}.xlsx")
+
+            with tab_year:
+                oc_year2 = st.number_input("Enter Year", min_value=int(get_min_year()), max_value=current_year,
+                                          value=current_year, step=1, key="oc_year")
+                data = _other_charges_for_period(load_other_charges(), None, oc_year2)
+                if data.empty:
+                    st.warning(f"⚠️ No Other Charges for {oc_year2}.")
+                else:
+                    render_other_charges_stats(data, f"### 📊 Statistics — {oc_year2}")
+                    st.markdown("### 🏷️ Category Breakdown")
+                    st.dataframe(other_charges_breakdown(data, "Category"))
+                    st.markdown("### 👥 Client Breakdown")
+                    st.dataframe(other_charges_breakdown(data, "Client"))
+                    disp = data.drop(columns=[c for c in ["_Other_dt"] if c in data.columns])
+                    disp.index = range(1, len(disp) + 1)
+                    show = disp.copy()
+                    if "Total" in show.columns:
+                        show["Total"] = show["Total"].map("${:,.2f}".format)
+                    st.markdown("### 📄 Records")
+                    st.dataframe(show)
+                    download_excel_button(disp, f"OtherCharges_{oc_year2}.xlsx")
+
+            with tab_cat:
+                data = load_other_charges()
+                if data.empty:
+                    st.warning("⚠️ No Other Charges data available.")
+                else:
+                    render_other_charges_stats(data, "### 📊 Overall Statistics")
+                    st.markdown("### 🏷️ Category-wise Breakdown")
+                    st.dataframe(other_charges_breakdown(data, "Category"))
+                    download_excel_button(other_charges_breakdown(data, "Category"),
+                                          "OtherCharges_Categorywise.xlsx")
+
+            with tab_client:
+                data = load_other_charges()
+                if data.empty:
+                    st.warning("⚠️ No Other Charges data available.")
+                else:
+                    render_other_charges_stats(data, "### 📊 Overall Statistics")
+                    st.markdown("### 👥 Client-wise Breakdown")
+                    st.dataframe(other_charges_breakdown(data, "Client"))
+                    download_excel_button(other_charges_breakdown(data, "Client"),
+                                          "OtherCharges_Clientwise.xlsx")
+
+            with tab_search:
+                data = load_other_charges()
+                if data.empty:
+                    st.warning("⚠️ No Other Charges data available.")
+                else:
+                    q = st.text_input("Search Service / Client", placeholder="e.g. Animation, Richard Vane",
+                                      key="oc_search_text")
+                    f1, f2, f3 = st.columns(3)
+                    with f1:
+                        cats = sorted(data["Category"].dropna().unique().tolist()) if "Category" in data else []
+                        sel_cats = st.multiselect("Filter by Category", cats, key="oc_search_cat")
+                    with f2:
+                        ctys = sorted(data["Country"].dropna().unique().tolist()) if "Country" in data else []
+                        sel_ctys = st.multiselect("Filter by Country", ctys, key="oc_search_cty")
+                    with f3:
+                        clis = sorted(data["Client"].dropna().unique().tolist()) if "Client" in data else []
+                        sel_clis = st.multiselect("Filter by Client", clis, key="oc_search_cli")
+                    a1, a2 = st.columns(2)
+                    with a1:
+                        min_amt = st.number_input("Min Total ($)", min_value=0.0, value=0.0, step=1.0,
+                                                  key="oc_min_amt")
+                    with a2:
+                        max_amt = st.number_input("Max Total ($, 0 = no limit)", min_value=0.0, value=0.0,
+                                                  step=1.0, key="oc_max_amt")
+                    results = filter_other_charges(
+                        data, q, sel_cats, sel_ctys, sel_clis,
+                        min_amt if min_amt > 0 else None,
+                        max_amt if max_amt > 0 else None)
+                    if q or sel_cats or sel_ctys or sel_clis or min_amt > 0 or max_amt > 0:
+                        if results.empty:
+                            st.warning("⚠️ No results found for these filters.")
+                        else:
+                            st.success(f"✅ Found {len(results)} result(s)")
+                            render_other_charges_stats(results, "### 📊 Search Results Statistics")
+                            st.markdown("### 🏷️ Category Breakdown")
+                            st.dataframe(other_charges_breakdown(results, "Category"))
+                            disp = results.drop(columns=[c for c in ["_Other_dt"] if c in results.columns])
+                            disp.index = range(1, len(disp) + 1)
+                            show = disp.copy()
+                            if "Total" in show.columns:
+                                show["Total"] = show["Total"].map("${:,.2f}".format)
+                            st.dataframe(show)
+                            download_excel_button(disp, "OtherCharges_Search.xlsx")
+                    else:
+                        st.info("👆 Use search or filters above (they combine)")
 
 
 if __name__ == '__main__':
