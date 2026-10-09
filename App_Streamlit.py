@@ -3485,12 +3485,12 @@ def main() -> None:
                             "Lost": len(lost),
                             "Lost Payment": f"${lost_payment:,.2f}",
                         })
-                    summary = pd.DataFrame(rows).sort_values(by="Payment Saved", ascending=False)
-                    summary.index = range(1, len(summary) + 1)
-                    summary.index.name = "#"
+                    brand_summary = pd.DataFrame(rows).sort_values(by="Payment Saved", ascending=False)
+                    brand_summary.index = range(1, len(brand_summary) + 1)
+                    brand_summary.index.name = "#"
                     st.markdown("### 🏷️ Brand-wise Breakdown")
-                    st.dataframe(summary)
-                    download_excel_button(summary, "Chargeback_Brandwise.xlsx")
+                    st.dataframe(brand_summary)
+                    download_excel_button(brand_summary, "Chargeback_Brandwise.xlsx")
                     st.markdown("### 📄 All Records")
                     disp = data.drop(columns=[c for c in ["_Chargeback_dt"] if c in data.columns])
                     disp.index = range(1, len(disp) + 1)
